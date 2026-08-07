@@ -33,6 +33,7 @@ class User:
     permission_version: int
     status: UserStatus
     created_at: datetime
+    is_platform_admin: bool = False
 
     def ensure_can_authenticate(self) -> None:
         """Raise if this user is not allowed to start a new session.

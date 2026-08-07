@@ -37,6 +37,26 @@ class TenantNotActiveError(IdentityDomainError):
         self.status = status
 
 
+class InvalidTenantStatusTransitionError(IdentityDomainError):
+    error_code = "INVALID_TENANT_STATUS_TRANSITION"
+
+    def __init__(self, tenant_id: str, from_status: str, to_status: str) -> None:
+        super().__init__(
+            f"Tenant '{tenant_id}' cannot transition from '{from_status}' to '{to_status}'."
+        )
+        self.tenant_id = tenant_id
+        self.from_status = from_status
+        self.to_status = to_status
+
+
+class TenantLegalNameConflictError(IdentityDomainError):
+    error_code = "TENANT_LEGAL_NAME_CONFLICT"
+
+    def __init__(self, legal_name: str) -> None:
+        super().__init__(f"A tenant with legal name '{legal_name}' already exists.")
+        self.legal_name = legal_name
+
+
 class UserNotFoundError(IdentityDomainError):
     error_code = "USER_NOT_FOUND"
 
@@ -90,3 +110,33 @@ class InvalidEmailAddressError(IdentityDomainError):
     def __init__(self, value: str) -> None:
         super().__init__(f"'{value}' is not a valid email address.")
         self.value = value
+
+
+class InvalidAccessTokenError(IdentityDomainError):
+    """Raised by auth middleware when an access token is missing, malformed,
+    expired, or its ``permission_version`` no longer matches the live value
+    (Technical Architecture v2.0 Group C)."""
+
+    error_code = "INVALID_ACCESS_TOKEN"
+
+    def __init__(self, reason: str = "Access token is missing, invalid, or expired.") -> None:
+        super().__init__(reason)
+
+
+class InsufficientPrivilegesError(IdentityDomainError):
+    """Raised when an authenticated caller lacks the privilege a
+    (temporary, non-RBAC — see modules/identity/README.md) endpoint
+    requires, e.g. platform-admin-only tenant lifecycle operations."""
+
+    error_code = "INSUFFICIENT_PRIVILEGES"
+
+    def __init__(self) -> None:
+        super().__init__("This action requires platform administrator privileges.")
+
+
+class SubscriptionNotFoundError(IdentityDomainError):
+    error_code = "SUBSCRIPTION_NOT_FOUND"
+
+    def __init__(self, tenant_id: str) -> None:
+        super().__init__(f"Tenant '{tenant_id}' has no subscription.")
+        self.tenant_id = tenant_id
