@@ -289,6 +289,14 @@ class SQLAlchemySessionRepository:
         )
         await self._session.execute(stmt)
 
+    async def revoke_all_for_tenant(self, tenant_id: str) -> None:
+        stmt = (
+            update(SessionModel)
+            .where(SessionModel.tenant_id == tenant_id, SessionModel.revoked_at.is_(None))
+            .values(revoked_at=datetime.now(UTC))
+        )
+        await self._session.execute(stmt)
+
 
 class SQLAlchemySubscriptionRepository:
     """Implements ``SubscriptionRepository``."""

@@ -40,3 +40,14 @@ class SessionRepository(Protocol):
         ``UserRepository.bump_permission_version``.
         """
         ...
+
+    async def revoke_all_for_tenant(self, tenant_id: str) -> None:
+        """Revoke every active session across every user in a tenant.
+
+        Sprint 4.1: backs tenant suspension/offboarding (Data
+        Architecture v2.0 SS4.5 — "the Auth layer rejects new sessions
+        immediately"). Distinct from ``revoke_all_for_user`` because a
+        tenant-wide revoke must not require enumerating that tenant's
+        users first.
+        """
+        ...
