@@ -1,4 +1,16 @@
+from restaurant_os_api.modules.identity.application.use_cases.get_subscription_status import (
+    GetSubscriptionStatusUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.get_tenant import GetTenantUseCase
+from restaurant_os_api.modules.identity.application.use_cases.get_tenant_quota_usage import (
+    GetTenantQuotaUsageUseCase,
+)
+from restaurant_os_api.modules.identity.application.use_cases.get_tenant_settings import (
+    GetTenantSettingsUseCase,
+)
+from restaurant_os_api.modules.identity.application.use_cases.list_feature_flags import (
+    ListFeatureFlagsUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.list_tenants import (
     ListTenantsUseCase,
 )
@@ -26,12 +38,19 @@ from restaurant_os_api.modules.identity.application.use_cases.suspend_tenant imp
 from restaurant_os_api.modules.identity.application.use_cases.update_tenant import (
     UpdateTenantUseCase,
 )
+from restaurant_os_api.modules.identity.application.use_cases.update_tenant_settings import (
+    UpdateTenantSettingsUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.verify_access_token import (
     VerifyAccessTokenUseCase,
 )
 
 __all__ = [
+    "GetSubscriptionStatusUseCase",
+    "GetTenantQuotaUsageUseCase",
+    "GetTenantSettingsUseCase",
     "GetTenantUseCase",
+    "ListFeatureFlagsUseCase",
     "ListTenantsUseCase",
     "LoginUserUseCase",
     "LogoutUserUseCase",
@@ -40,6 +59,7 @@ __all__ = [
     "ReactivateTenantUseCase",
     "RefreshAccessTokenUseCase",
     "SuspendTenantUseCase",
+    "UpdateTenantSettingsUseCase",
     "UpdateTenantUseCase",
     "VerifyAccessTokenUseCase",
 ]

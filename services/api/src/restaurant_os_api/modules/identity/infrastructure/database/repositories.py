@@ -241,6 +241,18 @@ class SQLAlchemyUserRepository:
         result = await self._session.execute(stmt)
         return result.scalar_one()
 
+    async def count_active_for_tenant(self, tenant_id: str) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(UserModel)
+            .where(
+                UserModel.tenant_id == tenant_id,
+                UserModel.status == "active",
+                UserModel.deleted_at.is_(None),
+            )
+        )
+        return (await self._session.execute(stmt)).scalar_one()
+
 
 class SQLAlchemySessionRepository:
     """Implements ``SessionRepository``."""

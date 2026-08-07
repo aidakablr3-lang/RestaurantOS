@@ -32,3 +32,11 @@ class UserRepository(Protocol):
         follow-up PR) has a stable contract to implement against.
         """
         ...
+
+    async def count_active_for_tenant(self, tenant_id: str) -> int:
+        """Count active (not deactivated, not soft-deleted) users in a
+        tenant. Sprint 4.1: backs quota-usage reporting — the one
+        dimension of "current usage" this module can actually measure
+        today, since Branch/Order don't exist yet (see
+        ``GetTenantQuotaUsageUseCase``)."""
+        ...
