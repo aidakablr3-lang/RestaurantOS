@@ -259,34 +259,10 @@ class TenantDirectoryEntryModel(Base):
     )
 
 
-class OutboxEventModel(Base, ULIDPrimaryKeyMixin):
-    """Technical Architecture v2.0 Group B / Data Architecture v2.0 SS5.11.
-
-    Deliberately carries no foreign keys to any business table — an
-    outbox insert must never fail because of an unrelated constraint on
-    a table it doesn't even need to join to. ``tenant_id`` is a plain
-    column for the same reason, not a FK.
-    """
-
-    __tablename__ = "outbox_events"
-    __table_args__ = (
-        ulid_check_constraint("id"),
-        Index(
-            "ix_outbox_events_dispatched_at",
-            "dispatched_at",
-            postgresql_where="dispatched_at IS NULL",
-        ),
-    )
-
-    tenant_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
-    aggregate_type: Mapped[str] = mapped_column(Text, nullable=False)
-    aggregate_id: Mapped[str] = mapped_column(Text, nullable=False)
-    event_type: Mapped[str] = mapped_column(Text, nullable=False)
-    event_version: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default="1")
-    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        TimestampType(timezone=True), server_default=func.now(), nullable=False
-    )
-    dispatched_at: Mapped[datetime | None] = mapped_column(
-        TimestampType(timezone=True), nullable=True, default=None
-    )
+# Note: OutboxEventModel is NOT defined here. It is genuinely
+# cross-module, shared-kernel infrastructure (every future module writes
+# its own domain events to the same table) — it lives in
+# platform/outbox/models.py, not inside a specific module's
+# Infrastructure layer. It shares this file's ``outbox_events`` table
+# (created by this same migration) but is registered on ``Base.metadata``
+# from its own home in ``platform``.

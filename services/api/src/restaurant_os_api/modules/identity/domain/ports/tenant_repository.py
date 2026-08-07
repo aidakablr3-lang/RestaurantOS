@@ -18,11 +18,17 @@ class TenantRepository(Protocol):
 
     async def get_by_legal_name(self, legal_name: str) -> Tenant | None:
         """Used by onboarding to reject a duplicate legal name before
-        attempting an insert — a friendlier failure than a raw
-        constraint violation, and the check a real uniqueness constraint
-        backs at the database layer regardless (belt-and-suspenders,
-        consistent with Data Architecture v2.0's isolation philosophy
-        applied here to data quality, not tenant isolation)."""
+        attempting an insert.
+
+        Correction from this port's first draft: this is an
+        application-level check only — the migration deliberately does
+        not add a database-level unique constraint on ``legal_name``,
+        since two distinct, legitimately-named businesses coinciding is
+        plausible and not something the schema should hard-block. If
+        this check ever needs to be race-proof, that's a real,
+        separate design decision (e.g., an advisory lock around
+        onboarding), not something to bolt on silently.
+        """
         ...
 
     async def create(self, tenant: Tenant) -> Tenant: ...

@@ -19,6 +19,7 @@ from restaurant_os_api.modules.identity.infrastructure.database import (  # noqa
     models as identity_models,
 )
 from restaurant_os_api.platform.database import Base
+from restaurant_os_api.platform.outbox import models as outbox_models  # noqa: F401
 
 config = context.config
 
