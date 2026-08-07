@@ -1,0 +1,200 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, "feature/**"]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHON_VERSION: "3.13"
+  NODE_VERSION: "20"
+  # Dev-only, never used against a real database or real users -- see
+  # infrastructure/docker/dev-jwt/README.md for why a fixed keypair is
+  # safe to commit at all. CI generates its own throwaway pair per run
+  # instead of reusing that file, since a workflow run is exactly the
+  # kind of place a leaked "dev" secret could get scraped from logs.
+  JWT_ISSUER: restaurantos-ci
+
+jobs:
+  backend-lint:
+    name: Backend / lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e ".[dev]"
+        working-directory: services/api
+      - run: ruff format --check .
+        working-directory: services/api
+      - run: ruff check .
+        working-directory: services/api
+
+  backend-typecheck:
+    name: Backend / type check (advisory)
+    runs-on: ubuntu-latest
+    # Non-blocking: 5 pre-existing mypy findings predate this workflow
+    # (see docs/AI_HANDOFF.md) and fixing them is an application-code
+    # change outside Step 5's release-hardening scope. Reporting here
+    # keeps them visible without gating merges on a pre-existing gap.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e ".[dev]"
+        working-directory: services/api
+      - run: mypy src/
+        working-directory: services/api
+
+  backend-test:
+    name: Backend / unit + integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: restaurantos
+          POSTGRES_PASSWORD: restaurantos
+          POSTGRES_DB: restaurantos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U restaurantos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e ".[dev]"
+        working-directory: services/api
+      - name: Generate a throwaway RS256 keypair for this run
+        run: |
+          openssl genrsa -out /tmp/ci_jwt_private.pem 2048
+          openssl rsa -in /tmp/ci_jwt_private.pem -pubout -out /tmp/ci_jwt_public.pem
+          {
+            echo "JWT_PRIVATE_KEY<<EOF"
+            cat /tmp/ci_jwt_private.pem
+            echo "EOF"
+            echo "JWT_PUBLIC_KEY<<EOF"
+            cat /tmp/ci_jwt_public.pem
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+      - name: Run full backend suite (unit + integration)
+        working-directory: services/api
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://restaurantos:restaurantos@localhost:5432/restaurantos_test
+        run: python -m pytest tests/ -v
+
+  frontend:
+    name: Frontend / typecheck, lint, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/admin-web/package-lock.json
+      - run: npm ci
+        working-directory: apps/admin-web
+      - run: npx tsc --noEmit
+        working-directory: apps/admin-web
+      - run: npx eslint .
+        working-directory: apps/admin-web
+      - run: npm run build
+        working-directory: apps/admin-web
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: restaurantos
+          POSTGRES_PASSWORD: restaurantos
+          POSTGRES_DB: restaurantos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U restaurantos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e ".[dev]"
+        working-directory: services/api
+
+      - name: Generate a throwaway RS256 keypair for this run
+        run: |
+          openssl genrsa -out /tmp/ci_jwt_private.pem 2048
+          openssl rsa -in /tmp/ci_jwt_private.pem -pubout -out /tmp/ci_jwt_public.pem
+          {
+            echo "JWT_PRIVATE_KEY<<EOF"
+            cat /tmp/ci_jwt_private.pem
+            echo "EOF"
+            echo "JWT_PUBLIC_KEY<<EOF"
+            cat /tmp/ci_jwt_public.pem
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: Migrate and start the backend
+        working-directory: services/api
+        env:
+          DATABASE_URL: postgresql+asyncpg://restaurantos:restaurantos@localhost:5432/restaurantos
+          CORS_ALLOWED_ORIGINS: http://localhost:3000
+          APP_ENV: development
+        run: |
+          python -m alembic upgrade head
+          python -m uvicorn restaurant_os_api.main:app --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/health/live && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8000/health/live
+
+      - name: Seed the E2E platform-admin fixture
+        working-directory: services/api
+        env:
+          DATABASE_URL: postgresql+asyncpg://restaurantos:restaurantos@localhost:5432/restaurantos
+        run: |
+          python scripts/seed_e2e_fixtures.py | tee /tmp/seed_output.txt
+          echo "E2E_ADMIN_TENANT_ID=$(grep -oP 'E2E_TENANT_ID=\K.*' /tmp/seed_output.txt)" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/admin-web/package-lock.json
+      - run: npm ci
+        working-directory: apps/admin-web
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/admin-web
+
+      - name: Run Playwright E2E suite
+        working-directory: apps/admin-web
+        env:
+          CI: "true"
+          E2E_API_BASE_URL: http://localhost:8000
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/admin-web/playwright-report/
+          retention-days: 7
