@@ -7,7 +7,9 @@ Every module's presentation router is added here the same way.
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from restaurant_os_api.core.config import get_settings
 from restaurant_os_api.core.exceptions import register_exception_handlers
 from restaurant_os_api.modules.identity.presentation.api.v1.admin_tenant_router import (
     router as admin_tenant_router,
@@ -22,6 +24,19 @@ from restaurant_os_api.modules.identity.presentation.api.v1.self_service_tenant_
 
 def create_app() -> FastAPI:
     app = FastAPI(title="RestaurantOS API", version="0.1.0")
+
+    # Every client (admin-web, customer-ordering, kitchen-display) is a
+    # browser app calling this API cross-origin. Auth is Bearer-token-based
+    # (Authorization header, never a cookie), so allow_credentials stays
+    # False -- no session cookie crosses origins, so there is nothing for
+    # credentialed CORS to protect here.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().cors_allowed_origins,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     register_exception_handlers(app)
 
