@@ -79,9 +79,10 @@ silently build:
   documented as a rule (Technical Architecture v2.0 §2.2) but not yet
   machine-enforced.
 - Secrets management beyond "GitHub Actions generates a throwaway
-  keypair per CI run" and "a committed, clearly-labeled dev-only
-  keypair for `docker compose up`" — no secrets manager, no key
-  rotation, because there's no real deployment target yet for either
-  to protect.
+  keypair per CI run" and "`docker compose up` reads a locally
+  generated, gitignored dev keypair" (see
+  `infrastructure/docker/dev-jwt/generate-dev-keys.sh`) — no secrets
+  manager, no key rotation, because there's no real deployment target
+  yet for either to protect.
 - A CHANGELOG.md / semantic version tags — no release has been cut
   yet.

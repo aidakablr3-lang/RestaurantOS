@@ -9,11 +9,11 @@ on:
 env:
   PYTHON_VERSION: "3.13"
   NODE_VERSION: "20"
-  # Dev-only, never used against a real database or real users -- see
-  # infrastructure/docker/dev-jwt/README.md for why a fixed keypair is
-  # safe to commit at all. CI generates its own throwaway pair per run
-  # instead of reusing that file, since a workflow run is exactly the
-  # kind of place a leaked "dev" secret could get scraped from logs.
+  # Every job below that needs a JWT keypair generates its own
+  # throwaway RS256 pair inline (see the "Generate a throwaway RS256
+  # keypair" steps) rather than relying on any locally-generated dev
+  # keypair -- a workflow run's logs are exactly the kind of place a
+  # leaked "dev" secret could get scraped from, so CI never reuses one.
   JWT_ISSUER: restaurantos-ci
 
 jobs:

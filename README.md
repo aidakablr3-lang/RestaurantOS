@@ -42,10 +42,11 @@ See `technical-architecture-v2.md` §3 for the full folder-structure rationale.
 ## Getting Started
 
 ```bash
+./infrastructure/docker/dev-jwt/generate-dev-keys.sh   # one-time: local-only JWT keypair, gitignored
 docker compose up
 ```
 
-Brings up PostgreSQL + the API (`services/api`), migrated and hot-reloading, on `http://localhost:8000`. Then, for the frontend:
+Brings up PostgreSQL + the API (`services/api`), migrated and hot-reloading, on `http://localhost:8000`. The dev JWT keypair is generated locally and never committed — see [`infrastructure/docker/dev-jwt/README.md`](infrastructure/docker/dev-jwt/README.md). Then, for the frontend:
 
 ```bash
 cd apps/admin-web && cp .env.local.example .env.local && npm install && npm run dev

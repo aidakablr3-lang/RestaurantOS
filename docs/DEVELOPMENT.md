@@ -19,15 +19,23 @@ Docker, for fast Fast Refresh.
 ## Option A: Docker Compose (recommended)
 
 ```bash
+./infrastructure/docker/dev-jwt/generate-dev-keys.sh   # one-time; see below
 docker compose up
 ```
 
 This builds and starts `postgres` + `api` (see `docker-compose.yml`),
 runs migrations automatically on container start, and serves the API
 on `http://localhost:8000` with hot reload (source-mounted, `uvicorn
---reload`). JWT keys are read from a committed, clearly-labeled
-dev-only keypair (`infrastructure/docker/dev-jwt/`, never used for
-anything but this) -- zero setup needed.
+--reload`).
+
+**JWT keys are generated locally, not committed.** The first command
+above creates a local-only RS256 keypair at
+`infrastructure/docker/dev-jwt/{private,public}.pem` (gitignored) that
+`docker-compose.yml` mounts into the `api` container. It's idempotent
+-- safe to run every time, it only generates a key if one doesn't
+already exist. Use `generate-dev-keys.py` instead if you don't have
+`openssl` on your `PATH` but do have Python (same output). See
+`infrastructure/docker/dev-jwt/README.md`.
 
 To also run the frontend:
 

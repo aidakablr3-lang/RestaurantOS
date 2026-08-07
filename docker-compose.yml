@@ -52,7 +52,10 @@ services:
       - "8000:8000"
     # JWT_PRIVATE_KEY/JWT_PUBLIC_KEY need real PEM content (with actual
     # newlines), which a .env file can't represent cleanly -- read from the
-    # mounted dev-only keypair at container start instead. See
+    # mounted dev-only keypair at container start instead. That keypair is
+    # generated locally, not committed -- run
+    # infrastructure/docker/dev-jwt/generate-dev-keys.sh (or .py) once
+    # before your first `docker compose up`. See
     # infrastructure/docker/dev-jwt/README.md.
     command:
       - sh
