@@ -3,7 +3,7 @@
 **Purpose:** This is the canonical handoff document for every future Claude session working on RestaurantOS. Read this file first, before touching any code, to reconstruct full project context.
 
 **Last updated:** 2026-08-07
-**Updated by:** Sprint 4.1 Step 3 session — admin-web scaffold + Tenant List/Details/Create/Edit/Suspend/Reactivate
+**Updated by:** Sprint 4.1 Step 3 session — admin-web scaffold, Tenant List/Details/Create/Edit/Suspend/Reactivate, real-backend browser verification, and 3 defect fixes found by it (1 backend, 1 CORS, 3 frontend)
 
 ---
 
@@ -13,7 +13,7 @@
 
 ## 2. Current Step
 
-**Step 3 — Frontend implementation. In progress, not yet complete, not yet presented for approval.** `apps/admin-web` is scaffolded and six of the ten originally-scoped screens are implemented and committed: Tenant List, Tenant Details, Create Tenant, Edit Tenant, Suspend Tenant, Reactivate Tenant (all with loading/error/empty states, responsive layout, dark mode, and accessible shadcn/Base UI primitives). **Scope was deliberately narrowed mid-session** — see the "Scope-down decision" note below and §11.
+**Step 3 — Frontend implementation. Built, browser-verified end-to-end against a real backend, and fixed up. Not yet formally presented to the user for the Step 3 sign-off itself.** `apps/admin-web` is scaffolded and six of the ten originally-scoped screens are implemented, committed, and verified working in a real browser against a real running `services/api` + PostgreSQL: Tenant List, Tenant Details, Create Tenant, Edit Tenant, Suspend Tenant, Reactivate Tenant. **Scope was deliberately narrowed mid-session** — see the "Scope-down decision" note below and §11 — and the user approved that narrowing explicitly.
 
 Sprint 4.1 follows a 5-step gated process, defined explicitly by the user:
 
@@ -21,15 +21,17 @@ Sprint 4.1 follows a 5-step gated process, defined explicitly by the user:
 |---|---|---|
 | 1 | Explain implementation plan, wait for approval | Complete — approved, including 3 explicit architecture-compliance decisions (see §11 Known Issues / Decisions) |
 | 2 | Implement backend, wait for approval | Complete — 7 commits, approved |
-| 3 | Implement frontend, wait for approval | **In progress** — 6/10 originally-scoped screens built (3 commits, `a76c5a9`→`fccea87`); not yet presented to the user for approval; not yet browser-verified (see §16) |
+| 3 | Implement frontend, wait for approval | **Implemented and verified; approval for the step itself has not been separately re-requested since verification finished.** 6/10 originally-scoped screens built and browser-verified (7 commits, `a76c5a9`→`012bd8b`) |
 | 4 | Testing, wait for approval | Not started |
 | 5 | Documentation, wait for approval | Not started |
 
-**Scope-down decision (this session, approved by the user):** The original Step 1 plan listed 10 admin-web screens, including Subscription Status, Quota Dashboard, Feature Flag Display, and Tenant Settings. Discovered mid-session: the backend only exposes those four as **self-service** endpoints (`/api/v1/tenants/me/*`), which resolve `tenant_id` from the caller's own JWT and structurally cannot take an admin-selected tenant ID (`self_service_tenant_router.py:1-4`, citing Data Architecture v2.0 §4.1 — tenant scope is never client-asserted). There is no admin-scoped route (e.g. `/api/v1/admin/tenants/{id}/subscription`) — the underlying use cases (`GetSubscriptionStatusUseCase`, `GetTenantQuotaUsageUseCase`, `GetTenantSettingsUseCase`, `ListFeatureFlagsUseCase`) already accept any `tenant_id` and could be wired to one, but that wiring doesn't exist yet. Presented to the user as a STOP with 3 options (add thin admin endpoints now / scope down / decide later); **user chose to scope down**. Those 4 screens are deferred, not abandoned — see §11.
+**Scope-down decision (approved by the user):** The original Step 1 plan listed 10 admin-web screens, including Subscription Status, Quota Dashboard, Feature Flag Display, and Tenant Settings. Discovered mid-session: the backend only exposes those four as **self-service** endpoints (`/api/v1/tenants/me/*`), which resolve `tenant_id` from the caller's own JWT and structurally cannot take an admin-selected tenant ID (`self_service_tenant_router.py:1-4`, citing Data Architecture v2.0 §4.1 — tenant scope is never client-asserted). There is no admin-scoped route (e.g. `/api/v1/admin/tenants/{id}/subscription`) — the underlying use cases (`GetSubscriptionStatusUseCase`, `GetTenantQuotaUsageUseCase`, `GetTenantSettingsUseCase`, `ListFeatureFlagsUseCase`) already accept any `tenant_id` and could be wired to one, but that wiring doesn't exist yet. Presented to the user as a STOP with 3 options (add thin admin endpoints now / scope down / decide later); **user chose to scope down, and explicitly reconfirmed "do not add backend endpoints for Subscription, Quota, Feature Flags, or Tenant Settings in this sprint. Treat those as future work"** when giving the verification task. Those 4 screens are deferred, not abandoned — see §11.
+
+**Real-backend browser verification (this session, user-requested as the direct follow-up to the scope-down decision):** Login, Tenant List, Tenant Details, Create Tenant, Edit Tenant, Suspend Tenant, and Reactivate Tenant were all exercised end-to-end in a real browser against a real `services/api` process backed by a real PostgreSQL 17 database (see §16, §17 for how this environment was stood up — it does not exist as committed infrastructure yet). This surfaced 3 real defects (1 backend, 1 backend CORS, 3 frontend — see §8's new subsection and §11), all fixed, each fix isolated to its own commit per the user's instruction. Not one line of new functionality was added during this pass — every change was a correction of something already in scope.
 
 ## 3. Current Milestone
 
-Backend for the Tenant Platform is complete and merged to history (not yet to `main` via PR — see §9 Current PR). Frontend (`apps/admin-web`) is scaffolded (Next.js 15.5.23 App Router, React 19, TypeScript, Tailwind v4, shadcn/ui on Base UI primitives, TanStack Query, Zustand, React Hook Form + Zod) with Tenant List/Details/Create/Edit/Suspend/Reactivate implemented against the platform-admin REST API. Not yet browser-verified in this session (tooling permission denial — see §16), not yet reviewed/approved by the user, and 4 of the original 10 screens are deferred pending a backend decision (see §2, §11).
+Backend for the Tenant Platform is complete and merged to history (not yet to `main` via PR — see §9 Current PR). Frontend (`apps/admin-web`) is scaffolded (Next.js 15.5.23 App Router, React 19, TypeScript, Tailwind v4, shadcn/ui on Base UI primitives, TanStack Query, Zustand, React Hook Form + Zod) with Tenant List/Details/Create/Edit/Suspend/Reactivate implemented against the platform-admin REST API, and now **verified working end-to-end in a real browser against a real backend**. 4 of the original 10 screens remain deferred, explicitly confirmed as future work by the user (see §2, §11).
 
 ## 4. Repository Path
 
@@ -48,17 +50,17 @@ Branch structure:
 ```
 main                                 <- renamed from master
  └── develop                         <- created from main
-      └── feature/tenant-platform-frontend   <- 3 commits ahead of develop/main (this session's admin-web work)
+      └── feature/tenant-platform-frontend   <- 7 commits ahead of develop/main (this session's admin-web work + fixes)
 ```
 
-`main` and `develop` are still at `a1f83de` (the handoff-doc commit); only `feature/tenant-platform-frontend` has this session's 3 new commits. Not yet merged up — Step 3 isn't finished or approved yet.
+`main` and `develop` are still at `a1f83de` (the handoff-doc commit); only `feature/tenant-platform-frontend` has this session's new commits. Not yet merged up — Step 3's own sign-off hasn't been separately re-requested since verification finished.
 
 ## 6. Current HEAD Commit
 
 ```
-fccea87460f1ec0e2df0ede5f5121629970a01b0
+012bd8baa2c96a623c962bcfa996797455331b23
 ```
-(short: `fccea87` — `feat(admin-web): tenant list, details, create, and edit flows`)
+(short: `012bd8b` — `fix(admin-web): defects found during real-backend browser verification`)
 
 ## 7. Working Tree Status
 
@@ -99,35 +101,50 @@ Full PR-style writeup (files changed, technical decisions, testing evidence, rol
 2. `1e0fc92` — `feat(admin-web): add authentication and API client`. `ApiResponse`/`ApiErrorResponse`-matching client types, a `fetch` wrapper (`apiClient`) that attaches the Bearer token and unwraps the envelope, a Zustand-persisted auth store, the login page (`POST /api/v1/auth/login`), and the `(admin)` route group's `AuthGuard` + app-shell layout (header, dark-mode toggle, logout).
 3. `fccea87` — `feat(admin-web): tenant list, details, create, and edit flows`. Tenant List (paginated, status filter, loading/error/empty states), Tenant Details (with gated Suspend/Reactivate behind an `AlertDialog` confirmation), Create Tenant, Edit Tenant — all against `admin_tenant_router.py`'s endpoints.
 
-Typecheck (`tsc --noEmit`), lint (`eslint`), and production build (`next build`) are all clean as of `fccea87`. **Not yet browser-verified** (see §11, §16) and **not yet presented to the user for Step 3 approval** — this handoff point is mid-step, not a step boundary.
+Typecheck (`tsc --noEmit`), lint (`eslint`), and production build (`next build`) are all clean as of `fccea87`.
+
+### Sprint 4.1, Step 3 continued — real-backend browser verification + 3 defect fixes
+
+The Browser tool (blocked by a permission classifier at the end of the previous session) worked this session. To verify against a *real* backend rather than just the UI in isolation, a full local dev stack was stood up by hand (not committed — see §17): PostgreSQL 17 (installed via winget), migrations `0001`+`0002` applied, a generated RS256 dev keypair, `services/api` run directly via `uvicorn`, and two seed tenants/platform-admin users created via a throwaway script that reuses `TenantProvisioningService` (so provisioning invariants stay correct) plus a direct `UserModel` insert (no user-creation use case exists yet — expected, see Decision C).
+
+3 commits, `07dea29` → `012bd8b`:
+
+1. `07dea29` — `fix(database): use set_config() for transaction-local tenant context`. **Critical, found immediately on first real-Postgres write.** `UnitOfWork.__aenter__` issued `SET LOCAL app.tenant_id = :tenant_id` as a bound parameter; PostgreSQL's `SET`/`SET LOCAL` statement cannot take a bind parameter at all (confirmed with a minimal asyncpg-only repro, independent of this codebase) — every tenant-scoped transaction, in every module, would have failed the same way. Fixed to `SELECT set_config('app.tenant_id', :tenant_id, true)`, identical transaction-local semantics. User explicitly approved this as a "genuine production defect" before it was touched. Adds `tests/integration/platform/test_unit_of_work.py` (2 tests, requires `TEST_DATABASE_URL`) — verified by hand (git-stash the fix, confirm the tests reproduce the original error; restore the fix, confirm they pass) that they're a real regression test, since running them via `pytest` also surfaces a *separate*, pre-existing, out-of-scope bug: `tests/integration/conftest.py`'s `engine` fixture calls `asyncio.run()` from inside an already-running async fixture, which blocks the *entire* integration suite from executing in this environment. Not fixed (unrelated), disclosed here and in §11/§16.
+2. `6e50f68` — `fix(api): add CORS middleware so browser clients can call the API`. **Second defect, found immediately after fixing #1: admin-web's login request never reached the backend at all.** The app had no `CORSMiddleware`; every browser's preflight `OPTIONS` request got `405 Method Not Allowed` with no `Access-Control-Allow-Origin` header, so the browser blocked the real request before it was ever sent. Added `Settings.cors_allowed_origins` (env `CORS_ALLOWED_ORIGINS`, defaults to admin-web's dev origin), `allow_credentials=False` (Bearer-token auth, never cookies, so nothing for credentialed CORS to protect). Adds `tests/unit/core/test_config.py` and `tests/unit/test_main.py` (TestClient preflight tests); required adding `httpx` as a dev dependency.
+3. `012bd8b` — `fix(admin-web): defects found during real-backend browser verification`. Three frontend-only defects found by actually clicking through the app against real data: (a) tenant status values assumed uppercase (`"ACTIVE"`) but the backend's domain `TenantStatus` StrEnum serializes lowercase (`"active"`, plus `"provisioning"`/`"migrating"` the frontend type didn't even have) — this silently hid the Suspend/Reactivate buttons entirely, since neither status comparison ever matched; (b) the Edit Tenant form never pre-filled — `useForm`'s `values` option was given a fresh object literal every render and never took effect, replaced with the standard `defaultValues` + `useEffect` + `form.reset()` pattern; (c) every `Button` rendered as a `Link` logged a Base UI console warning (`nativeButton` defaults `true`, needs explicit `false` when rendering an `<a>` instead of a `<button>`).
+
+All 7 flows (Login, Tenant List, Tenant Details, Create, Edit, Suspend, Reactivate) confirmed working post-fix via the Browser tool against the real stack; dark mode toggle confirmed; all four tenant pages confirmed free of console errors on a fresh load. No new functionality was added at any point in this pass — every change was a correction.
 
 ## 9. Current Work
 
-Sprint 4.1 Step 3 (Tenant Platform frontend), scoped down mid-session — see §2's "Scope-down decision". 6 of the original 10 screens are built; 4 are deferred pending a backend decision. No backend or architecture files were touched this session.
+Sprint 4.1 Step 3 (Tenant Platform frontend) is implemented and browser-verified end-to-end against a real backend. 6 of the original 10 screens are built and verified; 4 remain explicitly deferred as future work per the user's decision (§2). No architecture files were touched this session; the two backend changes (`07dea29`, `6e50f68`) were both pre-approved, isolated, critical-bug fixes, not scope changes.
 
 ## 10. Next Task
 
 In priority order:
 
-1. **Get this session's frontend work reviewed and approved by the user** (per Step 3's own gate) before treating it as done — it has not been presented for approval yet.
-2. **Browser-verify the app for real.** This session could not open the Browser pane (`preview_start` was denied twice by the harness's permission classifier — see §11). The dev server itself boots cleanly (`npm run dev` in `apps/admin-web`, confirmed via server log, port 3001 in this session), but no screen has been visually confirmed to render or interact correctly, and the login flow has never been exercised against a live backend (no `services/api` instance or Postgres was running this session either). Do this before claiming the 6 built screens work.
-3. **Resolve the Subscription/Quota/Feature-Flag/Settings gap** (§2, §11) — get a decision on adding the 4 admin-scoped backend endpoints, then build those screens if approved.
-4. Once the above are done and Step 3 is user-approved, proceed to Step 4 (testing) and Step 5 (documentation) per the 5-step gate.
+1. **Get Step 3 formally signed off** — the 5-step gate calls for user approval at each step boundary; verification is done and defects are fixed, but a final "Step 3 approved, move to Step 4" checkpoint with the user hasn't happened as its own explicit exchange.
+2. **Stand up committed local dev infrastructure.** This session's Postgres + backend + seed data were all manual, uncommitted, scratchpad-only setup (see §17) — reproducible by following §17's commands, but `infrastructure/docker`'s Docker Compose setup (flagged as pending since the Sprint 3 scaffold, per the repo README) still doesn't exist. Worth doing before Step 4 (testing) needs the same stack repeatedly.
+3. **Resolve the Subscription/Quota/Feature-Flag/Settings gap** (§2, §11) if/when the user wants those 4 screens — needs the admin-scoped backend endpoints first, explicitly out of scope for this sprint per the user's latest instruction.
+4. Once Step 3 is signed off, proceed to Step 4 (testing) and Step 5 (documentation) per the 5-step gate. Step 4 in particular should productionize this session's manual verification into the permanent pytest suite Sprint 4.1 still lacks (§11, §16) — the two new regression tests from this session's fixes are a start, not the whole job.
 
 ## 11. Pending Tasks / Known Issues
 
 **Pending (scheduled, not defects):**
-- Sprint 4.1 Step 3 — Frontend: 6/10 screens built, not yet browser-verified, not yet user-approved (see §2, §9, §10)
-- Sprint 4.1 Step 3 — Subscription Status, Quota Dashboard, Feature Flag Display, Tenant Settings screens: **deferred**, not built. Blocked on adding admin-scoped backend routes (e.g. `GET /api/v1/admin/tenants/{id}/subscription`) that reuse the existing self-service use cases with an admin-supplied `tenant_id` instead of the JWT-derived one. User was given 3 options (add the endpoints now / scope down / decide later) and chose to scope down for this session — the decision to add those endpoints is still open, not rejected.
-- Sprint 4.1 Step 3 — Browser verification never happened this session. `preview_start` was denied twice by the harness's own permission classifier (not a user denial, not a code issue) — see §10 item 2. The dev server itself starts cleanly; nothing beyond that was confirmed.
-- Sprint 4.1 Step 4 — Formal automated test suite for the Tenant Platform backend (unit + integration + API + security tests as pytest cases; the backend was verified via hands-on scripted checks during implementation, documented in each commit message, but no permanent pytest files exist yet for Sprint 4.1 — Sprint 3's 44 tests are unaffected and still pass). No automated tests exist for `apps/admin-web` either (no test runner is configured yet).
+- Sprint 4.1 Step 3 — Subscription Status, Quota Dashboard, Feature Flag Display, Tenant Settings screens: **deferred**, not built. Blocked on adding admin-scoped backend routes (e.g. `GET /api/v1/admin/tenants/{id}/subscription`) that reuse the existing self-service use cases with an admin-supplied `tenant_id` instead of the JWT-derived one. User explicitly confirmed: do not add these backend endpoints this sprint, treat as future work.
+- Sprint 4.1 Step 3 — a final "Step 3 signed off, move to Step 4" checkpoint with the user hasn't happened as its own exchange (see §10 item 1).
+- Committed local dev infrastructure (Docker Compose for Postgres, etc.) still doesn't exist — flagged as pending since the Sprint 3 scaffold (repo README), still true. This session's entire verification stack (Postgres, keys, seed data) was manual and uncommitted (see §17) — reproducible, but not durable.
+- Sprint 4.1 Step 4 — Formal automated test suite for the Tenant Platform backend (unit + integration + API + security tests as pytest cases). This session added 2 new integration tests (`tests/integration/platform/test_unit_of_work.py`) and 5 new unit tests (CORS), but the bulk of Sprint 4.1's own business logic (tenant lifecycle, subscription, settings, feature flags) still has no permanent pytest coverage — Sprint 3's 44 tests are unaffected and still pass. No automated tests exist for `apps/admin-web` either (no test runner is configured yet).
 - Sprint 4.1 Step 5 — Documentation (identity module README needs a Tenant Platform section; `apps/admin-web/README.md` exists but is minimal)
+- **A pre-existing, unrelated bug in `tests/integration/conftest.py`'s `engine` fixture** (session-scoped `pytest_asyncio.fixture` calling the synchronous `_run_alembic_upgrade()`, which itself calls `asyncio.run()` from inside an already-running event loop) blocks the *entire* integration test suite from executing in this environment — `RuntimeError: asyncio.run() cannot be called from a running event loop`. Found while verifying this session's new integration test; confirmed it's not specific to the new test by running the pre-existing `test_repositories.py` too (same failure). Out of scope for this session's fixes (unrelated to what was being fixed); needs its own fix before the integration suite can run at all, here or in CI.
 
 **Frontend implementation notes (disclosed, not bugs):**
 - `create-next-app@latest` installs Next.js 16; the approved stack is Next.js 15, so `apps/admin-web` was scaffolded with `create-next-app@15` (currently resolves to `15.5.23`) instead. Pin this explicitly if re-scaffolding anything.
 - `npm audit` reports 3 high-severity advisories (PostCSS XSS/path-traversal, sharp/libvips CVEs) as transitive dependencies of `next@15.5.23`'s own toolchain. The only fix `npm audit fix --force` offers is upgrading to `next@16`, which would violate the Next.js 15 pin above, so it was left as-is. Both are build/dev-tooling-time dependencies (CSS processing, image optimization), not something `admin-web`'s runtime code calls directly. Revisit when Next.js 15 ships a patch release, or explicitly re-decide the Next 15 vs 16 pin with the user.
 - shadcn's current registry (`shadcn@4.16.2`, `style: base-nova`, Base UI) has no `form` component for this style — `shadcn add form` resolves but writes nothing (confirmed via `--dry-run`/`--view`: "No files"). `src/components/ui/form.tsx` was hand-written to match the classic shadcn form API (`Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormDescription`, `FormMessage`) using `React.cloneElement` instead of Radix's `Slot` (no Radix dependency was added, to stay consistent with the Base UI choice).
-- Base UI components use a `render` prop for polymorphism (e.g. `<Button render={<Link href="..." />}>`), not Radix's `asChild` — every button-as-link/trigger in `apps/admin-web` uses `render`, not `asChild`.
+- Base UI components use a `render` prop for polymorphism (e.g. `<Button render={<Link href="..." />}>`), not Radix's `asChild` — every button-as-link/trigger in `apps/admin-web` uses `render`, not `asChild`. Base UI's `Button` also defaults `nativeButton={true}`; every such usage needs `nativeButton={false}` explicitly (see the 3rd defect fix above) since it renders an `<a>`, not a `<button>`.
+- React Hook Form's `values` option (for syncing form state to async-loaded data) needs a *stable* object reference to work reliably — passing a freshly-constructed object literal inline on every render (as this session's first Edit Tenant implementation did) silently fails to populate the form. Use `defaultValues` + `useEffect` + `form.reset()` instead when the "default" data arrives asynchronously; that pattern is now what `apps/admin-web` uses (`tenants/[tenantId]/edit/page.tsx`).
+- A platform-admin user that belongs to the same tenant it's administering will log itself out when it suspends that tenant (suspending a tenant revokes all of that tenant's sessions, correctly). Not a bug — just a reminder that a real deployment needs the platform-admin identity to live in a tenant distinct from any customer tenant it manages. This session's second seed tenant ("Platform Ops") exists specifically to avoid this when testing Suspend.
 
 **Architecture-compliance decisions made during Sprint 4.1 Step 1 (approved by user, no ADR required — these apply existing frozen architecture, they don't change it):**
 - **Decision A:** Tenant Platform code extends `modules/identity` (Data Architecture v2.0 §12.5 already assigns `Tenant` there) rather than creating a new `modules/tenant`.
@@ -158,10 +175,11 @@ In priority order:
 
 ## 16. Test Status
 
-- **Sprint 3 (Identity — auth):** 44/44 unit tests passing. Integration tests exist (`tests/integration/`) but require a live PostgreSQL instance to execute; not run in this environment.
-- **Sprint 4.1 backend (Tenant Platform):** No formal pytest suite yet (Step 4, pending). Verified during implementation via hands-on scripts against in-memory fakes and FastAPI's `TestClient` — full lifecycle, security (403 on non-admin), subscription/quota/settings/feature-flag logic, and validation paths all confirmed working; evidence recorded in each commit's message. These scripts were run from the scratchpad directory and are **not** part of the committed test suite.
-- **Lint/compile (backend):** `ruff format`, `ruff check`, and `python -m py_compile` all clean as of `1747258`.
-- **Sprint 4.1 frontend (`apps/admin-web`):** No test runner configured, no automated tests written. `npx tsc --noEmit`, `npx eslint .`, and `npm run build` (production build via Turbopack) are all clean as of `fccea87`. **No browser verification happened** — `preview_start` was denied twice by the harness's permission classifier this session (not attributable to the code); the dev server was confirmed to boot (`npm run dev`, "Ready in 8.3s" on port 3001) but no page was ever actually loaded, rendered, or interacted with. Login was never exercised against a live `services/api` — no backend or Postgres instance was running this session. Treat every screen as **unverified** until someone opens it in a browser against a running backend.
+- **Sprint 3 (Identity — auth):** 44/44 unit tests passing.
+- **This session's new backend tests:** 5 new unit tests (CORS config parsing + preflight `TestClient` checks, `tests/unit/core/test_config.py` + `tests/unit/test_main.py`) — **49/49 unit tests passing total**. 2 new integration tests (`tests/integration/platform/test_unit_of_work.py`, requires `TEST_DATABASE_URL`) — verified correct by hand (not via `pytest`, which currently can't run this suite at all — see §11's disclosed `conftest.py` bug) by git-stashing the `set_config()` fix and confirming the tests fail with the exact original error, then restoring the fix and confirming they pass.
+- **Sprint 4.1 backend business logic (tenant lifecycle, subscription, settings, feature flags):** Still no formal pytest suite (Step 4, pending). Verified during implementation via hands-on scripts against in-memory fakes and FastAPI's `TestClient`; evidence recorded in each commit's message. Additionally, this session ran the real thing — the actual `TenantProvisioningService`, `SuspendTenantUseCase`, `ReactivateTenantUseCase`, etc. — against a real PostgreSQL database via the running API and the Browser tool, for the first time (see §8).
+- **Lint/compile (backend):** `ruff format`, `ruff check`, and `python -m py_compile` all clean as of `012bd8b`.
+- **Sprint 4.1 frontend (`apps/admin-web`):** No test runner configured, no automated tests written. `npx tsc --noEmit`, `npx eslint .`, and `npm run build` (production build via Turbopack) are all clean as of `012bd8b`. **Browser-verified this session** — all 7 flows (Login, Tenant List, Tenant Details, Create, Edit, Suspend, Reactivate) confirmed working via the Browser tool against a real backend + real PostgreSQL; dark mode toggle confirmed; all 4 tenant pages confirmed free of console errors on a fresh load, after fixing 3 defects the verification found (§8, §11).
 
 ## 17. Commands to Resume Development
 
@@ -181,15 +199,12 @@ git branch --show-current
 
 # Confirm HEAD matches this document
 git rev-parse HEAD
-# Expect: fccea87460f1ec0e2df0ede5f5121629970a01b0
+# Expect: 012bd8baa2c96a623c962bcfa996797455331b23
 
-# Re-run the existing backend test suite (from services/api)
+# Re-run the existing backend unit test suite (from services/api)
 cd services/api
 JWT_PRIVATE_KEY=dummy JWT_PUBLIC_KEY=dummy python -m pytest tests/unit -q
-# Expect: 44 passed
-
-# Inspect the current migration state (dry-run, no DB required)
-JWT_PRIVATE_KEY=dummy JWT_PUBLIC_KEY=dummy DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/db" python -m alembic upgrade head --sql
+# Expect: 49 passed
 
 # Frontend: install, configure, and run admin-web
 cd apps/admin-web
@@ -197,9 +212,50 @@ cp .env.local.example .env.local   # point NEXT_PUBLIC_API_BASE_URL at a running
 npm install
 npx tsc --noEmit && npx eslint .   # Expect: both clean
 npm run dev                        # Expect: ready on http://localhost:3000
-# Then actually open it in a browser and click through Tenant List -> Details ->
-# Create -> Edit -> Suspend -> Reactivate against a live backend — this has not
-# been done yet this session (see §11, §16).
+```
+
+### Reproducing this session's full local dev stack (real Postgres + real API)
+
+None of this is committed infrastructure yet (§11) — it's the manual sequence this session used to actually browser-verify against a real backend, kept here so the next session doesn't have to rediscover it:
+
+```bash
+# 1. PostgreSQL 17, if not already installed
+winget install --id PostgreSQL.PostgreSQL.17 --silent --accept-package-agreements --accept-source-agreements
+
+# 2. A standalone instance you own (sidesteps the installer service's
+#    unknown/random superuser password entirely -- no admin rights needed)
+initdb -D <some-data-dir> -U restaurantos --auth=trust -E UTF8
+pg_ctl start -D <some-data-dir> -o "-p 5433 -c listen_addresses=localhost" -l <some-data-dir>/logfile
+createdb -h localhost -p 5433 -U restaurantos restaurantos
+
+# 3. RS256 dev keypair (JWT_PRIVATE_KEY=dummy only works for tests that
+#    never actually sign/verify a real token)
+openssl genrsa -out jwt_private.pem 2048
+openssl rsa -in jwt_private.pem -pubout -out jwt_public.pem
+
+# 4. Python env + migrations (from services/api)
+python -m venv .venv
+./.venv/Scripts/python.exe -m pip install -e ".[dev]"
+export JWT_PRIVATE_KEY="$(cat jwt_private.pem)" JWT_PUBLIC_KEY="$(cat jwt_public.pem)"
+export DATABASE_URL="postgresql+asyncpg://restaurantos@localhost:5433/restaurantos"
+./.venv/Scripts/python.exe -m alembic upgrade head
+
+# 5. Seed at least one tenant + platform-admin user -- there is no
+#    user-creation use case/endpoint yet (Decision C), so this has to go
+#    through TenantProvisioningService (for the tenant, to keep every
+#    provisioning invariant correct) plus a direct UserModel insert (for
+#    the user) inside a UnitOfWork(session_factory, TenantContext(tenant.id)).
+#    Seed a SECOND tenant for the admin's own identity if you intend to
+#    test Suspend on the first one -- suspending your own tenant logs you
+#    out (§11, correct behavior, not a bug).
+
+# 6. Run the API itself
+export APP_ENV=development
+export CORS_ALLOWED_ORIGINS="http://localhost:3000"   # or whatever port `npm run dev` picks
+./.venv/Scripts/python.exe -m uvicorn restaurant_os_api.main:app --host 127.0.0.1 --port 8000
+
+# 7. Point apps/admin-web/.env.local at it and `npm run dev`, then use the
+#    Browser tool (or a real browser) against http://localhost:3000.
 ```
 
 ---
@@ -208,11 +264,14 @@ npm run dev                        # Expect: ready on http://localhost:3000
 
 **Completed Sprints:** 0 (Product Blueprint), 1 (Technical Architecture v1.0), 1.5 (TAD remediation → v2.0), 2 (Data Architecture v1.0), 2.6 (Data Architecture remediation → v2.0), 3 (Identity Platform backend), 4.1 Steps 1–2 (Tenant Platform plan + backend).
 
-**In progress:** Sprint 4.1 Step 3 (Tenant Platform frontend) — 6/10 screens, not yet reviewed/approved/browser-verified.
+**In progress:** Sprint 4.1 Step 3 (Tenant Platform frontend) — 6/10 screens, implemented and browser-verified end-to-end against a real backend; formal step sign-off with the user not yet separately re-requested (§10).
 
-**Completed Commits (18 total on `feature/tenant-platform-frontend`; `main`/`develop` are 3 commits behind, still at `a1f83de`):**
+**Completed Commits (22 total on `feature/tenant-platform-frontend`; `main`/`develop` are 7 commits behind, still at `a1f83de`):**
 
 ```
+012bd8b fix(admin-web): defects found during real-backend browser verification
+6e50f68 fix(api): add CORS middleware so browser clients can call the API
+07dea29 fix(database): use set_config() for transaction-local tenant context
 fccea87 feat(admin-web): tenant list, details, create, and edit flows
 1e0fc92 feat(admin-web): add authentication and API client
 a76c5a9 chore(admin-web): scaffold Next.js admin-web app
@@ -237,9 +296,9 @@ f56869f chore(repo): scaffold monorepo structure and archive frozen architecture
 
 **Current PR:** None. This repository has no remote configured — all work is local. No pull request has been opened (there is nothing to open one against yet).
 
-**Current Milestone:** Sprint 4.1 Step 3 — Frontend implementation for the Tenant Platform. In progress, not complete: 6/10 screens built, not browser-verified, not user-approved.
+**Current Milestone:** Sprint 4.1 Step 3 — Frontend implementation for the Tenant Platform. 6/10 screens built and browser-verified end-to-end against a real backend; formal step sign-off with the user not yet separately re-requested.
 
-**Current Feature:** Tenant Platform (Sprint 4.1) — Tenant CRUD/lifecycle, Subscription, Settings, Feature Flags, Tenant Directory, Tenant Administration (backend complete; frontend: List/Details/Create/Edit/Suspend/Reactivate built and unverified, Subscription/Quota/Feature-Flags/Settings deferred).
+**Current Feature:** Tenant Platform (Sprint 4.1) — Tenant CRUD/lifecycle, Subscription, Settings, Feature Flags, Tenant Directory, Tenant Administration (backend complete and browser-verified; frontend: List/Details/Create/Edit/Suspend/Reactivate built and browser-verified, Subscription/Quota/Feature-Flags/Settings explicitly deferred as future work per the user).
 
 **Current Module:** Backend — `services/api/src/restaurant_os_api/modules/identity` (extended, not new, per Decision A). Frontend — `apps/admin-web` (Next.js 15 app, scaffolded and partially built this session).
 
