@@ -1,0 +1,67 @@
+# Local development orchestration (Technical Architecture v2.0 §7.2 / §9.1).
+#
+# Brings up Postgres + the API with a single `docker compose up`, source-
+# mounted for hot reload (uvicorn --reload).
+#
+# Deliberately just `postgres` + `api` today, not the full illustrative
+# topology from the superseded v1.0 architecture doc (nginx, redis, worker,
+# beat, websocket, minio) -- those services don't exist in this codebase
+# yet (no Celery, no WebSocket app, no Redis client anywhere -- see
+# docs/AI_HANDOFF.md's disclosed scope boundaries). Add them here when they
+# actually get built, not before.
+#
+# apps/admin-web is NOT containerized here on purpose: Next.js's own dev
+# server (`npm run dev`) gives faster Fast Refresh than a bind-mounted
+# container would, and the superseded architecture doc's own illustrative
+# topology never listed a frontend service either -- see docs/DEVELOPMENT.md.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-restaurantos}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-restaurantos}
+      POSTGRES_DB: ${DATABASE_NAME:-restaurantos}
+    ports:
+      - "${DATABASE_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-restaurantos}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: ../../infrastructure/docker/api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+asyncpg://${DATABASE_USER:-restaurantos}:${DATABASE_PASSWORD:-restaurantos}@postgres:5432/${DATABASE_NAME:-restaurantos}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      JWT_PRIVATE_KEY_PATH: /run/dev-jwt/private.pem
+      JWT_PUBLIC_KEY_PATH: /run/dev-jwt/public.pem
+    volumes:
+      - ./services/api:/app
+      - ./infrastructure/docker/dev-jwt:/run/dev-jwt:ro
+    ports:
+      - "8000:8000"
+    # JWT_PRIVATE_KEY/JWT_PUBLIC_KEY need real PEM content (with actual
+    # newlines), which a .env file can't represent cleanly -- read from the
+    # mounted dev-only keypair at container start instead. See
+    # infrastructure/docker/dev-jwt/README.md.
+    command:
+      - sh
+      - -c
+      - |
+        export JWT_PRIVATE_KEY="$$(cat "$$JWT_PRIVATE_KEY_PATH")"
+        export JWT_PUBLIC_KEY="$$(cat "$$JWT_PUBLIC_KEY_PATH")"
+        alembic upgrade head
+        exec uvicorn restaurant_os_api.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
