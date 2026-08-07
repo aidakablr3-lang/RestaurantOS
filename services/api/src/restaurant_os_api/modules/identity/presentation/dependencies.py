@@ -12,7 +12,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from restaurant_os_api.core.config import Settings, get_settings
+from restaurant_os_api.modules.identity.application.dto import AuthenticatedPrincipalDTO
 from restaurant_os_api.modules.identity.application.interfaces import (
     PasswordHasher,
     TokenService,
@@ -29,6 +30,11 @@ from restaurant_os_api.modules.identity.application.use_cases import (
     LoginUserUseCase,
     LogoutUserUseCase,
     RefreshAccessTokenUseCase,
+    VerifyAccessTokenUseCase,
+)
+from restaurant_os_api.modules.identity.domain.exceptions import (
+    InsufficientPrivilegesError,
+    InvalidAccessTokenError,
 )
 from restaurant_os_api.modules.identity.infrastructure.database.repositories import (
     SQLAlchemySessionRepository,
@@ -126,3 +132,54 @@ def get_logout_use_case(
 LoginUseCaseDep = Annotated[LoginUserUseCase, Depends(get_login_use_case)]
 RefreshUseCaseDep = Annotated[RefreshAccessTokenUseCase, Depends(get_refresh_use_case)]
 LogoutUseCaseDep = Annotated[LogoutUserUseCase, Depends(get_logout_use_case)]
+
+
+def get_verify_access_token_use_case(
+    session_factory: SessionFactoryDep,
+    token_service: TokenServiceDep,
+) -> VerifyAccessTokenUseCase:
+    return VerifyAccessTokenUseCase(
+        session_factory=session_factory,
+        tenant_repository_factory=SQLAlchemyTenantRepository,
+        user_repository_factory=SQLAlchemyUserRepository,
+        token_service=token_service,
+    )
+
+
+VerifyAccessTokenUseCaseDep = Annotated[
+    VerifyAccessTokenUseCase, Depends(get_verify_access_token_use_case)
+]
+
+
+async def require_authenticated_user(
+    verify_access_token: VerifyAccessTokenUseCaseDep,
+    authorization: Annotated[str | None, Header()] = None,
+) -> AuthenticatedPrincipalDTO:
+    """The authentication + tenant-validation dependency every protected
+    route depends on (Sprint 4.1's combined check — see
+    ``VerifyAccessTokenUseCase``'s docstring for why this is one
+    dependency, not two)."""
+    if authorization is None or not authorization.startswith("Bearer "):
+        raise InvalidAccessTokenError("Missing or malformed Authorization header.")
+    raw_token = authorization.removeprefix("Bearer ").strip()
+    return await verify_access_token.execute(raw_token)
+
+
+AuthenticatedPrincipalDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_authenticated_user)
+]
+
+
+async def require_platform_admin(
+    principal: AuthenticatedPrincipalDep,
+) -> AuthenticatedPrincipalDTO:
+    """Gate for tenant-lifecycle mutation endpoints (approved plan's
+    Decision C). Deliberately not RBAC — a single boolean flag, checked
+    here and nowhere else, until a real permissions system exists (see
+    the identity module README's "Not Included" section)."""
+    if not principal.is_platform_admin:
+        raise InsufficientPrivilegesError()
+    return principal
+
+
+PlatformAdminDep = Annotated[AuthenticatedPrincipalDTO, Depends(require_platform_admin)]

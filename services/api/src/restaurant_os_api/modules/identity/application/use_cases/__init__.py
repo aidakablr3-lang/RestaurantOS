@@ -7,5 +7,13 @@ from restaurant_os_api.modules.identity.application.use_cases.logout_user import
 from restaurant_os_api.modules.identity.application.use_cases.refresh_access_token import (
     RefreshAccessTokenUseCase,
 )
+from restaurant_os_api.modules.identity.application.use_cases.verify_access_token import (
+    VerifyAccessTokenUseCase,
+)
 
-__all__ = ["LoginUserUseCase", "LogoutUserUseCase", "RefreshAccessTokenUseCase"]
+__all__ = [
+    "LoginUserUseCase",
+    "LogoutUserUseCase",
+    "RefreshAccessTokenUseCase",
+    "VerifyAccessTokenUseCase",
+]

@@ -39,3 +39,16 @@ class TokenPairDTO:
     refresh_token: str
     expires_in: int
     token_type: str = "bearer"
+
+
+@dataclass(frozen=True, slots=True)
+class AuthenticatedPrincipalDTO:
+    """The result of successfully verifying an access token — everything
+    a protected route needs to know about the caller, resolved and
+    validated in one pass (Sprint 4.1's `VerifyAccessTokenUseCase`)."""
+
+    user_id: str
+    tenant_id: str
+    session_id: str
+    device_id: str | None
+    is_platform_admin: bool
