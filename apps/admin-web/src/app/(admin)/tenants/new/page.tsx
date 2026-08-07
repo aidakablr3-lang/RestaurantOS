@@ -123,6 +123,7 @@ export default function CreateTenantPage() {
                   type="button"
                   variant="ghost"
                   render={<Link href="/tenants" />}
+                  nativeButton={false}
                 >
                   Cancel
                 </Button>

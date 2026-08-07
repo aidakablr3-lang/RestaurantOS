@@ -28,10 +28,11 @@ import type { TenantStatus } from "@/lib/api-types"
 const PAGE_SIZE = 20
 const STATUS_OPTIONS: Array<TenantStatus | "ALL"> = [
   "ALL",
-  "PENDING",
-  "ACTIVE",
-  "SUSPENDED",
-  "OFFBOARDED",
+  "provisioning",
+  "active",
+  "suspended",
+  "migrating",
+  "offboarded",
 ]
 
 export default function TenantListPage() {
@@ -69,13 +70,13 @@ export default function TenantListPage() {
             </SelectTrigger>
             <SelectContent>
               {STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
+                <SelectItem key={option} value={option} className="capitalize">
                   {option === "ALL" ? "All statuses" : option}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button render={<Link href="/tenants/new" />}>
+          <Button render={<Link href="/tenants/new" />} nativeButton={false}>
             <PlusIcon />
             New Tenant
           </Button>

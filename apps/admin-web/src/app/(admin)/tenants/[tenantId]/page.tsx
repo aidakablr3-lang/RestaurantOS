@@ -114,12 +114,13 @@ export default function TenantDetailsPage() {
           <Button
             variant="outline"
             render={<Link href={`/tenants/${tenant.id}/edit`} />}
+            nativeButton={false}
           >
             <PencilIcon />
             Edit
           </Button>
 
-          {tenant.status === "ACTIVE" ? (
+          {tenant.status === "active" ? (
             <AlertDialog>
               <AlertDialogTrigger
                 render={
@@ -147,7 +148,7 @@ export default function TenantDetailsPage() {
             </AlertDialog>
           ) : null}
 
-          {tenant.status === "SUSPENDED" ? (
+          {tenant.status === "suspended" ? (
             <AlertDialog>
               <AlertDialogTrigger
                 render={

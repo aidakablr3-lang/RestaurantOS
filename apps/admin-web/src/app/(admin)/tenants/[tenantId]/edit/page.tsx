@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -35,16 +36,20 @@ export default function EditTenantPage() {
 
   const form = useForm<EditTenantFormValues>({
     resolver: zodResolver(editTenantSchema),
-    values: tenant
-      ? {
-          displayName: tenant.displayName,
-          metadata:
-            Object.keys(tenant.metadata).length > 0
-              ? JSON.stringify(tenant.metadata, null, 2)
-              : "",
-        }
-      : undefined,
+    defaultValues: { displayName: "", metadata: "" },
   })
+
+  React.useEffect(() => {
+    if (!tenant) return
+    form.reset({
+      displayName: tenant.displayName,
+      metadata:
+        Object.keys(tenant.metadata).length > 0
+          ? JSON.stringify(tenant.metadata, null, 2)
+          : "",
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant])
 
   async function onSubmit(values: EditTenantFormValues) {
     try {
@@ -157,6 +162,7 @@ export default function EditTenantPage() {
                   type="button"
                   variant="ghost"
                   render={<Link href={`/tenants/${tenantId}`} />}
+                  nativeButton={false}
                 >
                   Cancel
                 </Button>

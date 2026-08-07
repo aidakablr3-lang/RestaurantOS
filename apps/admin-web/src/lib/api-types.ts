@@ -27,11 +27,15 @@ export interface ApiErrorEnvelope {
   error: ApiErrorDetail
 }
 
+// Lowercase, matching the domain's TenantStatus StrEnum values exactly
+// (modules/identity/domain/entities/tenant.py) -- these are serialized
+// as-is on the wire, not upper-cased.
 export type TenantStatus =
-  | "PENDING"
-  | "ACTIVE"
-  | "SUSPENDED"
-  | "OFFBOARDED"
+  | "provisioning"
+  | "active"
+  | "suspended"
+  | "migrating"
+  | "offboarded"
 
 export interface Tenant {
   id: string
