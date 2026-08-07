@@ -3,7 +3,7 @@
 **Purpose:** This is the canonical handoff document for every future Claude session working on RestaurantOS. Read this file first, before touching any code, to reconstruct full project context.
 
 **Last updated:** 2026-08-07
-**Updated by:** Repository standardization task (branch restructuring + handoff doc creation)
+**Updated by:** Sprint 4.1 Step 3 session — admin-web scaffold + Tenant List/Details/Create/Edit/Suspend/Reactivate
 
 ---
 
@@ -13,7 +13,7 @@
 
 ## 2. Current Step
 
-**Step 3 — Frontend implementation.** Approved by the user, but not yet started — this session was interrupted to perform repository standardization (branch restructuring + this handoff document) before any frontend code is written.
+**Step 3 — Frontend implementation. In progress, not yet complete, not yet presented for approval.** `apps/admin-web` is scaffolded and six of the ten originally-scoped screens are implemented and committed: Tenant List, Tenant Details, Create Tenant, Edit Tenant, Suspend Tenant, Reactivate Tenant (all with loading/error/empty states, responsive layout, dark mode, and accessible shadcn/Base UI primitives). **Scope was deliberately narrowed mid-session** — see the "Scope-down decision" note below and §11.
 
 Sprint 4.1 follows a 5-step gated process, defined explicitly by the user:
 
@@ -21,13 +21,15 @@ Sprint 4.1 follows a 5-step gated process, defined explicitly by the user:
 |---|---|---|
 | 1 | Explain implementation plan, wait for approval | Complete — approved, including 3 explicit architecture-compliance decisions (see §11 Known Issues / Decisions) |
 | 2 | Implement backend, wait for approval | Complete — 7 commits, approved |
-| 3 | Implement frontend, wait for approval | **Not started** — approved to begin, blocked on this repo-standardization task |
+| 3 | Implement frontend, wait for approval | **In progress** — 6/10 originally-scoped screens built (3 commits, `a76c5a9`→`fccea87`); not yet presented to the user for approval; not yet browser-verified (see §16) |
 | 4 | Testing, wait for approval | Not started |
 | 5 | Documentation, wait for approval | Not started |
 
+**Scope-down decision (this session, approved by the user):** The original Step 1 plan listed 10 admin-web screens, including Subscription Status, Quota Dashboard, Feature Flag Display, and Tenant Settings. Discovered mid-session: the backend only exposes those four as **self-service** endpoints (`/api/v1/tenants/me/*`), which resolve `tenant_id` from the caller's own JWT and structurally cannot take an admin-selected tenant ID (`self_service_tenant_router.py:1-4`, citing Data Architecture v2.0 §4.1 — tenant scope is never client-asserted). There is no admin-scoped route (e.g. `/api/v1/admin/tenants/{id}/subscription`) — the underlying use cases (`GetSubscriptionStatusUseCase`, `GetTenantQuotaUsageUseCase`, `GetTenantSettingsUseCase`, `ListFeatureFlagsUseCase`) already accept any `tenant_id` and could be wired to one, but that wiring doesn't exist yet. Presented to the user as a STOP with 3 options (add thin admin endpoints now / scope down / decide later); **user chose to scope down**. Those 4 screens are deferred, not abandoned — see §11.
+
 ## 3. Current Milestone
 
-Backend for the Tenant Platform is complete and merged to history (not yet to `main` via PR — see §9 Current PR). Frontend (`apps/admin-web`) has not been scaffolded yet — no Next.js project exists on disk at `apps/admin-web` beyond the empty placeholder from the Sprint 3 monorepo scaffold.
+Backend for the Tenant Platform is complete and merged to history (not yet to `main` via PR — see §9 Current PR). Frontend (`apps/admin-web`) is scaffolded (Next.js 15.5.23 App Router, React 19, TypeScript, Tailwind v4, shadcn/ui on Base UI primitives, TanStack Query, Zustand, React Hook Form + Zod) with Tenant List/Details/Create/Edit/Suspend/Reactivate implemented against the platform-admin REST API. Not yet browser-verified in this session (tooling permission denial — see §16), not yet reviewed/approved by the user, and 4 of the original 10 screens are deferred pending a backend decision (see §2, §11).
 
 ## 4. Repository Path
 
@@ -41,26 +43,26 @@ This is both the Git repository root and the monorepo root (`services/api`, `app
 
 **Current branch:** `feature/tenant-platform-frontend`
 
-Branch structure (created in this repo-standardization task):
+Branch structure:
 
 ```
 main                                 <- renamed from master
  └── develop                         <- created from main
-      └── feature/tenant-platform-frontend   <- created from develop, currently checked out
+      └── feature/tenant-platform-frontend   <- 3 commits ahead of develop/main (this session's admin-web work)
 ```
 
-All three branches point at the same commit as of this writing (no divergence yet — `develop` and the feature branch were just cut).
+`main` and `develop` are still at `a1f83de` (the handoff-doc commit); only `feature/tenant-platform-frontend` has this session's 3 new commits. Not yet merged up — Step 3 isn't finished or approved yet.
 
 ## 6. Current HEAD Commit
 
 ```
-174725802f6c998be403a736dbedc2c8c230aab9
+fccea87460f1ec0e2df0ede5f5121629970a01b0
 ```
-(short: `1747258` — `feat(identity): add Tenant Administration REST API`)
+(short: `fccea87` — `feat(admin-web): tenant list, details, create, and edit flows`)
 
 ## 7. Working Tree Status
 
-Clean immediately before this document's own commit. After this document is committed, the tree returns to clean on `feature/tenant-platform-frontend`. Verify with `git status` (see §14).
+Clean immediately before this document's own commit (verified via `git status`). After this document is committed, the tree returns to clean on `feature/tenant-platform-frontend`. Verify with `git status` (see §17).
 
 ## 8. Completed Work
 
@@ -89,24 +91,43 @@ Step 1 plan approved with 3 explicit architecture-compliance decisions (see §11
 
 Full PR-style writeup (files changed, technical decisions, testing evidence, rollback plan) was presented to the user and approved before Step 3 began.
 
+### Sprint 4.1, Step 3 (partial) — Tenant Platform frontend
+
+3 commits, `a76c5a9` → `fccea87`, on `feature/tenant-platform-frontend`:
+
+1. `a76c5a9` — `chore(admin-web): scaffold Next.js admin-web app`. `create-next-app@15` (pinned — see §11) with App Router, `src/`, TypeScript, Tailwind v4; `shadcn@latest init` (pulled in **Base UI**, not Radix — shadcn's current default; components use a `render` prop for polymorphism, not `asChild`); shadcn primitives (button, card, input, label, table, badge, alert-dialog, form — form.tsx hand-written, see §11 — select, skeleton, textarea, tooltip); TanStack Query + next-themes providers, dark-mode toggle, sonner toasts. No business logic.
+2. `1e0fc92` — `feat(admin-web): add authentication and API client`. `ApiResponse`/`ApiErrorResponse`-matching client types, a `fetch` wrapper (`apiClient`) that attaches the Bearer token and unwraps the envelope, a Zustand-persisted auth store, the login page (`POST /api/v1/auth/login`), and the `(admin)` route group's `AuthGuard` + app-shell layout (header, dark-mode toggle, logout).
+3. `fccea87` — `feat(admin-web): tenant list, details, create, and edit flows`. Tenant List (paginated, status filter, loading/error/empty states), Tenant Details (with gated Suspend/Reactivate behind an `AlertDialog` confirmation), Create Tenant, Edit Tenant — all against `admin_tenant_router.py`'s endpoints.
+
+Typecheck (`tsc --noEmit`), lint (`eslint`), and production build (`next build`) are all clean as of `fccea87`. **Not yet browser-verified** (see §11, §16) and **not yet presented to the user for Step 3 approval** — this handoff point is mid-step, not a step boundary.
+
 ## 9. Current Work
 
-Repository standardization (this task): branch rename/creation, this handoff document. **No frontend code has been written.** No architecture or backend files were touched in this task.
+Sprint 4.1 Step 3 (Tenant Platform frontend), scoped down mid-session — see §2's "Scope-down decision". 6 of the original 10 screens are built; 4 are deferred pending a backend decision. No backend or architecture files were touched this session.
 
 ## 10. Next Task
 
-Resume Sprint 4.1 Step 3 (Frontend), starting with scaffolding `apps/admin-web` as a Next.js 15 / React 19 / TypeScript / Tailwind / shadcn/ui / Zustand / TanStack Query / React Hook Form + Zod application, per Technical Architecture v2.0. Per the approved Step 1 plan, the remaining commit sequence is:
+In priority order:
 
-- `chore(admin-web): scaffold Next.js admin-web app`
-- `feat(admin-web): tenant list, details, and create/edit flows`
-- `feat(admin-web): subscription status and quota dashboard`
+1. **Get this session's frontend work reviewed and approved by the user** (per Step 3's own gate) before treating it as done — it has not been presented for approval yet.
+2. **Browser-verify the app for real.** This session could not open the Browser pane (`preview_start` was denied twice by the harness's permission classifier — see §11). The dev server itself boots cleanly (`npm run dev` in `apps/admin-web`, confirmed via server log, port 3001 in this session), but no screen has been visually confirmed to render or interact correctly, and the login flow has never been exercised against a live backend (no `services/api` instance or Postgres was running this session either). Do this before claiming the 6 built screens work.
+3. **Resolve the Subscription/Quota/Feature-Flag/Settings gap** (§2, §11) — get a decision on adding the 4 admin-scoped backend endpoints, then build those screens if approved.
+4. Once the above are done and Step 3 is user-approved, proceed to Step 4 (testing) and Step 5 (documentation) per the 5-step gate.
 
 ## 11. Pending Tasks / Known Issues
 
 **Pending (scheduled, not defects):**
-- Sprint 4.1 Step 3 — Frontend (not started)
-- Sprint 4.1 Step 4 — Formal automated test suite for the Tenant Platform backend (unit + integration + API + security tests as pytest cases; the backend was verified via hands-on scripted checks during implementation, documented in each commit message, but no permanent pytest files exist yet for Sprint 4.1 — Sprint 3's 44 tests are unaffected and still pass)
-- Sprint 4.1 Step 5 — Documentation (identity module README needs a Tenant Platform section)
+- Sprint 4.1 Step 3 — Frontend: 6/10 screens built, not yet browser-verified, not yet user-approved (see §2, §9, §10)
+- Sprint 4.1 Step 3 — Subscription Status, Quota Dashboard, Feature Flag Display, Tenant Settings screens: **deferred**, not built. Blocked on adding admin-scoped backend routes (e.g. `GET /api/v1/admin/tenants/{id}/subscription`) that reuse the existing self-service use cases with an admin-supplied `tenant_id` instead of the JWT-derived one. User was given 3 options (add the endpoints now / scope down / decide later) and chose to scope down for this session — the decision to add those endpoints is still open, not rejected.
+- Sprint 4.1 Step 3 — Browser verification never happened this session. `preview_start` was denied twice by the harness's own permission classifier (not a user denial, not a code issue) — see §10 item 2. The dev server itself starts cleanly; nothing beyond that was confirmed.
+- Sprint 4.1 Step 4 — Formal automated test suite for the Tenant Platform backend (unit + integration + API + security tests as pytest cases; the backend was verified via hands-on scripted checks during implementation, documented in each commit message, but no permanent pytest files exist yet for Sprint 4.1 — Sprint 3's 44 tests are unaffected and still pass). No automated tests exist for `apps/admin-web` either (no test runner is configured yet).
+- Sprint 4.1 Step 5 — Documentation (identity module README needs a Tenant Platform section; `apps/admin-web/README.md` exists but is minimal)
+
+**Frontend implementation notes (disclosed, not bugs):**
+- `create-next-app@latest` installs Next.js 16; the approved stack is Next.js 15, so `apps/admin-web` was scaffolded with `create-next-app@15` (currently resolves to `15.5.23`) instead. Pin this explicitly if re-scaffolding anything.
+- `npm audit` reports 3 high-severity advisories (PostCSS XSS/path-traversal, sharp/libvips CVEs) as transitive dependencies of `next@15.5.23`'s own toolchain. The only fix `npm audit fix --force` offers is upgrading to `next@16`, which would violate the Next.js 15 pin above, so it was left as-is. Both are build/dev-tooling-time dependencies (CSS processing, image optimization), not something `admin-web`'s runtime code calls directly. Revisit when Next.js 15 ships a patch release, or explicitly re-decide the Next 15 vs 16 pin with the user.
+- shadcn's current registry (`shadcn@4.16.2`, `style: base-nova`, Base UI) has no `form` component for this style — `shadcn add form` resolves but writes nothing (confirmed via `--dry-run`/`--view`: "No files"). `src/components/ui/form.tsx` was hand-written to match the classic shadcn form API (`Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormDescription`, `FormMessage`) using `React.cloneElement` instead of Radix's `Slot` (no Radix dependency was added, to stay consistent with the Base UI choice).
+- Base UI components use a `render` prop for polymorphism (e.g. `<Button render={<Link href="..." />}>`), not Radix's `asChild` — every button-as-link/trigger in `apps/admin-web` uses `render`, not `asChild`.
 
 **Architecture-compliance decisions made during Sprint 4.1 Step 1 (approved by user, no ADR required — these apply existing frozen architecture, they don't change it):**
 - **Decision A:** Tenant Platform code extends `modules/identity` (Data Architecture v2.0 §12.5 already assigns `Tenant` there) rather than creating a new `modules/tenant`.
@@ -138,8 +159,9 @@ Resume Sprint 4.1 Step 3 (Frontend), starting with scaffolding `apps/admin-web` 
 ## 16. Test Status
 
 - **Sprint 3 (Identity — auth):** 44/44 unit tests passing. Integration tests exist (`tests/integration/`) but require a live PostgreSQL instance to execute; not run in this environment.
-- **Sprint 4.1 (Tenant Platform):** No formal pytest suite yet (Step 4, pending). Verified during implementation via hands-on scripts against in-memory fakes and FastAPI's `TestClient` — full lifecycle, security (403 on non-admin), subscription/quota/settings/feature-flag logic, and validation paths all confirmed working; evidence recorded in each commit's message. These scripts were run from the scratchpad directory and are **not** part of the committed test suite.
-- **Lint/compile:** `ruff format`, `ruff check`, and `python -m py_compile` all clean as of HEAD.
+- **Sprint 4.1 backend (Tenant Platform):** No formal pytest suite yet (Step 4, pending). Verified during implementation via hands-on scripts against in-memory fakes and FastAPI's `TestClient` — full lifecycle, security (403 on non-admin), subscription/quota/settings/feature-flag logic, and validation paths all confirmed working; evidence recorded in each commit's message. These scripts were run from the scratchpad directory and are **not** part of the committed test suite.
+- **Lint/compile (backend):** `ruff format`, `ruff check`, and `python -m py_compile` all clean as of `1747258`.
+- **Sprint 4.1 frontend (`apps/admin-web`):** No test runner configured, no automated tests written. `npx tsc --noEmit`, `npx eslint .`, and `npm run build` (production build via Turbopack) are all clean as of `fccea87`. **No browser verification happened** — `preview_start` was denied twice by the harness's permission classifier this session (not attributable to the code); the dev server was confirmed to boot (`npm run dev`, "Ready in 8.3s" on port 3001) but no page was ever actually loaded, rendered, or interacted with. Login was never exercised against a live `services/api` — no backend or Postgres instance was running this session. Treat every screen as **unverified** until someone opens it in a browser against a running backend.
 
 ## 17. Commands to Resume Development
 
@@ -159,7 +181,7 @@ git branch --show-current
 
 # Confirm HEAD matches this document
 git rev-parse HEAD
-# Expect: 174725802f6c998be403a736dbedc2c8c230aab9
+# Expect: fccea87460f1ec0e2df0ede5f5121629970a01b0
 
 # Re-run the existing backend test suite (from services/api)
 cd services/api
@@ -168,6 +190,16 @@ JWT_PRIVATE_KEY=dummy JWT_PUBLIC_KEY=dummy python -m pytest tests/unit -q
 
 # Inspect the current migration state (dry-run, no DB required)
 JWT_PRIVATE_KEY=dummy JWT_PUBLIC_KEY=dummy DATABASE_URL="postgresql+asyncpg://user:pass@localhost:5432/db" python -m alembic upgrade head --sql
+
+# Frontend: install, configure, and run admin-web
+cd apps/admin-web
+cp .env.local.example .env.local   # point NEXT_PUBLIC_API_BASE_URL at a running services/api
+npm install
+npx tsc --noEmit && npx eslint .   # Expect: both clean
+npm run dev                        # Expect: ready on http://localhost:3000
+# Then actually open it in a browser and click through Tenant List -> Details ->
+# Create -> Edit -> Suspend -> Reactivate against a live backend — this has not
+# been done yet this session (see §11, §16).
 ```
 
 ---
@@ -176,9 +208,15 @@ JWT_PRIVATE_KEY=dummy JWT_PUBLIC_KEY=dummy DATABASE_URL="postgresql+asyncpg://us
 
 **Completed Sprints:** 0 (Product Blueprint), 1 (Technical Architecture v1.0), 1.5 (TAD remediation → v2.0), 2 (Data Architecture v1.0), 2.6 (Data Architecture remediation → v2.0), 3 (Identity Platform backend), 4.1 Steps 1–2 (Tenant Platform plan + backend).
 
-**Completed Commits (14 total on `main`/`develop`/`feature/tenant-platform-frontend`, all three currently identical):**
+**In progress:** Sprint 4.1 Step 3 (Tenant Platform frontend) — 6/10 screens, not yet reviewed/approved/browser-verified.
+
+**Completed Commits (18 total on `feature/tenant-platform-frontend`; `main`/`develop` are 3 commits behind, still at `a1f83de`):**
 
 ```
+fccea87 feat(admin-web): tenant list, details, create, and edit flows
+1e0fc92 feat(admin-web): add authentication and API client
+a76c5a9 chore(admin-web): scaffold Next.js admin-web app
+a1f83de docs(repo): add AI session handoff document
 1747258 feat(identity): add Tenant Administration REST API
 529d9b3 feat(identity): add subscription, settings, and feature-flag use cases
 e97c05b feat(identity): add TenantProvisioningService and tenant lifecycle use cases
@@ -199,11 +237,11 @@ f56869f chore(repo): scaffold monorepo structure and archive frozen architecture
 
 **Current PR:** None. This repository has no remote configured — all work is local. No pull request has been opened (there is nothing to open one against yet).
 
-**Current Milestone:** Sprint 4.1 Step 3 — Frontend implementation for the Tenant Platform.
+**Current Milestone:** Sprint 4.1 Step 3 — Frontend implementation for the Tenant Platform. In progress, not complete: 6/10 screens built, not browser-verified, not user-approved.
 
-**Current Feature:** Tenant Platform (Sprint 4.1) — Tenant CRUD/lifecycle, Subscription, Settings, Feature Flags, Tenant Directory, Tenant Administration (backend complete, frontend pending).
+**Current Feature:** Tenant Platform (Sprint 4.1) — Tenant CRUD/lifecycle, Subscription, Settings, Feature Flags, Tenant Directory, Tenant Administration (backend complete; frontend: List/Details/Create/Edit/Suspend/Reactivate built and unverified, Subscription/Quota/Feature-Flags/Settings deferred).
 
-**Current Module:** Backend — `services/api/src/restaurant_os_api/modules/identity` (extended, not new, per Decision A). Frontend — `apps/admin-web` (not yet scaffolded).
+**Current Module:** Backend — `services/api/src/restaurant_os_api/modules/identity` (extended, not new, per Decision A). Frontend — `apps/admin-web` (Next.js 15 app, scaffolded and partially built this session).
 
 ---
 
