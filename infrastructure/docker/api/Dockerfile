@@ -19,14 +19,20 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Dependency layer cached separately from source so editing application code
-# doesn't invalidate the (slow) dependency install.
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e ".[dev]"
-
-# Overwritten by docker-compose.yml's bind mount in dev; present here so the
-# image is still runnable standalone (`docker build` + `docker run`).
+# Source must be present *before* the editable install: setuptools'
+# PEP 660 editable install only maps the files it can see in the
+# package directory (src/restaurant_os_api) at install time -- with
+# only pyproject.toml copied in, `pip install -e .` "succeeds" (it
+# builds an editable wheel with zero mapped files) but the package is
+# permanently unimportable even after src/ is copied in afterward.
+# Confirmed by reproducing this exact two-step sequence outside Docker.
+# Costs the dependency-layer-caching optimization a naive COPY-order
+# would give (editing application code now invalidates this layer too),
+# but the image must actually build and run correctly first. Overwritten
+# by docker-compose.yml's bind mount in dev either way; present here so
+# the image is still runnable standalone (`docker build` + `docker run`).
 COPY . .
+RUN pip install --no-cache-dir -e ".[dev]"
 
 EXPOSE 8000
 
