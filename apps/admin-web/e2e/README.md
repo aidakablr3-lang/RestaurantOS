@@ -37,12 +37,25 @@ npm run e2e:ui      # interactive UI mode, for writing/debugging specs
 ```
 
 `playwright.config.ts` starts `admin-web`'s own dev server automatically
-(on port 3100 by default, to avoid colliding with a `npm run dev` you
-already have open on 3000) and points `NEXT_PUBLIC_API_BASE_URL` at
-whatever `E2E_API_BASE_URL` resolves to. It does **not** start Postgres
-or `services/api` -- `global-setup.ts` checks the backend is reachable
-and the E2E fixture logs in successfully before any spec runs, and
-fails with a clear message (not 20 confusing per-test failures) if not.
+(on port 3100 by default, via `E2E_PORT`, to avoid colliding with a
+`npm run dev` you already have open on 3000). It does **not** start
+Postgres or `services/api` -- `global-setup.ts` checks the backend is
+reachable and the E2E fixture logs in successfully before any spec
+runs, and fails with a clear message (not 20 confusing per-test
+failures) if not.
+
+**`E2E_API_BASE_URL` only tells `global-setup.ts`/`fixtures.ts` where
+to reach the backend for their own checks -- it does not configure the
+app under test.** The browser talks to whatever `NEXT_PUBLIC_API_BASE_URL`
+was set to when the dev server started (see `.env.local`, or export it
+before running `npm run e2e`); it defaults to `http://localhost:8000`
+if unset, matching `E2E_API_BASE_URL`'s own default. **If your backend
+runs anywhere other than the default, set both** or the test fixtures
+and the app itself will disagree about where the API is. Also note:
+whatever port the frontend actually starts on (`E2E_PORT`, above) must
+be included in the backend's `CORS_ALLOWED_ORIGINS`, or every request
+the browser makes will be rejected by CORS before it reaches the API
+-- see `.github/workflows/ci.yml`'s `e2e` job for a worked example.
 
 ## Design notes
 

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: "3.13"
   NODE_VERSION: "20"
@@ -25,6 +29,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/api/pyproject.toml
       - run: pip install -e ".[dev]"
         working-directory: services/api
       - run: ruff format --check .
@@ -45,6 +51,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/api/pyproject.toml
       - run: pip install -e ".[dev]"
         working-directory: services/api
       - run: mypy src/
@@ -72,6 +80,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/api/pyproject.toml
       - run: pip install -e ".[dev]"
         working-directory: services/api
       - name: Generate a throwaway RS256 keypair for this run
@@ -135,6 +145,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/api/pyproject.toml
       - run: pip install -e ".[dev]"
         working-directory: services/api
 
@@ -189,6 +201,15 @@ jobs:
         env:
           CI: "true"
           E2E_API_BASE_URL: http://localhost:8000
+          # playwright.config.ts's webServer defaults to port 3100 (to
+          # avoid colliding with a developer's own `npm run dev` on
+          # 3000), but the backend above only allows CORS from
+          # localhost:3000 (see CORS_ALLOWED_ORIGINS in the "Migrate and
+          # start the backend" step). Pin E2E_PORT to 3000 here so the
+          # frontend's actual origin matches what the backend allows --
+          # otherwise every browser request in this suite gets rejected
+          # by CORS before it reaches the API.
+          E2E_PORT: "3000"
         run: npm run e2e
 
       - name: Upload Playwright report

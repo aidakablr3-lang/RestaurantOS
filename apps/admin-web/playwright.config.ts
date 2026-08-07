@@ -9,7 +9,12 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  reporter: process.env.CI ? "github" : "list",
+  // "github" alone annotates the PR but writes no report to disk --
+  // ci.yml's "Upload Playwright report" step needs the "html" reporter's
+  // output to actually have something to upload on failure. `open:
+  // "never"` avoids the html reporter trying to launch a browser on the
+  // headless runner.
+  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: BASE_URL,
