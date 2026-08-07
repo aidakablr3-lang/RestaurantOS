@@ -22,6 +22,11 @@ build/
 .env.*
 !.env.example
 
+# Locally-generated dev JWT keypair (see
+# infrastructure/docker/dev-jwt/generate-dev-keys.sh) -- never commit
+# private keys, even dev-only ones.
+infrastructure/docker/dev-jwt/*.pem
+
 # IDE
 .vscode/
 .idea/

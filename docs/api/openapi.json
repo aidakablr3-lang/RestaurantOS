@@ -1,0 +1,1633 @@
+{
+  "components": {
+    "schemas": {
+      "ApiResponse_SubscriptionResponseSchema_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SubscriptionResponseSchema"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[SubscriptionResponseSchema]",
+        "type": "object"
+      },
+      "ApiResponse_SystemSettingResponseSchema_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SystemSettingResponseSchema"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[SystemSettingResponseSchema]",
+        "type": "object"
+      },
+      "ApiResponse_TenantQuotaUsageResponseSchema_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TenantQuotaUsageResponseSchema"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[TenantQuotaUsageResponseSchema]",
+        "type": "object"
+      },
+      "ApiResponse_TenantResponseSchema_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TenantResponseSchema"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[TenantResponseSchema]",
+        "type": "object"
+      },
+      "ApiResponse_TokenPairResponseSchema_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TokenPairResponseSchema"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[TokenPairResponseSchema]",
+        "type": "object"
+      },
+      "ApiResponse_list_FeatureFlagStatusResponseSchema__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/FeatureFlagStatusResponseSchema"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[list[FeatureFlagStatusResponseSchema]]",
+        "type": "object"
+      },
+      "ApiResponse_list_SystemSettingResponseSchema__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SystemSettingResponseSchema"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[list[SystemSettingResponseSchema]]",
+        "type": "object"
+      },
+      "ApiResponse_list_TenantResponseSchema__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TenantResponseSchema"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[list[TenantResponseSchema]]",
+        "type": "object"
+      },
+      "FeatureFlagStatusResponseSchema": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "enabled"
+        ],
+        "title": "FeatureFlagStatusResponseSchema",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LoginRequestSchema": {
+        "properties": {
+          "deviceId": {
+            "anyOf": [
+              {
+                "maxLength": 26,
+                "minLength": 26,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deviceid"
+          },
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "tenantId": {
+            "maxLength": 26,
+            "minLength": 26,
+            "title": "Tenantid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "email",
+          "password"
+        ],
+        "title": "LoginRequestSchema",
+        "type": "object"
+      },
+      "LogoutRequestSchema": {
+        "properties": {
+          "refreshToken": {
+            "minLength": 1,
+            "title": "Refreshtoken",
+            "type": "string"
+          },
+          "tenantId": {
+            "maxLength": 26,
+            "minLength": 26,
+            "title": "Tenantid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "refreshToken"
+        ],
+        "title": "LogoutRequestSchema",
+        "type": "object"
+      },
+      "OnboardTenantRequestSchema": {
+        "properties": {
+          "defaultCurrencyCode": {
+            "maxLength": 3,
+            "minLength": 3,
+            "title": "Defaultcurrencycode",
+            "type": "string"
+          },
+          "displayName": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Displayname",
+            "type": "string"
+          },
+          "legalName": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Legalname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "legalName",
+          "displayName",
+          "defaultCurrencyCode"
+        ],
+        "title": "OnboardTenantRequestSchema",
+        "type": "object"
+      },
+      "PaginationMeta": {
+        "description": "Sprint 4.1's first consumer: the offset/limit tenant list endpoint\n(Technical Architecture v2.0 SS5.7's back-office pagination shape).",
+        "properties": {
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "PaginationMeta",
+        "type": "object"
+      },
+      "RefreshRequestSchema": {
+        "properties": {
+          "deviceId": {
+            "anyOf": [
+              {
+                "maxLength": 26,
+                "minLength": 26,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deviceid"
+          },
+          "refreshToken": {
+            "minLength": 1,
+            "title": "Refreshtoken",
+            "type": "string"
+          },
+          "tenantId": {
+            "maxLength": 26,
+            "minLength": 26,
+            "title": "Tenantid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "refreshToken"
+        ],
+        "title": "RefreshRequestSchema",
+        "type": "object"
+      },
+      "SubscriptionResponseSchema": {
+        "properties": {
+          "currentPeriodEnd": {
+            "format": "date-time",
+            "title": "Currentperiodend",
+            "type": "string"
+          },
+          "gracePeriodUntil": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graceperioduntil"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "isActive": {
+            "title": "Isactive",
+            "type": "boolean"
+          },
+          "isInTrial": {
+            "title": "Isintrial",
+            "type": "boolean"
+          },
+          "maxBranches": {
+            "title": "Maxbranches",
+            "type": "integer"
+          },
+          "maxMonthlyOrders": {
+            "title": "Maxmonthlyorders",
+            "type": "integer"
+          },
+          "maxUsers": {
+            "title": "Maxusers",
+            "type": "integer"
+          },
+          "nextBillingDate": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextbillingdate"
+          },
+          "planCode": {
+            "title": "Plancode",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tenantId": {
+            "title": "Tenantid",
+            "type": "string"
+          },
+          "trialEnd": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trialend"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "planCode",
+          "status",
+          "currentPeriodEnd",
+          "trialEnd",
+          "nextBillingDate",
+          "gracePeriodUntil",
+          "maxBranches",
+          "maxUsers",
+          "maxMonthlyOrders",
+          "isActive",
+          "isInTrial"
+        ],
+        "title": "SubscriptionResponseSchema",
+        "type": "object"
+      },
+      "SystemSettingResponseSchema": {
+        "properties": {
+          "branchId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branchid"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "additionalProperties": true,
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "branchId"
+        ],
+        "title": "SystemSettingResponseSchema",
+        "type": "object"
+      },
+      "TenantQuotaUsageResponseSchema": {
+        "properties": {
+          "currentBranches": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentbranches"
+          },
+          "currentMonthlyOrders": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentmonthlyorders"
+          },
+          "currentUsers": {
+            "title": "Currentusers",
+            "type": "integer"
+          },
+          "maxBranches": {
+            "title": "Maxbranches",
+            "type": "integer"
+          },
+          "maxMonthlyOrders": {
+            "title": "Maxmonthlyorders",
+            "type": "integer"
+          },
+          "maxUsers": {
+            "title": "Maxusers",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "maxBranches",
+          "maxUsers",
+          "maxMonthlyOrders",
+          "currentUsers",
+          "currentBranches",
+          "currentMonthlyOrders"
+        ],
+        "title": "TenantQuotaUsageResponseSchema",
+        "type": "object"
+      },
+      "TenantResponseSchema": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "defaultCurrencyCode": {
+            "title": "Defaultcurrencycode",
+            "type": "string"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "legalName": {
+            "title": "Legalname",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tenantTier": {
+            "title": "Tenanttier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "legalName",
+          "displayName",
+          "tenantTier",
+          "status",
+          "defaultCurrencyCode",
+          "metadata",
+          "createdAt"
+        ],
+        "title": "TenantResponseSchema",
+        "type": "object"
+      },
+      "TokenPairResponseSchema": {
+        "properties": {
+          "accessToken": {
+            "title": "Accesstoken",
+            "type": "string"
+          },
+          "expiresIn": {
+            "title": "Expiresin",
+            "type": "integer"
+          },
+          "refreshToken": {
+            "title": "Refreshtoken",
+            "type": "string"
+          },
+          "tokenType": {
+            "title": "Tokentype",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "tokenType",
+          "expiresIn"
+        ],
+        "title": "TokenPairResponseSchema",
+        "type": "object"
+      },
+      "UpdateSettingRequestSchema": {
+        "properties": {
+          "key": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "value": {
+            "additionalProperties": true,
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "UpdateSettingRequestSchema",
+        "type": "object"
+      },
+      "UpdateTenantRequestSchema": {
+        "properties": {
+          "displayName": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Displayname",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          }
+        },
+        "required": [
+          "displayName"
+        ],
+        "title": "UpdateTenantRequestSchema",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "RestaurantOS API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/admin/tenants": {
+      "get": {
+        "operationId": "list_tenants_api_v1_admin_tenants_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_TenantResponseSchema__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tenants",
+        "tags": [
+          "tenant-administration"
+        ]
+      },
+      "post": {
+        "operationId": "onboard_tenant_api_v1_admin_tenants_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardTenantRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TenantResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Onboard Tenant",
+        "tags": [
+          "tenant-administration"
+        ]
+      }
+    },
+    "/api/v1/admin/tenants/{tenant_id}": {
+      "get": {
+        "operationId": "get_tenant_api_v1_admin_tenants__tenant_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "maxLength": 26,
+              "minLength": 26,
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TenantResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tenant",
+        "tags": [
+          "tenant-administration"
+        ]
+      },
+      "patch": {
+        "operationId": "update_tenant_api_v1_admin_tenants__tenant_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "maxLength": 26,
+              "minLength": 26,
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTenantRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TenantResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Tenant",
+        "tags": [
+          "tenant-administration"
+        ]
+      }
+    },
+    "/api/v1/admin/tenants/{tenant_id}/offboard": {
+      "post": {
+        "operationId": "offboard_tenant_api_v1_admin_tenants__tenant_id__offboard_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "maxLength": 26,
+              "minLength": 26,
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TenantResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Offboard Tenant",
+        "tags": [
+          "tenant-administration"
+        ]
+      }
+    },
+    "/api/v1/admin/tenants/{tenant_id}/reactivate": {
+      "post": {
+        "operationId": "reactivate_tenant_api_v1_admin_tenants__tenant_id__reactivate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "maxLength": 26,
+              "minLength": 26,
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TenantResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reactivate Tenant",
+        "tags": [
+          "tenant-administration"
+        ]
+      }
+    },
+    "/api/v1/admin/tenants/{tenant_id}/suspend": {
+      "post": {
+        "operationId": "suspend_tenant_api_v1_admin_tenants__tenant_id__suspend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "maxLength": 26,
+              "minLength": 26,
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TenantResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suspend Tenant",
+        "tags": [
+          "tenant-administration"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TokenPairResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_api_v1_auth_logout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "refresh_api_v1_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TokenPairResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/tenants/me": {
+      "get": {
+        "operationId": "get_my_tenant_api_v1_tenants_me_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TenantResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get My Tenant",
+        "tags": [
+          "tenant-self-service"
+        ]
+      }
+    },
+    "/api/v1/tenants/me/feature-flags": {
+      "get": {
+        "operationId": "get_my_feature_flags_api_v1_tenants_me_feature_flags_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_FeatureFlagStatusResponseSchema__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get My Feature Flags",
+        "tags": [
+          "tenant-self-service"
+        ]
+      }
+    },
+    "/api/v1/tenants/me/quotas": {
+      "get": {
+        "operationId": "get_my_quota_usage_api_v1_tenants_me_quotas_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TenantQuotaUsageResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get My Quota Usage",
+        "tags": [
+          "tenant-self-service"
+        ]
+      }
+    },
+    "/api/v1/tenants/me/settings": {
+      "get": {
+        "operationId": "get_my_settings_api_v1_tenants_me_settings_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_SystemSettingResponseSchema__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get My Settings",
+        "tags": [
+          "tenant-self-service"
+        ]
+      },
+      "put": {
+        "operationId": "update_my_setting_api_v1_tenants_me_settings_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_SystemSettingResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update My Setting",
+        "tags": [
+          "tenant-self-service"
+        ]
+      }
+    },
+    "/api/v1/tenants/me/subscription": {
+      "get": {
+        "operationId": "get_my_subscription_api_v1_tenants_me_subscription_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_SubscriptionResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get My Subscription",
+        "tags": [
+          "tenant-self-service"
+        ]
+      }
+    }
+  }
+}

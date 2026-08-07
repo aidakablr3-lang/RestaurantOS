@@ -45,6 +45,22 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     jwt: JWTSettings = Field(default_factory=JWTSettings)  # type: ignore[arg-type]
+    # A plain, comma-separated `str` -- not `list[str]` -- because
+    # pydantic-settings parses any complex-typed env var as JSON by
+    # default, which rejects a plain comma-separated value outright.
+    # `cors_allowed_origins` below does the splitting.
+    cors_allowed_origins_csv: str = Field(
+        default="http://localhost:3000",
+        alias="CORS_ALLOWED_ORIGINS",
+        description="Comma-separated browser origins allowed to call this "
+        "API cross-origin (e.g. apps/admin-web's dev server).",
+    )
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        return [
+            origin.strip() for origin in self.cors_allowed_origins_csv.split(",") if origin.strip()
+        ]
 
 
 @lru_cache(maxsize=1)

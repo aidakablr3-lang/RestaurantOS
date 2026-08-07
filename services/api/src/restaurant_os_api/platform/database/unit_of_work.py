@@ -6,11 +6,17 @@ it does happens inside that single transaction boundary — this is what
 makes a future Outbox insert (Technical Architecture v2.0 Group B, not
 yet introduced in this PR) atomic with the business write it accompanies.
 
-This is also the **only** place that issues ``SET LOCAL app.tenant_id``
-(Data Architecture v2.0 SS4.1/SS4.8) — transaction-scoped, safe under
-PgBouncer transaction-mode pooling, because ``SET LOCAL`` resets at
-``COMMIT``/``ROLLBACK`` regardless of whether the underlying physical
-connection is reused.
+This is also the **only** place that sets ``app.tenant_id`` (Data
+Architecture v2.0 SS4.1/SS4.8) — transaction-scoped, safe under
+PgBouncer transaction-mode pooling, because ``set_config(..., true)``
+(the ``is_local`` flag) resets at ``COMMIT``/``ROLLBACK`` regardless of
+whether the underlying physical connection is reused, identically to
+``SET LOCAL``. ``set_config()`` is used instead of ``SET LOCAL``
+because PostgreSQL's ``SET``/``SET LOCAL`` statement syntax does not
+accept a bind parameter (the value must be a literal) — asyncpg's
+server-side parameter binding rejects ``SET LOCAL app.tenant_id = $1``
+with a syntax error, whereas ``set_config()`` is an ordinary function
+call and accepts one normally.
 """
 
 from __future__ import annotations
@@ -55,7 +61,7 @@ class UnitOfWork:
         self._session = self._session_factory()
         if self._tenant_context is not None:
             await self._session.execute(
-                text("SET LOCAL app.tenant_id = :tenant_id"),
+                text("SELECT set_config('app.tenant_id', :tenant_id, true)"),
                 {"tenant_id": self._tenant_context.tenant_id},
             )
         return self
