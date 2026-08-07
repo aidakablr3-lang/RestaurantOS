@@ -24,6 +24,7 @@ from restaurant_os_api.modules.identity.domain.exceptions import (
 @dataclass(slots=True)
 class Session:
     id: str
+    tenant_id: str
     user_id: str
     device_id: str | None
     refresh_token_hash: str

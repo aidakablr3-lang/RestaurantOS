@@ -5,6 +5,7 @@ from restaurant_os_api.platform.database.mixins import (
     TimestampMixin,
     ULIDPrimaryKeyMixin,
 )
+from restaurant_os_api.platform.database.unit_of_work import UnitOfWork
 
 __all__ = [
     "Base",
@@ -12,4 +13,5 @@ __all__ = [
     "TenantScopedMixin",
     "TimestampMixin",
     "ULIDPrimaryKeyMixin",
+    "UnitOfWork",
 ]
