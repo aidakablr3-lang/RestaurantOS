@@ -20,9 +20,19 @@ class CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+class PaginationMeta(CamelModel):
+    """Sprint 4.1's first consumer: the offset/limit tenant list endpoint
+    (Technical Architecture v2.0 SS5.7's back-office pagination shape)."""
+
+    total: int
+    offset: int
+    limit: int
+
+
 class ApiResponse(CamelModel, Generic[T]):  # noqa: UP046 -- Pydantic generic model support
     success: bool = True
     data: T
+    meta: PaginationMeta | None = None
 
 
 class ApiErrorDetail(CamelModel):

@@ -26,10 +26,23 @@ from restaurant_os_api.modules.identity.application.interfaces import (
     PasswordHasher,
     TokenService,
 )
+from restaurant_os_api.modules.identity.application.services import TenantProvisioningService
 from restaurant_os_api.modules.identity.application.use_cases import (
+    GetSubscriptionStatusUseCase,
+    GetTenantQuotaUsageUseCase,
+    GetTenantSettingsUseCase,
+    GetTenantUseCase,
+    ListFeatureFlagsUseCase,
+    ListTenantsUseCase,
     LoginUserUseCase,
     LogoutUserUseCase,
+    OffboardTenantUseCase,
+    OnboardTenantUseCase,
+    ReactivateTenantUseCase,
     RefreshAccessTokenUseCase,
+    SuspendTenantUseCase,
+    UpdateTenantSettingsUseCase,
+    UpdateTenantUseCase,
     VerifyAccessTokenUseCase,
 )
 from restaurant_os_api.modules.identity.domain.exceptions import (
@@ -37,7 +50,11 @@ from restaurant_os_api.modules.identity.domain.exceptions import (
     InvalidAccessTokenError,
 )
 from restaurant_os_api.modules.identity.infrastructure.database.repositories import (
+    SQLAlchemyFeatureFlagRepository,
     SQLAlchemySessionRepository,
+    SQLAlchemySubscriptionRepository,
+    SQLAlchemySystemSettingRepository,
+    SQLAlchemyTenantDirectoryRepository,
     SQLAlchemyTenantRepository,
     SQLAlchemyUserRepository,
 )
@@ -45,6 +62,7 @@ from restaurant_os_api.modules.identity.infrastructure.security import (
     Argon2PasswordHasher,
     JWTTokenService,
 )
+from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchemyOutboxWriter
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
@@ -183,3 +201,147 @@ async def require_platform_admin(
 
 
 PlatformAdminDep = Annotated[AuthenticatedPrincipalDTO, Depends(require_platform_admin)]
+
+
+# --- Tenant Platform (Sprint 4.1) ---------------------------------------
+
+
+def get_tenant_provisioning_service(
+    session_factory: SessionFactoryDep,
+) -> TenantProvisioningService:
+    return TenantProvisioningService(
+        session_factory=session_factory,
+        tenant_repository_factory=SQLAlchemyTenantRepository,
+        subscription_repository_factory=SQLAlchemySubscriptionRepository,
+        feature_flag_repository_factory=SQLAlchemyFeatureFlagRepository,
+        directory_repository_factory=SQLAlchemyTenantDirectoryRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+TenantProvisioningServiceDep = Annotated[
+    TenantProvisioningService, Depends(get_tenant_provisioning_service)
+]
+
+
+def get_onboard_tenant_use_case(
+    provisioning_service: TenantProvisioningServiceDep,
+) -> OnboardTenantUseCase:
+    return OnboardTenantUseCase(provisioning_service=provisioning_service)
+
+
+def get_get_tenant_use_case(session_factory: SessionFactoryDep) -> GetTenantUseCase:
+    return GetTenantUseCase(
+        session_factory=session_factory, tenant_repository_factory=SQLAlchemyTenantRepository
+    )
+
+
+def get_list_tenants_use_case(session_factory: SessionFactoryDep) -> ListTenantsUseCase:
+    return ListTenantsUseCase(
+        session_factory=session_factory, tenant_repository_factory=SQLAlchemyTenantRepository
+    )
+
+
+def get_update_tenant_use_case(session_factory: SessionFactoryDep) -> UpdateTenantUseCase:
+    return UpdateTenantUseCase(
+        session_factory=session_factory, tenant_repository_factory=SQLAlchemyTenantRepository
+    )
+
+
+def get_suspend_tenant_use_case(session_factory: SessionFactoryDep) -> SuspendTenantUseCase:
+    return SuspendTenantUseCase(
+        session_factory=session_factory,
+        tenant_repository_factory=SQLAlchemyTenantRepository,
+        session_repository_factory=SQLAlchemySessionRepository,
+        directory_repository_factory=SQLAlchemyTenantDirectoryRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+def get_reactivate_tenant_use_case(
+    session_factory: SessionFactoryDep,
+) -> ReactivateTenantUseCase:
+    return ReactivateTenantUseCase(
+        session_factory=session_factory,
+        tenant_repository_factory=SQLAlchemyTenantRepository,
+        directory_repository_factory=SQLAlchemyTenantDirectoryRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+def get_offboard_tenant_use_case(session_factory: SessionFactoryDep) -> OffboardTenantUseCase:
+    return OffboardTenantUseCase(
+        session_factory=session_factory,
+        tenant_repository_factory=SQLAlchemyTenantRepository,
+        session_repository_factory=SQLAlchemySessionRepository,
+        directory_repository_factory=SQLAlchemyTenantDirectoryRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+def get_subscription_status_use_case(
+    session_factory: SessionFactoryDep,
+) -> GetSubscriptionStatusUseCase:
+    return GetSubscriptionStatusUseCase(
+        session_factory=session_factory,
+        subscription_repository_factory=SQLAlchemySubscriptionRepository,
+    )
+
+
+def get_tenant_quota_usage_use_case(
+    session_factory: SessionFactoryDep,
+) -> GetTenantQuotaUsageUseCase:
+    return GetTenantQuotaUsageUseCase(
+        session_factory=session_factory,
+        subscription_repository_factory=SQLAlchemySubscriptionRepository,
+        user_repository_factory=SQLAlchemyUserRepository,
+    )
+
+
+def get_tenant_settings_use_case(session_factory: SessionFactoryDep) -> GetTenantSettingsUseCase:
+    return GetTenantSettingsUseCase(
+        session_factory=session_factory,
+        system_setting_repository_factory=SQLAlchemySystemSettingRepository,
+    )
+
+
+def get_update_tenant_settings_use_case(
+    session_factory: SessionFactoryDep,
+) -> UpdateTenantSettingsUseCase:
+    return UpdateTenantSettingsUseCase(
+        session_factory=session_factory,
+        system_setting_repository_factory=SQLAlchemySystemSettingRepository,
+    )
+
+
+def get_list_feature_flags_use_case(session_factory: SessionFactoryDep) -> ListFeatureFlagsUseCase:
+    return ListFeatureFlagsUseCase(
+        session_factory=session_factory,
+        feature_flag_repository_factory=SQLAlchemyFeatureFlagRepository,
+    )
+
+
+OnboardTenantUseCaseDep = Annotated[OnboardTenantUseCase, Depends(get_onboard_tenant_use_case)]
+GetTenantUseCaseDep = Annotated[GetTenantUseCase, Depends(get_get_tenant_use_case)]
+ListTenantsUseCaseDep = Annotated[ListTenantsUseCase, Depends(get_list_tenants_use_case)]
+UpdateTenantUseCaseDep = Annotated[UpdateTenantUseCase, Depends(get_update_tenant_use_case)]
+SuspendTenantUseCaseDep = Annotated[SuspendTenantUseCase, Depends(get_suspend_tenant_use_case)]
+ReactivateTenantUseCaseDep = Annotated[
+    ReactivateTenantUseCase, Depends(get_reactivate_tenant_use_case)
+]
+OffboardTenantUseCaseDep = Annotated[OffboardTenantUseCase, Depends(get_offboard_tenant_use_case)]
+GetSubscriptionStatusUseCaseDep = Annotated[
+    GetSubscriptionStatusUseCase, Depends(get_subscription_status_use_case)
+]
+GetTenantQuotaUsageUseCaseDep = Annotated[
+    GetTenantQuotaUsageUseCase, Depends(get_tenant_quota_usage_use_case)
+]
+GetTenantSettingsUseCaseDep = Annotated[
+    GetTenantSettingsUseCase, Depends(get_tenant_settings_use_case)
+]
+UpdateTenantSettingsUseCaseDep = Annotated[
+    UpdateTenantSettingsUseCase, Depends(get_update_tenant_settings_use_case)
+]
+ListFeatureFlagsUseCaseDep = Annotated[
+    ListFeatureFlagsUseCase, Depends(get_list_feature_flags_use_case)
+]
