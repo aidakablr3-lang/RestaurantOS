@@ -62,8 +62,14 @@ override values, put them in a root-level `.env` (gitignored), not
 **Note:** this repo's Docker setup was authored and syntax-validated
 (`docker compose config`-equivalent YAML parsing) but not run against
 a live Docker daemon in the environment that built it -- Docker wasn't
-installed there. If `docker compose up` doesn't work as described,
-that's the first thing to check; please fix forward and update this
+installed there. One real build-breaking bug was already found and
+fixed this way (`infrastructure/docker/api/Dockerfile` installed the
+package before its source existed in the image, permanently breaking
+the import -- confirmed and fixed by reproducing the exact pip/
+setuptools sequence outside Docker, see `docs/releases/v0.1.0-rc1.md`),
+but a full `docker compose up --build` has still never actually run.
+If it doesn't work as described, that's the first thing to check;
+please fix forward and update this
 doc rather than assuming it's untestable.
 
 ## Option B: Manual native setup
