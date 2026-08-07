@@ -3,7 +3,7 @@
 **Purpose:** This is the canonical handoff document for every future Claude session working on RestaurantOS. Read this file first, before touching any code, to reconstruct full project context.
 
 **Last updated:** 2026-08-07
-**Updated by:** Sprint 4.1 Step 3 (frontend build + real-backend browser verification + defect fixes), Step 4 (integration suite restored, 17 new backend integration tests, 24-spec Playwright E2E suite, 1 more real defect found and fixed), Step 5 (Docker Compose, developer docs, OpenAPI export, GitHub Actions CI, README/release-checklist — release hardening, no new application functionality), an **RC1 hardening pass** (removed a committed dev JWT private key, fixed a build-breaking Dockerfile bug and a CI CORS/port mismatch, produced `docs/releases/v0.1.0-rc1.md`), and **first GitHub push** (repository created, `origin` configured, all 3 branches pushed, CI confirmed passing on real infrastructure for the first time — see §18/§19)
+**Updated by:** Sprint 4.1 Step 3 (frontend build + real-backend browser verification + defect fixes), Step 4 (integration suite restored, 17 new backend integration tests, 24-spec Playwright E2E suite, 1 more real defect found and fixed), Step 5 (Docker Compose, developer docs, OpenAPI export, GitHub Actions CI, README/release-checklist — release hardening, no new application functionality), an **RC1 hardening pass** (removed a committed dev JWT private key, fixed a build-breaking Dockerfile bug and a CI CORS/port mismatch, produced `docs/releases/v0.1.0-rc1.md`), **first GitHub push** (repository created, `origin` configured, all 3 branches pushed, CI confirmed passing on real infrastructure), and **the merge itself** (`feature/tenant-platform-frontend` merged into `develop` via an explicit merge commit, user-approved — see §20)
 
 ---
 
@@ -23,7 +23,7 @@ Sprint 4.1 follows a 5-step gated process, defined explicitly by the user:
 | 2 | Implement backend, wait for approval | Complete — 7 commits, approved |
 | 3 | Implement frontend, wait for approval | **Complete — user explicitly confirmed "Step 3 is complete" after reviewing the real-backend browser verification results.** 6/10 originally-scoped screens (7 commits, `a76c5a9`→`012bd8b`) |
 | 4 | Testing, wait for approval | **Complete — user explicitly confirmed "Step 4 is complete"** (5 commits, `1962a45`→`695ea34`): integration test suite restored + extended, Playwright E2E suite added, both green |
-| 5 | Documentation / release hardening, wait for approval | **Done for its defined scope** (5 commits, `d9f5457`→`13b1bb2`): Docker Compose, developer docs, OpenAPI export, GitHub Actions CI, README + release checklist. Not yet presented to the user for the Step 5 sign-off itself (see §10) |
+| 5 | Documentation / release hardening, wait for approval | **Complete — user explicitly approved: "The Tenant Platform Release Candidate (RC1) has passed review... Proceed with the merge."** `feature/tenant-platform-frontend` merged into `develop` via merge commit `80fcb9d`, pushed to `origin/develop`. See §20. |
 
 **Scope-down decision (approved by the user):** The original Step 1 plan listed 10 admin-web screens, including Subscription Status, Quota Dashboard, Feature Flag Display, and Tenant Settings. Discovered mid-session: the backend only exposes those four as **self-service** endpoints (`/api/v1/tenants/me/*`), which resolve `tenant_id` from the caller's own JWT and structurally cannot take an admin-selected tenant ID (`self_service_tenant_router.py:1-4`, citing Data Architecture v2.0 §4.1 — tenant scope is never client-asserted). There is no admin-scoped route (e.g. `/api/v1/admin/tenants/{id}/subscription`) — the underlying use cases (`GetSubscriptionStatusUseCase`, `GetTenantQuotaUsageUseCase`, `GetTenantSettingsUseCase`, `ListFeatureFlagsUseCase`) already accept any `tenant_id` and could be wired to one, but that wiring doesn't exist yet. Presented to the user as a STOP with 3 options (add thin admin endpoints now / scope down / decide later); **user chose to scope down, and explicitly reconfirmed "do not add backend endpoints for Subscription, Quota, Feature Flags, or Tenant Settings in this sprint. Treat those as future work"** when giving the Step 4 task. Those 4 screens are deferred, not abandoned — see §11.
 
@@ -49,24 +49,24 @@ This is both the Git repository root and the monorepo root (`services/api`, `app
 
 ## 5. Git Branch
 
-**Current branch:** `feature/tenant-platform-frontend`
+**Current branch:** `develop` (checked out to perform the merge; `feature/tenant-platform-frontend` still exists, untouched, not deleted per explicit instruction)
 
-Branch structure:
+Branch structure (post-merge):
 
 ```
-main                                 <- renamed from master
- └── develop                         <- created from main
-      └── feature/tenant-platform-frontend   <- 28 commits ahead of develop/main (Step 3 + Step 4 + Step 5 + RC1 hardening + GitHub push)
+main                                 <- renamed from master; still at 1747258, not yet promoted
+ └── develop                         <- MERGED: now contains all of feature/tenant-platform-frontend's history
+      └── feature/tenant-platform-frontend   <- still exists (28 commits, HEAD 4294792), not deleted
 ```
 
-`main` and `develop` are still at `1747258` (Step 2's last backend commit); only `feature/tenant-platform-frontend` has all of Step 3's, Step 4's, Step 5's, the RC1 pass's, and this session's commits. **Not yet merged up.** All three branches are now pushed to `origin` with upstream tracking (§19), but that is a separate action from merging — "prepare for merge"/"do not merge" continues to be read as: get the branch merge-ready and present that readiness for an explicit go-ahead, not as standing authorization to run `git merge` unprompted. This session's own instructions repeated this explicitly ("Do NOT merge... Wait for my approval"). See §19's Merge Recommendation.
+**The merge is complete.** `develop` was merged with `feature/tenant-platform-frontend` via an explicit `--no-ff` merge commit (`80fcb9d`, two parents: old `develop` tip `1747258` and feature-branch tip `4294792`) — a real merge commit, not a fast-forward, not a squash, full history preserved. Pushed to `origin/develop`. `main` is unchanged, still at `1747258` — promoting `develop` into `main` is a separate, not-yet-requested action. See §20 for the full merge record.
 
 ## 6. Current HEAD Commit
 
 ```
-09f4be84ddcbdc5ef19eebf168ae10f401151291
+80fcb9d3ba3d6fb0f00f928d6c223afc33e44e8e
 ```
-(short: `09f4be8` — `docs(releases): update v0.1.0-rc1 with real GitHub push and CI results`)
+(short: `80fcb9d` — `Merge feature/tenant-platform-frontend into develop`, on `develop`)
 
 ## 7. Working Tree Status
 
@@ -147,20 +147,18 @@ Full re-verification after all 5 commits: backend 84/84 passing, `ruff format --
 
 ## 9. Current Work
 
-Sprint 4.1 Steps 3, 4, and 5 are all done for their defined scope, and Steps 3 and 4 have both been explicitly signed off by the user ("Step 3 is complete", "Step 4 is complete"). Beyond Step 5, this session ran an explicit **RC1 hardening pass** (8-step gate: verify state, remove committed dev keys, GitHub prep, CI review, Docker review, fix-only-verified-issues, RC1 report, this update) — see §18 for the full account. 4 admin-web screens remain explicitly deferred as future work per the user's decision (§2). No architecture files were touched this session; the only backend runtime-code changes across Steps 3–5 and the RC1 pass (`07dea29`, `6e50f68`) were pre-approved critical-bug fixes — everything else was test/test-infrastructure, tooling, release-engineering, or documentation work.
-
-**The branch is prepared for a merge into `develop`.** Everything needed for a clean merge is in place (working tree clean, all tests green, this document current, `docs/releases/v0.1.0-rc1.md` written) and that readiness is being reported to the user, but the actual `git merge` command has not been run and won't be without an explicit go-ahead in the same turn — every earlier phase this sprint used "do not merge yet" language, and nothing said since reads as a standing exception to that.
+Sprint 4.1 (Tenant Platform) is **merged into `develop`.** Steps 3, 4, and 5 are all done for their defined scope; Steps 3, 4, and 5 have all been explicitly signed off by the user ("Step 3 is complete", "Step 4 is complete", "The Tenant Platform Release Candidate (RC1) has passed review... Proceed with the merge"). The RC1 hardening pass, the GitHub push/CI verification pass, and the merge itself are all recorded in §18–§20. 4 admin-web screens remain explicitly deferred as future work per the user's decision (§2). No architecture files were touched at any point in this branch's life; the only backend runtime-code changes across Steps 3–5 and the RC1 pass (`07dea29`, `6e50f68`) were pre-approved critical-bug fixes — everything else was test/test-infrastructure, tooling, release-engineering, or documentation work, all now part of `develop`'s history.
 
 ## 10. Next Task
 
 In priority order:
 
-1. **Get explicit confirmation to actually run the merge.** Everything is prepared (§9, §18); `git merge feature/tenant-platform-frontend` into `develop` has not been executed. This is the single next action once the user responds.
-2. **After merging to `develop`,** decide whether to also promote to `main` now or treat that as a separate, later decision — `docs/RELEASE_CHECKLIST.md`'s "Before promoting `develop` into `main`" section requires full CI green *on `develop` itself*, impossible to satisfy today since GitHub Actions has never actually run (no remote configured).
-3. **Someone/something with Docker and a real GitHub remote should live-test** `docker compose up --build` and the `.github/workflows/ci.yml` pipeline at the first opportunity. This RC1 pass found and fixed one real bug in each (a build-breaking Dockerfile COPY-order issue, a CORS/port mismatch that would have failed every E2E test in CI) via careful static reproduction — but neither has actually executed end-to-end. This is the biggest real gap left. See §18.
-4. **Decide what to do about the dev-JWT-keypair exposure in this branch's earlier commit history** (§11, §18) — the key itself is low-risk (never protected anything real), but a decision on whether to rewrite history belongs to whoever owns this repository, not something done unilaterally.
+1. **Decide on `main`.** `develop` now has the Tenant Platform; `main` does not yet. Promoting `develop` → `main` is a separate, not-yet-requested action — `docs/RELEASE_CHECKLIST.md`'s "Before promoting `develop` into `main`" section requires full CI green *on `develop` itself* first (not just the feature branch), which hasn't been separately checked yet since the merge (see §20).
+2. **The user has explicitly said to wait for approval before creating the first release tag** (e.g. `v0.1.0-rc1` as an actual git tag) — do not create one unprompted.
+3. **`docker compose up --build` still needs a real run** on a machine with Docker installed — the one remaining unverified piece of this whole release (GitHub Actions is now confirmed, see §19).
+4. **Decide what to do about the dev-JWT-keypair exposure in this branch's earlier commit history** (§11, §18) — the key itself is low-risk (never protected anything real), but a decision on whether to rewrite history belongs to whoever owns this repository, not something done unilaterally. Note this history is now part of `develop` too, post-merge.
 5. **Resolve the Subscription/Quota/Feature-Flag/Settings gap** (§2, §11) if/when the user wants those 4 screens — needs the admin-scoped backend endpoints first, explicitly out of scope for this sprint per the user's instruction.
-6. Once merged, the next sprint (per the user: "Do not begin Restaurant Platform yet") is still an open decision — Sprint 4.1's own remaining scope (the 4 deferred screens) vs. starting the Restaurant Platform is the user's call, not assumed here.
+6. **The next sprint is an open decision, explicitly not to be started unprompted** ("Do NOT begin Restaurant Platform") — Sprint 4.1's own remaining scope (the 4 deferred screens) vs. starting the Restaurant Platform is the user's call.
 
 ## 11. Pending Tasks / Known Issues
 
@@ -365,15 +363,37 @@ All three branches tracking: `main` → `origin/main`, `develop` → `origin/dev
 
 ---
 
+## 20. Merge Completion
+
+**The merge happened.** User approval, verbatim: *"Approved. The Tenant Platform Release Candidate (RC1) has passed review. GitHub verification is complete. GitHub Actions are green. Proceed with the merge."* — followed by an explicit 5-step gate for the merge itself.
+
+**Steps completed:**
+
+1. **Final verification before merging** — `git status` (clean), `git branch -vv` (all three branches tracking `origin`), `git log --oneline -5` (feature branch), plus an explicit ahead/behind check: `develop`/`origin/develop` and `feature/tenant-platform-frontend`/`origin/feature/tenant-platform-frontend` were each exactly `0 ahead, 0 behind` their remote counterpart before the merge — both branches fully pushed, nothing divergent.
+2. **Merge** — checked out `develop`, ran `git merge --no-ff feature/tenant-platform-frontend` with a detailed merge-commit message summarizing the whole Tenant Platform release. Result: **merge commit `80fcb9d3ba3d6fb0f00f928d6c223afc33e44e8e`**, confirmed to have two parents (`1747258` = old `develop` tip, `4294792` = feature-branch tip) — a genuine merge commit. No fast-forward (explicitly avoided with `--no-ff`, since a fast-forward was otherwise available and would not have produced the "normal merge commit" the user asked for), no squash, no rebase. Full history preserved: all 43 commits from `feature/tenant-platform-frontend` are now reachable from `develop`. Merge was clean — no conflicts.
+3. **Push** — `git push origin develop`: `1747258..80fcb9d develop -> develop`. Verified via `git branch -vv` (`develop` now tracks `origin/develop` at `80fcb9d`) and `git ls-remote origin` (`refs/heads/develop` = `80fcb9d3ba3d6fb0f00f928d6c223afc33e44e8e`, matching local exactly). `feature/tenant-platform-frontend` and `main` untouched, still present on both local and remote.
+4. **This update.**
+
+**Merge commit:** `80fcb9d3ba3d6fb0f00f928d6c223afc33e44e8e` (short `80fcb9d`)
+**`develop` HEAD (post-merge, post-push):** `80fcb9d3ba3d6fb0f00f928d6c223afc33e44e8e`, confirmed identical on `origin/develop`
+**RC1 status:** Merged. `v0.1.0-rc1`'s full content (93 files changed, 17,350 insertions, 17 deletions — the merge's own diffstat) is now part of `develop`'s history. No git tag has been created — the user explicitly said to wait for approval before creating the first release tag.
+**Current repository status:** Working tree clean on `develop`. `feature/tenant-platform-frontend` still exists locally and remotely, not deleted (explicit instruction). `main` unchanged at `1747258`, not yet promoted.
+
+**What did NOT happen, per explicit instruction:** the feature branch was not deleted; no git tag was created; the Restaurant Platform was not started; `main` was not touched.
+
+---
+
 ## Engineering Status
 
-**Completed Sprints:** 0 (Product Blueprint), 1 (Technical Architecture v1.0), 1.5 (TAD remediation → v2.0), 2 (Data Architecture v1.0), 2.6 (Data Architecture remediation → v2.0), 3 (Identity Platform backend), 4.1 Steps 1–2 (Tenant Platform plan + backend).
+**Completed Sprints:** 0 (Product Blueprint), 1 (Technical Architecture v1.0), 1.5 (TAD remediation → v2.0), 2 (Data Architecture v1.0), 2.6 (Data Architecture remediation → v2.0), 3 (Identity Platform backend), **4.1 (Tenant Platform, all 5 steps — merged into `develop`)**.
 
-**In progress:** `feature/tenant-platform-frontend` pushed to GitHub (`https://github.com/aidakablr3-lang/RestaurantOS`) and confirmed via a real, green CI run (§19) — ready for a merge into `develop`, merge readiness reported to the user, actual `git merge` awaiting an explicit go-ahead (§9/§10/§18/§19). Steps 3, 4, and 5 are all complete for their defined scope; Steps 3 and 4 have been explicitly user-signed-off; the RC1 hardening pass found and fixed 2 real release-engineering bugs (Dockerfile build order, CI CORS/port mismatch) plus removed a committed dev private key; both fixes now confirmed on real GitHub infrastructure.
+**In progress:** Nothing actively in flight. Sprint 4.1 is merged into `develop` (merge commit `80fcb9d`, pushed to `origin/develop`). Open decisions for whoever picks this up next: promote `develop` → `main`, create the first release tag (both explicitly awaiting separate approval), a real `docker compose up --build` verification, and the choice of next sprint (remaining Tenant Platform screens vs. Restaurant Platform) — see §10.
 
-**Completed Commits (42 total on `feature/tenant-platform-frontend`; `main`/`develop` are 28 commits behind, still at `1747258`):**
+**Completed Commits on `develop` (44 total — 43 inherited from `feature/tenant-platform-frontend` plus the merge commit itself; `main` remains 30 commits behind, still at `1747258`; `feature/tenant-platform-frontend` still exists, untouched, at `4294792`):**
 
 ```
+80fcb9d Merge feature/tenant-platform-frontend into develop
+4294792 docs(repo): record GitHub push and CI verification in AI_HANDOFF.md
 09f4be8 docs(releases): update v0.1.0-rc1 with real GitHub push and CI results
 7bdc2db docs(repo): record RC1 hardening pass in AI_HANDOFF.md
 5f6dacd docs(releases): add v0.1.0-rc1 release candidate report
@@ -418,13 +438,13 @@ d85bb6a feat(identity): add SQLAlchemy models and initial migration for identity
 f56869f chore(repo): scaffold monorepo structure and archive frozen architecture docs
 ```
 
-**Current Branch:** `feature/tenant-platform-frontend`
+**Current Branch:** `develop` (post-merge). `feature/tenant-platform-frontend` still exists, not deleted.
 
-**Current PR:** None. The repository is now on GitHub (`https://github.com/aidakablr3-lang/RestaurantOS`, `origin` configured, all 3 branches pushed — §19), but no pull request has been opened; a merge into `develop`, when confirmed, is expected to be a local `git merge` pushed directly, not necessarily a PR, unless the user specifies otherwise.
+**Current PR:** None. The repository is on GitHub (`https://github.com/aidakablr3-lang/RestaurantOS`), but the merge was a direct local `git merge` + `git push origin develop`, not a pull request — no PR was ever opened for this work.
 
-**Current Milestone:** RC1 (v0.1.0-rc1) — Tenant Platform release candidate. Sprint 4.1 Step 5 (release hardening) done for its given scope, followed by an RC1 hardening pass (removed a committed dev private key, fixed 2 real release-engineering bugs via static/reproduction-based review) and then a GitHub push + CI verification pass (§19) that **confirmed both fixes on real infrastructure** with a green first-ever CI run. Docker Compose remains the one still-not-live-tested piece (no Docker in this environment — see §11, §18, §19). Branch is prepared for merge into `develop`; awaiting explicit confirmation before running `git merge` (§9/§10/§18/§19). Full report: `docs/releases/v0.1.0-rc1.md`.
+**Current Milestone:** Sprint 4.1 (Tenant Platform) — **merged into `develop`** via merge commit `80fcb9d`. RC1 hardening (removed a committed dev private key, fixed 2 real release-engineering bugs), a GitHub push + CI verification pass (confirmed both fixes on real infrastructure, first-ever green CI run), and the merge itself are all complete. Docker Compose remains the one still-not-live-tested piece (no Docker in this environment — see §11, §18, §19, §20). Full report: `docs/releases/v0.1.0-rc1.md`; full merge record: §20.
 
-**Current Feature:** Tenant Platform (Sprint 4.1) — Tenant CRUD/lifecycle, Subscription, Settings, Feature Flags, Tenant Directory, Tenant Administration (backend complete, browser-verified, and integration-tested; frontend: List/Details/Create/Edit/Suspend/Reactivate built, browser-verified, and E2E-tested; Subscription/Quota/Feature-Flags/Settings explicitly deferred as future work per the user). Release-hardened: Docker Compose, CI pipeline, developer docs, OpenAPI snapshot, release checklist all in place.
+**Current Feature:** Tenant Platform (Sprint 4.1) — Tenant CRUD/lifecycle, Subscription, Settings, Feature Flags, Tenant Directory, Tenant Administration (backend complete, browser-verified, and integration-tested; frontend: List/Details/Create/Edit/Suspend/Reactivate built, browser-verified, and E2E-tested; Subscription/Quota/Feature-Flags/Settings explicitly deferred as future work per the user). Release-hardened and merged: Docker Compose, CI pipeline, developer docs, OpenAPI snapshot, release checklist all in place on `develop`.
 
 **Current Module:** Backend — `services/api/src/restaurant_os_api/modules/identity` (extended, not new, per Decision A), plus its `tests/integration/` suite, `scripts/seed_e2e_fixtures.py`, and `scripts/export_openapi.py`. Frontend — `apps/admin-web` (Next.js 15 app), plus its `e2e/` Playwright suite. Infrastructure — `docker-compose.yml`, `infrastructure/docker/` (new this step). Docs — `docs/DEVELOPMENT.md`, `docs/RELEASE_CHECKLIST.md`, `docs/api/` (new this step).
 
