@@ -41,19 +41,29 @@ class TestUnitOfWorkTenantContext:
             )
             assert result.scalar_one() == tenant_id
 
-    async def test_tenant_context_does_not_leak_into_a_later_transaction(
-        self, session_factory
+    async def test_tenant_context_does_not_leak_into_a_later_transaction_on_the_same_connection(
+        self, engine
     ) -> None:
         """``set_config(..., true)`` (``is_local``) must reset at COMMIT,
-        the same guarantee ``SET LOCAL`` gave -- otherwise a pooled
-        connection could leak one request's tenant scope into the next."""
+        the same guarantee ``SET LOCAL`` gave -- otherwise a single
+        physical connection, reused by a later request under normal
+        pooling, could see a stale ``tenant_id`` left over from whatever
+        request used that connection last.
+
+        Uses one connection directly (not through ``session_factory``,
+        which sits on a ``NullPool`` for this test session specifically
+        so ``TestClient``-driven tests never reuse a connection across
+        event loops -- see conftest.py) so physical-connection reuse is
+        forced and deterministic here, not incidental.
+        """
         tenant_id = generate_ulid()
 
-        async with UnitOfWork(session_factory, TenantContext(tenant_id)):
-            pass
-
-        async with UnitOfWork(session_factory) as uow:
-            result = await uow.session.execute(
-                text("SELECT current_setting('app.tenant_id', true)")
-            )
-            assert result.scalar_one() == ""
+        async with engine.connect() as conn:
+            async with conn.begin():
+                await conn.execute(
+                    text("SELECT set_config('app.tenant_id', :tenant_id, true)"),
+                    {"tenant_id": tenant_id},
+                )
+            async with conn.begin():
+                result = await conn.execute(text("SELECT current_setting('app.tenant_id', true)"))
+                assert result.scalar_one() == ""
