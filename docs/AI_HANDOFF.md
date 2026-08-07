@@ -3,7 +3,7 @@
 **Purpose:** This is the canonical handoff document for every future Claude session working on RestaurantOS. Read this file first, before touching any code, to reconstruct full project context.
 
 **Last updated:** 2026-08-07
-**Updated by:** Sprint 4.1 Step 3 (frontend build + real-backend browser verification + defect fixes), Step 4 (integration suite restored, 17 new backend integration tests, 24-spec Playwright E2E suite, 1 more real defect found and fixed), Step 5 (Docker Compose, developer docs, OpenAPI export, GitHub Actions CI, README/release-checklist — release hardening, no new application functionality), and an **RC1 hardening pass** (removed a committed dev JWT private key, fixed a build-breaking Dockerfile bug and a CI CORS/port mismatch, produced `docs/releases/v0.1.0-rc1.md` — see §18)
+**Updated by:** Sprint 4.1 Step 3 (frontend build + real-backend browser verification + defect fixes), Step 4 (integration suite restored, 17 new backend integration tests, 24-spec Playwright E2E suite, 1 more real defect found and fixed), Step 5 (Docker Compose, developer docs, OpenAPI export, GitHub Actions CI, README/release-checklist — release hardening, no new application functionality), an **RC1 hardening pass** (removed a committed dev JWT private key, fixed a build-breaking Dockerfile bug and a CI CORS/port mismatch, produced `docs/releases/v0.1.0-rc1.md`), and **first GitHub push** (repository created, `origin` configured, all 3 branches pushed, CI confirmed passing on real infrastructure for the first time — see §18/§19)
 
 ---
 
@@ -45,6 +45,8 @@ C:\Users\prash\Documents\RestaurantOS
 
 This is both the Git repository root and the monorepo root (`services/api`, `apps/`, `packages/`, `infrastructure/`, `docs/`).
 
+**GitHub repository:** https://github.com/aidakablr3-lang/RestaurantOS — created and pushed to for the first time this session (§19). `origin` remote configured; all 3 local branches now have upstream tracking.
+
 ## 5. Git Branch
 
 **Current branch:** `feature/tenant-platform-frontend`
@@ -54,17 +56,17 @@ Branch structure:
 ```
 main                                 <- renamed from master
  └── develop                         <- created from main
-      └── feature/tenant-platform-frontend   <- 26 commits ahead of develop/main (Step 3 + Step 4 + Step 5 + RC1 hardening)
+      └── feature/tenant-platform-frontend   <- 28 commits ahead of develop/main (Step 3 + Step 4 + Step 5 + RC1 hardening + GitHub push)
 ```
 
-`main` and `develop` are still at `1747258` (Step 2's last backend commit); only `feature/tenant-platform-frontend` has all of Step 3's, Step 4's, Step 5's, and this RC1 pass's commits. **Not yet merged up.** No git remote is configured either — `git remote -v` is empty, no branch tracks an upstream (verified fresh this pass). "Prepare for merge" continues to be read as: get the branch merge-ready and present that readiness for an explicit go-ahead, not as standing authorization to run `git merge` unprompted — see §18's Merge Recommendation.
+`main` and `develop` are still at `1747258` (Step 2's last backend commit); only `feature/tenant-platform-frontend` has all of Step 3's, Step 4's, Step 5's, the RC1 pass's, and this session's commits. **Not yet merged up.** All three branches are now pushed to `origin` with upstream tracking (§19), but that is a separate action from merging — "prepare for merge"/"do not merge" continues to be read as: get the branch merge-ready and present that readiness for an explicit go-ahead, not as standing authorization to run `git merge` unprompted. This session's own instructions repeated this explicitly ("Do NOT merge... Wait for my approval"). See §19's Merge Recommendation.
 
 ## 6. Current HEAD Commit
 
 ```
-5f6dacde83c85111def536d4e0092221c086c2f8
+09f4be84ddcbdc5ef19eebf168ae10f401151291
 ```
-(short: `5f6dacd` — `docs(releases): add v0.1.0-rc1 release candidate report`)
+(short: `09f4be8` — `docs(releases): update v0.1.0-rc1 with real GitHub push and CI results`)
 
 ## 7. Working Tree Status
 
@@ -325,12 +327,41 @@ export CORS_ALLOWED_ORIGINS="http://localhost:3000"   # or whatever port `npm ru
 
 **Verification re-run fresh for this pass** (not carried over): backend unit 49/49, full suite (unit+integration) 84/84, `ruff format --check`/`ruff check` clean, `mypy src/` — same 5 pre-existing findings as before (unchanged), frontend `tsc --noEmit`/`eslint .`/`next build` all clean. Playwright's 24/24 was not re-run live this pass — the only Playwright-adjacent changes (`E2E_PORT` pin, CI-only `html` reporter) are both gated behind `process.env.CI`/`E2E_PORT`, neither set in a normal local run, so local behavior is provably unaffected; relying on this session's earlier-confirmed 24/24 with unchanged app/spec code.
 
-**Remaining work before RC1 is fully confirmed (not just believed correct):**
-- A real `docker compose up --build` on a machine with Docker installed.
-- A real GitHub Actions run once this repository has a remote.
+**Remaining work as of the end of this pass (see §19 for what closed since):**
+- ~~A real GitHub Actions run once this repository has a remote~~ — **done, see §19: repository pushed, CI confirmed passing.**
+- A real `docker compose up --build` on a machine with Docker installed — still the one open item.
 - A decision on whether the dev-JWT-keypair's presence in earlier commit history warrants a history rewrite (repo-owner decision, not made here).
 
-**Merge recommendation: ready to merge into `develop`, pending explicit approval.** See `docs/releases/v0.1.0-rc1.md`'s "Merge Readiness" section for the full reasoning — in short: every application-code change on this branch is additive or a pre-approved critical-bug fix relative to `develop` (which has none of this yet), the automated test suites are real and green, and the two things that remain genuinely unverified (a live Docker build, a live CI run) are infrastructure that fails loudly if still wrong, not something that could silently corrupt `develop`. No merge has been performed; no push has been performed (no remote exists to push to).
+**Merge recommendation (as of this pass): ready to merge into `develop`, pending explicit approval.** Superseded/reinforced by §19's update after the GitHub push and CI confirmation.
+
+---
+
+## 19. GitHub Push and CI Verification
+
+**This session's scope, user-directed via an explicit 8-step gate**, immediately following the RC1 hardening pass above: the user created the GitHub repository (`https://github.com/aidakablr3-lang/RestaurantOS`, "intentionally empty") and directed this session to configure the remote, push all branches, verify CI, verify Docker (still unavailable), regenerate the RC1 report, update this document, and report — explicitly **not** to merge or push in a way that would authorize a merge.
+
+**Steps completed:**
+
+1. **Verified project state** — matched `docs/AI_HANDOFF.md` exactly (branch, HEAD `7bdc2db`, clean tree, last 5 commits).
+2. **Configured `origin`** → `https://github.com/aidakablr3-lang/RestaurantOS.git`. Verified via `git remote -v`.
+3. **Pushed all three required branches** (`main`, `develop`, `feature/tenant-platform-frontend`) with `git push -u origin main develop feature/tenant-platform-frontend` — all three set up to track their `origin` counterparts. Verified via `git branch -vv` (all three show `[origin/<branch>]`) and `git ls-remote origin` (all three refs present, hashes matching local exactly).
+4. **Verified GitHub Actions** — `.github/workflows/ci.yml` only exists in `feature/tenant-platform-frontend`'s tree, so it triggered only on that branch's push (`main`'s and `develop`'s pushes triggered GitHub's own built-in dependency-graph submission workflow instead, unrelated to this repo). **Run [`31199349932`](https://github.com/aidakablr3-lang/RestaurantOS/actions/runs/31199349932), commit `7bdc2db`, conclusion: `success`.** All 5 jobs ran: `Frontend / typecheck, lint, build` ✅, `Backend / lint & format` ✅, `Backend / type check (advisory)` ⚠️ (expected — same 5 pre-existing `mypy` findings, non-blocking), `Backend / unit + integration tests` ✅ (full 84-test suite against a real Postgres service container), `End-to-end (Playwright)` ✅ (**directly confirms the prior pass's `E2E_PORT` CORS fix works on real infrastructure**, closing out the single biggest reasoning-not-observation gap from the previous RC1 pass). No failures — nothing to investigate or fix under this step.
+5. **Verified Docker** — still not installed in this environment; stated plainly, not claimed. The successful CI run does **not** substitute for this: `ci.yml` never invokes `docker compose`, so `docker-compose.yml`/the Dockerfile remain exercised only by the previous pass's static review + outside-Docker reproduction, not a real `docker compose up --build`. This is now the **only** remaining unverified piece of this RC (GitHub Actions is no longer in that category).
+6. **RC1 report updated** (`docs/releases/v0.1.0-rc1.md`, commit `09f4be8`) — Executive Summary, Version, Docker Status, and a new CI Status section with the full job breakdown; Release Metrics and Merge Readiness both updated to reflect the closed CI-verification gap.
+7. **This update.**
+
+**Remote configuration (verified this step):**
+```
+origin  https://github.com/aidakablr3-lang/RestaurantOS.git (fetch)
+origin  https://github.com/aidakablr3-lang/RestaurantOS.git (push)
+```
+All three branches tracking: `main` → `origin/main`, `develop` → `origin/develop`, `feature/tenant-platform-frontend` → `origin/feature/tenant-platform-frontend`.
+
+**CI status:** ✅ Passing (first-ever run on this repository). See run `31199349932` above.
+
+**Docker status:** ⚪ Still unverified — not installed in this environment. Not claimed as working; the one clearly-flagged remaining gap.
+
+**Merge readiness (updated):** **Ready to merge `feature/tenant-platform-frontend` → `develop`, pending explicit approval — stronger than the prior pass's recommendation**, since the GitHub Actions half of the "genuinely unverified" list from §18 has now closed with a real, green, first-ever run. Docker Compose remains the one open item, and it is infrastructure (fails loudly if wrong, doesn't silently corrupt `develop`), not application code. **No merge has been performed. Branches were pushed to `origin` this step, at the user's explicit instruction in this turn — that push is disclosed here as a completed fact, not treated as if it also authorized a merge.** Per the user's explicit instruction this turn ("Do NOT merge... Wait for my approval"), `git merge` will not run without a separate, explicit go-ahead.
 
 ---
 
@@ -338,11 +369,13 @@ export CORS_ALLOWED_ORIGINS="http://localhost:3000"   # or whatever port `npm ru
 
 **Completed Sprints:** 0 (Product Blueprint), 1 (Technical Architecture v1.0), 1.5 (TAD remediation → v2.0), 2 (Data Architecture v1.0), 2.6 (Data Architecture remediation → v2.0), 3 (Identity Platform backend), 4.1 Steps 1–2 (Tenant Platform plan + backend).
 
-**In progress:** `feature/tenant-platform-frontend` prepared as RC1 (§18) and ready for a merge into `develop` — merge readiness reported to the user, actual `git merge` awaiting an explicit go-ahead (§9/§10/§18). Steps 3, 4, and 5 are all complete for their defined scope; Steps 3 and 4 have been explicitly user-signed-off; the RC1 hardening pass found and fixed 2 real release-engineering bugs (Dockerfile build order, CI CORS/port mismatch) plus removed a committed dev private key.
+**In progress:** `feature/tenant-platform-frontend` pushed to GitHub (`https://github.com/aidakablr3-lang/RestaurantOS`) and confirmed via a real, green CI run (§19) — ready for a merge into `develop`, merge readiness reported to the user, actual `git merge` awaiting an explicit go-ahead (§9/§10/§18/§19). Steps 3, 4, and 5 are all complete for their defined scope; Steps 3 and 4 have been explicitly user-signed-off; the RC1 hardening pass found and fixed 2 real release-engineering bugs (Dockerfile build order, CI CORS/port mismatch) plus removed a committed dev private key; both fixes now confirmed on real GitHub infrastructure.
 
-**Completed Commits (40 total on `feature/tenant-platform-frontend`; `main`/`develop` are 26 commits behind, still at `1747258`):**
+**Completed Commits (42 total on `feature/tenant-platform-frontend`; `main`/`develop` are 28 commits behind, still at `1747258`):**
 
 ```
+09f4be8 docs(releases): update v0.1.0-rc1 with real GitHub push and CI results
+7bdc2db docs(repo): record RC1 hardening pass in AI_HANDOFF.md
 5f6dacd docs(releases): add v0.1.0-rc1 release candidate report
 a6aa9a0 docs(repo): note the Dockerfile build-order fix in DEVELOPMENT.md
 b53ca56 fix(infrastructure): fix Dockerfile editable-install ordering that broke the build
@@ -387,9 +420,9 @@ f56869f chore(repo): scaffold monorepo structure and archive frozen architecture
 
 **Current Branch:** `feature/tenant-platform-frontend`
 
-**Current PR:** None. This repository has no remote configured (confirmed fresh during the RC1 pass) — all work is local. No pull request has been opened (there is nothing to open one against yet); merge into `develop`, when confirmed, will be a local `git merge`, not a PR.
+**Current PR:** None. The repository is now on GitHub (`https://github.com/aidakablr3-lang/RestaurantOS`, `origin` configured, all 3 branches pushed — §19), but no pull request has been opened; a merge into `develop`, when confirmed, is expected to be a local `git merge` pushed directly, not necessarily a PR, unless the user specifies otherwise.
 
-**Current Milestone:** RC1 (v0.1.0-rc1) — Tenant Platform release candidate. Sprint 4.1 Step 5 (release hardening) done for its given scope, followed by an RC1 hardening pass that removed a committed dev private key and fixed 2 real release-engineering bugs found via careful static/reproduction-based review (Dockerfile build order, CI CORS/port mismatch). Docker Compose and CI still not live-tested (no Docker, no git remote in this environment — see §11, §18). Branch is prepared for merge into `develop`; awaiting explicit confirmation before running `git merge` (§9/§10/§18). Full report: `docs/releases/v0.1.0-rc1.md`.
+**Current Milestone:** RC1 (v0.1.0-rc1) — Tenant Platform release candidate. Sprint 4.1 Step 5 (release hardening) done for its given scope, followed by an RC1 hardening pass (removed a committed dev private key, fixed 2 real release-engineering bugs via static/reproduction-based review) and then a GitHub push + CI verification pass (§19) that **confirmed both fixes on real infrastructure** with a green first-ever CI run. Docker Compose remains the one still-not-live-tested piece (no Docker in this environment — see §11, §18, §19). Branch is prepared for merge into `develop`; awaiting explicit confirmation before running `git merge` (§9/§10/§18/§19). Full report: `docs/releases/v0.1.0-rc1.md`.
 
 **Current Feature:** Tenant Platform (Sprint 4.1) — Tenant CRUD/lifecycle, Subscription, Settings, Feature Flags, Tenant Directory, Tenant Administration (backend complete, browser-verified, and integration-tested; frontend: List/Details/Create/Edit/Suspend/Reactivate built, browser-verified, and E2E-tested; Subscription/Quota/Feature-Flags/Settings explicitly deferred as future work per the user). Release-hardened: Docker Compose, CI pipeline, developer docs, OpenAPI snapshot, release checklist all in place.
 
