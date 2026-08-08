@@ -74,6 +74,23 @@ class BranchNotFoundError(RestaurantDomainError):
         self.branch_id = branch_id
 
 
+class BranchNameConflictError(RestaurantDomainError):
+    """Mirrors the DB's own ``UNIQUE (restaurant_id, name)`` constraint
+    (Restaurant Platform Architecture SS3.1) -- checked proactively so
+    a duplicate name raises a clean domain error before ever reaching
+    Postgres in the common case; the constraint itself remains the
+    actual guarantee under a race."""
+
+    error_code = "BRANCH_NAME_CONFLICT"
+
+    def __init__(self, restaurant_id: str, name: str) -> None:
+        super().__init__(
+            f"A branch named '{name}' already exists for restaurant '{restaurant_id}'."
+        )
+        self.restaurant_id = restaurant_id
+        self.name = name
+
+
 class InvalidReservationStatusTransitionError(RestaurantDomainError):
     """A reasonable, standard reservation state machine
     (requested -> confirmed -> seated -> completed, with no_show/canceled
