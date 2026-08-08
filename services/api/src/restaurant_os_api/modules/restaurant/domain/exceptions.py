@@ -91,6 +91,22 @@ class BranchNameConflictError(RestaurantDomainError):
         self.name = name
 
 
+class OperatingHoursConflictError(RestaurantDomainError):
+    """A submitted weekly schedule contradicts itself for one
+    ``day_of_week`` -- either an explicit ``is_closed`` row mixed with
+    an open period for the same day, or two open periods that overlap.
+    Architecture SS3.1 states this explicitly: "overlap validation is
+    an application-layer concern, not a schema constraint" -- there is
+    no DB constraint to mirror here (unlike ``BranchNameConflictError``),
+    this exception *is* the validation."""
+
+    error_code = "OPERATING_HOURS_CONFLICT"
+
+    def __init__(self, day_of_week: int, detail: str) -> None:
+        super().__init__(f"Operating hours for day {day_of_week} conflict: {detail}")
+        self.day_of_week = day_of_week
+
+
 class InvalidReservationStatusTransitionError(RestaurantDomainError):
     """A reasonable, standard reservation state machine
     (requested -> confirmed -> seated -> completed, with no_show/canceled
