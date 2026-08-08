@@ -23,6 +23,9 @@ from restaurant_os_api.modules.identity.presentation.api.v1.rbac_router import (
 from restaurant_os_api.modules.identity.presentation.api.v1.self_service_tenant_router import (
     router as self_service_tenant_router,
 )
+from restaurant_os_api.modules.restaurant.presentation.api.v1.restaurant_router import (
+    router as restaurant_router,
+)
 
 
 def create_app() -> FastAPI:
@@ -47,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_tenant_router)
     app.include_router(self_service_tenant_router)
     app.include_router(rbac_router)
+    app.include_router(restaurant_router)
 
     @app.get("/health/live", include_in_schema=False)
     async def health_live() -> dict[str, str]:
