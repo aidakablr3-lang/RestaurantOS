@@ -201,7 +201,10 @@ async def _clean_tables(engine: AsyncEngine) -> AsyncGenerator[None]:
     yield
     async with engine.begin() as conn:
         await conn.exec_driver_sql(
-            "TRUNCATE TABLE outbox_events, user_roles, role_permissions, roles, "
+            "TRUNCATE TABLE outbox_events, reservations, menu_item_modifier_groups, "
+            "menu_item_availabilities, menu_item_branch_prices, modifiers, modifier_groups, "
+            "menu_items, menu_categories, qr_codes, tables, table_zones, operating_hours, "
+            "branches, addresses, restaurants, user_roles, role_permissions, roles, "
             "tenant_directory_entries, feature_flags, system_settings, subscriptions, "
             "sessions, users, tenants RESTART IDENTITY CASCADE"
         )
