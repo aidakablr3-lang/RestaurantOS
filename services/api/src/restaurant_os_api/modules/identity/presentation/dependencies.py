@@ -29,11 +29,16 @@ from restaurant_os_api.modules.identity.application.interfaces import (
 )
 from restaurant_os_api.modules.identity.application.services import TenantProvisioningService
 from restaurant_os_api.modules.identity.application.use_cases import (
+    AssignUserRoleUseCase,
+    CreateRoleUseCase,
+    GetRoleUseCase,
     GetSubscriptionStatusUseCase,
     GetTenantQuotaUsageUseCase,
     GetTenantSettingsUseCase,
     GetTenantUseCase,
     ListFeatureFlagsUseCase,
+    ListPermissionsUseCase,
+    ListRolesUseCase,
     ListTenantsUseCase,
     LoginUserUseCase,
     LogoutUserUseCase,
@@ -41,7 +46,9 @@ from restaurant_os_api.modules.identity.application.use_cases import (
     OnboardTenantUseCase,
     ReactivateTenantUseCase,
     RefreshAccessTokenUseCase,
+    ReplaceRolePermissionsUseCase,
     ResolveUserPermissionsUseCase,
+    RevokeUserRoleUseCase,
     SuspendTenantUseCase,
     UpdateTenantSettingsUseCase,
     UpdateTenantUseCase,
@@ -54,6 +61,7 @@ from restaurant_os_api.modules.identity.domain.exceptions import (
 )
 from restaurant_os_api.modules.identity.infrastructure.database.repositories import (
     SQLAlchemyFeatureFlagRepository,
+    SQLAlchemyPermissionRepository,
     SQLAlchemyRolePermissionRepository,
     SQLAlchemyRoleRepository,
     SQLAlchemySessionRepository,
@@ -293,6 +301,91 @@ def require_branch_permission(
         return principal
 
     return _dependency
+
+
+def get_create_role_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> CreateRoleUseCase:
+    return CreateRoleUseCase(
+        session_factory=session_factory,
+        resolve_user_permissions_use_case=resolve_permissions,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+def get_get_role_use_case(session_factory: SessionFactoryDep) -> GetRoleUseCase:
+    return GetRoleUseCase(
+        session_factory=session_factory, role_repository_factory=SQLAlchemyRoleRepository
+    )
+
+
+def get_list_roles_use_case(session_factory: SessionFactoryDep) -> ListRolesUseCase:
+    return ListRolesUseCase(
+        session_factory=session_factory, role_repository_factory=SQLAlchemyRoleRepository
+    )
+
+
+def get_replace_role_permissions_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ReplaceRolePermissionsUseCase:
+    return ReplaceRolePermissionsUseCase(
+        session_factory=session_factory,
+        resolve_user_permissions_use_case=resolve_permissions,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+    )
+
+
+def get_list_permissions_use_case(session_factory: SessionFactoryDep) -> ListPermissionsUseCase:
+    return ListPermissionsUseCase(
+        session_factory=session_factory,
+        permission_repository_factory=SQLAlchemyPermissionRepository,
+    )
+
+
+def get_assign_user_role_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> AssignUserRoleUseCase:
+    return AssignUserRoleUseCase(
+        session_factory=session_factory,
+        resolve_user_permissions_use_case=resolve_permissions,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+        user_role_repository_factory=SQLAlchemyUserRoleRepository,
+        user_repository_factory=SQLAlchemyUserRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+def get_revoke_user_role_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> RevokeUserRoleUseCase:
+    return RevokeUserRoleUseCase(
+        session_factory=session_factory,
+        resolve_user_permissions_use_case=resolve_permissions,
+        user_role_repository_factory=SQLAlchemyUserRoleRepository,
+        user_repository_factory=SQLAlchemyUserRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateRoleUseCaseDep = Annotated[CreateRoleUseCase, Depends(get_create_role_use_case)]
+GetRoleUseCaseDep = Annotated[GetRoleUseCase, Depends(get_get_role_use_case)]
+ListRolesUseCaseDep = Annotated[ListRolesUseCase, Depends(get_list_roles_use_case)]
+ReplaceRolePermissionsUseCaseDep = Annotated[
+    ReplaceRolePermissionsUseCase, Depends(get_replace_role_permissions_use_case)
+]
+ListPermissionsUseCaseDep = Annotated[
+    ListPermissionsUseCase, Depends(get_list_permissions_use_case)
+]
+AssignUserRoleUseCaseDep = Annotated[AssignUserRoleUseCase, Depends(get_assign_user_role_use_case)]
+RevokeUserRoleUseCaseDep = Annotated[RevokeUserRoleUseCase, Depends(get_revoke_user_role_use_case)]
 
 
 # --- Tenant Platform (Sprint 4.1) ---------------------------------------

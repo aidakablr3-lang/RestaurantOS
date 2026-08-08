@@ -100,3 +100,19 @@ class ReplaceRolePermissionsRequestDTO:
     actor_user_id: str
     role_id: str
     permission_codes: frozenset[str] = field(default_factory=frozenset)
+
+
+@dataclass(frozen=True, slots=True)
+class RoleListResultDTO:
+    roles: list[RoleDTO]
+    total: int
+    offset: int
+    limit: int
+
+
+@dataclass(frozen=True, slots=True)
+class PermissionDTO:
+    code: str
+    module: str
+    description: str
+    is_active: bool
