@@ -2,18 +2,20 @@
 
 **Purpose:** This is the canonical handoff document for every future Claude session working on RestaurantOS. Read this file first, before touching any code, to reconstruct full project context.
 
-**Last updated:** 2026-08-07
-**Updated by:** Sprint 4.1 Step 3 (frontend build + real-backend browser verification + defect fixes), Step 4 (integration suite restored, 17 new backend integration tests, 24-spec Playwright E2E suite, 1 more real defect found and fixed), Step 5 (Docker Compose, developer docs, OpenAPI export, GitHub Actions CI, README/release-checklist — release hardening, no new application functionality), an **RC1 hardening pass** (removed a committed dev JWT private key, fixed a build-breaking Dockerfile bug and a CI CORS/port mismatch, produced `docs/releases/v0.1.0-rc1.md`), **first GitHub push** (repository created, `origin` configured, all 3 branches pushed, CI confirmed passing on real infrastructure), and **the merge itself** (`feature/tenant-platform-frontend` merged into `develop` via an explicit merge commit, user-approved — see §20)
+**Last updated:** 2026-08-08
+**Updated by:** Sprint 5 Step 1 (Restaurant Platform architecture planning, documentation-only) and Step 2 (RBAC Foundation: architecture doc + 8-commit implementation — domain model, migration `0003`, permission resolution, authorization service, privilege-escalation protection, RBAC REST API, provisioning integration, comprehensive test matrix). See §21 for the full record. Everything in §1–§20 below predates Sprint 5 and describes Sprint 4.1 (Tenant Platform), which is unchanged and still merged into `develop`.
 
 ---
 
 ## 1. Current Sprint
 
-**Sprint 4.1 — Tenant Platform** (the first business platform; Product Blueprint Phase 1 / Technical Architecture v2.0 `modules/identity` extension).
+**Sprint 5 — Restaurant Platform** (the second business platform / bounded context). Step 1 (architecture planning) and Step 2 (RBAC Foundation, a prerequisite Step 1's own review identified) are complete — see §21. Restaurant Platform business entities (Restaurant/Branch/Tables/Menu/QR Ordering/POS/Billing/KDS/Inventory/Liquor) have **not** been started; explicit STOP after RBAC Step 2 per the user's instruction.
+
+Sections 1–20 below are unchanged from Sprint 4.1 and describe **Sprint 4.1 — Tenant Platform** (the first business platform; Product Blueprint Phase 1 / Technical Architecture v2.0 `modules/identity` extension), which remains merged into `develop`, untouched by Sprint 5.
 
 ## 2. Current Step
 
-**Step 3 — Frontend implementation: built, browser-verified, fixed up, user-approved as complete.** **Step 4 — Testing: done for this sprint's scope, user-approved as complete.** **Step 5 — Release hardening: done for this sprint's scope, and the branch is now being prepared for a merge readiness review (§9/§10).** `apps/admin-web` has six of the ten originally-scoped screens, verified working in a real browser against a real running `services/api` + PostgreSQL: Tenant List, Tenant Details, Create Tenant, Edit Tenant, Suspend Tenant, Reactivate Tenant. **Scope was deliberately narrowed mid-session** — see the "Scope-down decision" note below and §11 — user-approved. The manually-verified flows are backed by automated tests (17 backend integration tests + a 24-spec Playwright E2E suite), and the whole stack now has committed local dev infrastructure (Docker Compose) and a CI pipeline (GitHub Actions) that runs those same suites automatically — see the Step 5 section in §8.
+**(Sprint 4.1) Step 3 — Frontend implementation: built, browser-verified, fixed up, user-approved as complete.** **Step 4 — Testing: done for this sprint's scope, user-approved as complete.** **Step 5 — Release hardening: done for this sprint's scope, and the branch is now being prepared for a merge readiness review (§9/§10).** `apps/admin-web` has six of the ten originally-scoped screens, verified working in a real browser against a real running `services/api` + PostgreSQL: Tenant List, Tenant Details, Create Tenant, Edit Tenant, Suspend Tenant, Reactivate Tenant. **Scope was deliberately narrowed mid-session** — see the "Scope-down decision" note below and §11 — user-approved. The manually-verified flows are backed by automated tests (17 backend integration tests + a 24-spec Playwright E2E suite), and the whole stack now has committed local dev infrastructure (Docker Compose) and a CI pipeline (GitHub Actions) that runs those same suites automatically — see the Step 5 section in §8.
 
 Sprint 4.1 follows a 5-step gated process, defined explicitly by the user:
 
@@ -183,7 +185,7 @@ In priority order:
 **Architecture-compliance decisions made during Sprint 4.1 Step 1 (approved by user, no ADR required — these apply existing frozen architecture, they don't change it):**
 - **Decision A:** Tenant Platform code extends `modules/identity` (Data Architecture v2.0 §12.5 already assigns `Tenant` there) rather than creating a new `modules/tenant`.
 - **Decision B:** "Tenant soft delete" = the `OFFBOARDED` lifecycle status transition, not a new `deleted_at` column (Data Architecture v2.0 §5.2 explicitly has none).
-- **Decision C:** Tenant-lifecycle mutation endpoints are gated by an interim `users.is_platform_admin` boolean — explicitly **not** RBAC. Full RBAC (`Role`/`Permission`/`RolePermission`/`UserRole`) remains deferred with no consumer yet.
+- **Decision C:** Tenant-lifecycle mutation endpoints are gated by an interim `users.is_platform_admin` boolean — explicitly **not** RBAC. **Superseded as of Sprint 5 Step 2 (§21): full RBAC now exists** (`Role`/`Permission`/`RolePermission`/`UserRole`, migration `0003`, RBAC REST API). `is_platform_admin` itself is unchanged and structurally untouched by any RBAC code path (proven by test, §21) — it still gates platform-operator tenant administration; RBAC gates a tenant's own staff's access to future Restaurant Platform resources. The two mechanisms coexist by design, not by omission.
 
 **Known scope boundaries (disclosed, not bugs):**
 - The Transactional Outbox (`outbox_events`) durably and atomically records events, but the Redis Streams relay/dispatcher (Technical Architecture v2.0 Group D) is **not implemented** — no Redis client exists anywhere in the codebase yet.
@@ -383,11 +385,67 @@ All three branches tracking: `main` → `origin/main`, `develop` → `origin/dev
 
 ---
 
+## 21. Sprint 5 — Restaurant Platform Planning + RBAC Foundation
+
+**Branch:** `feature/restaurant-platform`, created from `develop` at `f1acdf5`. **Not merged, not pushed** — per explicit instruction, awaiting separate approval. Working tree clean; HEAD is `7f7a2c6`.
+
+**10 commits, in order:**
+
+```
+7f7a2c6 test(rbac): add authorization test matrix
+47ee17e feat(identity): seed default RBAC roles during provisioning
+9216e2e feat(rbac): add RBAC API
+44d040c fix(rbac): prevent privilege escalation
+e57145e feat(rbac): add authorization service
+ae6cce5 feat(rbac): add permission resolution
+46ef191 feat(rbac): add RBAC database migration
+ce78d9c feat(rbac): add RBAC domain model
+9b5c651 docs(architecture): add RBAC Foundation architecture (Sprint 5 Step 2 planning)
+e9be036 docs(architecture): add Restaurant Platform architecture (Sprint 5 planning)
+```
+
+### Step 1 — Restaurant Platform architecture (documentation only)
+
+`docs/architecture/RestaurantOS_Restaurant_Platform_Architecture.md` (861 lines, `e9be036`): bounded-context boundary, domain model, multi-tenancy, menu/table model, API/frontend boundaries, database design, offline-first, events, security/RBAC, test strategy, migration strategy, sprint breakdown, risks. **Critical finding from this pass:** the codebase had no RBAC at all — `is_platform_admin` is a single boolean that cannot express Restaurant Manager/Branch Manager/Waiter/Cashier/Kitchen Staff, each with different, sometimes branch-specific scope. User approved the architecture direction but explicitly blocked Restaurant Platform implementation on closing this gap first.
+
+### Step 2 — RBAC Foundation (architecture + full implementation)
+
+`docs/architecture/RBAC_Foundation_Architecture.md` (583 lines, `9b5c651`): RBAC domain model, role scope (platform/tenant/branch — one user can hold multiple simultaneous roles at different scopes), permission catalogue, authorization flow (JWT -> auth -> roles -> permissions -> tenant/branch scope, never embedding permissions in the JWT), `permission_version` interaction, Platform Admin coexistence, offline authorization design, audit/database/RLS/migration/API/testing strategy, security threats, risks, implementation sequence.
+
+**Domain model implemented** (`ce78d9c`): `Role` (nullable `tenant_id` — NULL means platform-wide), `Permission` (code as TEXT primary key, mirroring `ChartOfAccount.account_code`), `RolePermission` (join), `UserRole` (`tenant_id` required, `branch_id` nullable — NULL = tenant-wide grant, set = branch-specific). `RoleGrantPolicy` (`domain/services/`, new package): a scope ceiling (actor's own `roles.assign` scope must cover the target) and a delegation ceiling (actor cannot hand out a permission they don't hold), composed into `ensure_can_grant`/`ensure_can_revoke`.
+
+**Migration `0003`** (`46ef191`): `permissions`, `roles`, `role_permissions`, `user_roles`. `UNIQUE NULLS NOT DISTINCT` on `roles(tenant_id, name)` and `user_roles(user_id, role_id, branch_id)`. `roles`' RLS policy is deliberately widened (`tenant_id IS NULL OR tenant_id = current_setting(...)`, matching `feature_flags`' own precedent) so platform-wide roles stay visible from every tenant. Seeds exactly 11 permission codes (`restaurant.*`, `branch.*`, `table.*`, `menu.*`, `reservation.*`, `roles.assign`). `user_roles.branch_id` is a plain, unconstrained `TEXT` column — the FK to `branches.id` and a cross-table consistency trigger are explicitly deferred to migration `0004` (Restaurant Platform), documented in `0003`'s own docstring.
+
+**Permission resolution + authorization** (`ae6cce5`, `e57145e`): `ResolveUserPermissionsUseCase` walks `UserRole` -> `Role` -> `RolePermission` -> `Permission`, aggregating into tenant-wide/by-branch sets — a fresh Postgres read on every call, never cached, never embedded in the JWT. `require_permission(code)`/`require_branch_permission(code)` FastAPI dependency factories gate routes; neither special-cases `is_platform_admin`.
+
+**Privilege-escalation protection** (`44d040c`): `AssignUserRoleUseCase`/`RevokeUserRoleUseCase` check the granter/revoker's own freshly-resolved permissions against `RoleGrantPolicy` before writing anything. Every RBAC-affecting mutation bumps the *affected* user's `permission_version`.
+
+**RBAC REST API** (`9216e2e`): `GET /api/v1/me/permissions` (auth only), `GET /api/v1/rbac/permissions`, `POST`/`GET /api/v1/rbac/roles`, `GET /api/v1/rbac/roles/{id}`, `PUT /api/v1/rbac/roles/{id}/permissions`, `POST /api/v1/rbac/user-roles`, `DELETE /api/v1/rbac/user-roles/{id}` — all mutating routes gated by `require_permission("roles.assign")` (tenant-wide only — see the finding below).
+
+**Provisioning integration** (`47ee17e`): `TenantProvisioningService.provision()` now seeds the 7 default roles (Tenant Owner, Restaurant Manager, Branch Manager, Waiter, Cashier, Kitchen Staff, Bartender) + their permission grants for every *new* tenant, inside the same transaction as the rest of provisioning. Deliberately creates **no** `UserRole` grant (no user exists yet at provisioning time). `scripts/backfill_tenant_owner.py`: a standalone, manually-run script for tenants that predate this change — requires explicit `--tenant-id`/`--user-id` every time, never auto-discovers "the" owner, defaults to a dry-run preview, writes only with `--apply`.
+
+**Comprehensive test matrix** (`7f7a2c6`): 76 new unit tests (domain, `ResolveUserPermissionsUseCase`, `AssignUserRoleUseCase`/`RevokeUserRoleUseCase`'s privilege-escalation matrix, `CreateRoleUseCase`/`ReplaceRolePermissionsUseCase`, the authorization dependencies) + 43 new integration tests against real PostgreSQL (every RBAC repository, RLS proven directly for both `roles`' widened predicate and `user_roles`' standard predicate, database constraints, and 19 full-stack HTTP tests through a real login flow).
+
+### Two findings surfaced by the test matrix (real, disclosed, not fixed — decisions for the user)
+
+1. **`permission_version` invalidation is strict-equality, not eventual-consistency.** Granting or revoking a role does not make the change visible to the *same*, already-issued access token on its next request — it immediately stales that token (401 `INVALID_ACCESS_TOKEN`, `verify_access_token.py:72`), forcing re-authentication. The RBAC architecture doc's framing ("no separate propagation mechanism needed") is true in the sense that the *next fresh token* always reflects the change with zero lag, but it does **not** mean an in-flight session silently sees new/removed access without re-logging in. Worth confirming this is the intended UX for `apps/admin-web` before Restaurant Platform frontend work assumes otherwise.
+2. **Branch-scoped `roles.assign` cannot reach the RBAC API at all.** Every mutating RBAC route is gated by `require_permission("roles.assign")` (tenant-wide check only — it never consults a caller's branch-scoped grants). A user holding `roles.assign` only at one branch is rejected at the router layer (403 `PERMISSION_DENIED`) before ever reaching `AssignUserRoleUseCase`/`RevokeUserRoleUseCase`, whose `RoleGrantPolicy` scope ceiling *does* correctly support a branch-scoped granter (proven directly against the use cases in the unit tests). This is a real inconsistency between the domain layer's designed capability and the router's actual wiring — a legitimate Branch Manager cannot use the RBAC HTTP API for anything today, including managing their own branch's assignments. **Needs a decision:** either add a branch-aware variant of the `roles.assign` gate for `POST`/`DELETE /rbac/user-roles`, or explicitly decide branch-scoped `roles.assign` is out of scope for now and document that as intentional (today it is accidental, not decided).
+
+### Verification evidence
+
+Every commit was verified against a real, standalone PostgreSQL 17 instance (not just unit-level mocks) — migration upgrade/downgrade/upgrade, RLS proven via an unprivileged non-owner role, real FastAPI `TestClient` HTTP requests, real repository/UnitOfWork calls. Throwaway verification scripts were written to a scratch directory and deleted after each commit passed — never committed. Final state: **backend unit tests 125/125 passing** (49 pre-Sprint-5 + 76 new), **backend integration tests 78/78 passing** against real PostgreSQL (35 pre-Sprint-5 + 43 new), both suites run together with no cross-file interference. `ruff format`/`ruff check` clean across `src`, `tests`, `scripts`. `mypy` on `src`: 9 findings, all matching an already-disclosed `OutboxWriter.publish`/`DomainEvent` typing pattern (4 pre-existing + 5 new event-publish call sites added across Sprint 5) plus one pre-existing, unrelated `core/config.py` finding — no new class of problem. Migration `0003` upgrade/downgrade/upgrade cycle re-verified clean.
+
+### Explicit stop point
+
+Per the user's instruction: **do not proceed to Restaurant Platform Step 3 (business entities) without explicit approval.** Nothing in `modules/restaurant` or equivalent exists yet. This branch is not merged into `develop` and not pushed to GitHub.
+
+---
+
 ## Engineering Status
 
-**Completed Sprints:** 0 (Product Blueprint), 1 (Technical Architecture v1.0), 1.5 (TAD remediation → v2.0), 2 (Data Architecture v1.0), 2.6 (Data Architecture remediation → v2.0), 3 (Identity Platform backend), **4.1 (Tenant Platform, all 5 steps — merged into `develop`)**.
+**Completed Sprints:** 0 (Product Blueprint), 1 (Technical Architecture v1.0), 1.5 (TAD remediation → v2.0), 2 (Data Architecture v1.0), 2.6 (Data Architecture remediation → v2.0), 3 (Identity Platform backend), **4.1 (Tenant Platform, all 5 steps — merged into `develop`)**, **5 Steps 1–2 (Restaurant Platform architecture + RBAC Foundation — on `feature/restaurant-platform`, not yet merged; see §21)**.
 
-**In progress:** Nothing actively in flight. Sprint 4.1 is merged into `develop` (merge commit `80fcb9d`, pushed to `origin/develop`). Open decisions for whoever picks this up next: promote `develop` → `main`, create the first release tag (both explicitly awaiting separate approval), a real `docker compose up --build` verification, and the choice of next sprint (remaining Tenant Platform screens vs. Restaurant Platform) — see §10.
+**In progress:** Nothing actively in flight. Sprint 4.1 is merged into `develop` (merge commit `80fcb9d`, pushed to `origin/develop`) and unaffected by Sprint 5. Sprint 5's `feature/restaurant-platform` branch (10 commits, HEAD `7f7a2c6`, §21) is complete for its approved scope, not merged, not pushed, awaiting explicit approval before Restaurant Platform Step 3 (business entities) begins. Below this point (commit list, "Current Branch/PR/Milestone/Feature/Module") describes `develop`'s own state as of the Sprint 4.1 merge and is unchanged by Sprint 5 — see §21 for Sprint 5's own branch/commit/status details.
 
 **Completed Commits on `develop` (44 total — 43 inherited from `feature/tenant-platform-frontend` plus the merge commit itself; `main` remains 30 commits behind, still at `1747258`; `feature/tenant-platform-frontend` still exists, untouched, at `4294792`):**
 
