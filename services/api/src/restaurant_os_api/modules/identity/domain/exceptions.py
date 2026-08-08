@@ -231,6 +231,24 @@ class UserRoleNotFoundError(IdentityDomainError):
         self.user_role_id = user_role_id
 
 
+class PermissionDeniedError(IdentityDomainError):
+    """Raised by the ``require_permission``/``require_branch_permission``
+    authorization dependencies (RBAC Foundation Architecture SS8) when
+    the caller's resolved permission set does not include the code a
+    route requires. Deliberately distinct from
+    ``InsufficientGrantAuthorityError`` (the grant-time privilege-
+    escalation ceiling, Commit 5) — this is ordinary "you may not do
+    this" denial, not a self-escalation attempt."""
+
+    error_code = "PERMISSION_DENIED"
+
+    def __init__(self, permission_code: str, *, branch_id: str | None = None) -> None:
+        scope = f"at branch '{branch_id}'" if branch_id else "tenant-wide"
+        super().__init__(f"Permission '{permission_code}' is required ({scope}).")
+        self.permission_code = permission_code
+        self.branch_id = branch_id
+
+
 class InsufficientGrantAuthorityError(IdentityDomainError):
     """Raised by ``RoleGrantPolicy`` (RBAC Foundation Architecture SS16.1)
     when a grant would exceed the granter's own scope (they hold

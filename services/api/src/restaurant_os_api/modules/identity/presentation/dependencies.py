@@ -9,10 +9,11 @@ constructed fresh per request from those singletons.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Path
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -40,6 +41,7 @@ from restaurant_os_api.modules.identity.application.use_cases import (
     OnboardTenantUseCase,
     ReactivateTenantUseCase,
     RefreshAccessTokenUseCase,
+    ResolveUserPermissionsUseCase,
     SuspendTenantUseCase,
     UpdateTenantSettingsUseCase,
     UpdateTenantUseCase,
@@ -48,15 +50,19 @@ from restaurant_os_api.modules.identity.application.use_cases import (
 from restaurant_os_api.modules.identity.domain.exceptions import (
     InsufficientPrivilegesError,
     InvalidAccessTokenError,
+    PermissionDeniedError,
 )
 from restaurant_os_api.modules.identity.infrastructure.database.repositories import (
     SQLAlchemyFeatureFlagRepository,
+    SQLAlchemyRolePermissionRepository,
+    SQLAlchemyRoleRepository,
     SQLAlchemySessionRepository,
     SQLAlchemySubscriptionRepository,
     SQLAlchemySystemSettingRepository,
     SQLAlchemyTenantDirectoryRepository,
     SQLAlchemyTenantRepository,
     SQLAlchemyUserRepository,
+    SQLAlchemyUserRoleRepository,
 )
 from restaurant_os_api.modules.identity.infrastructure.security import (
     Argon2PasswordHasher,
@@ -201,6 +207,92 @@ async def require_platform_admin(
 
 
 PlatformAdminDep = Annotated[AuthenticatedPrincipalDTO, Depends(require_platform_admin)]
+
+
+# --- RBAC Foundation (Sprint 5, Step 2) ---------------------------------
+
+
+def get_resolve_user_permissions_use_case(
+    session_factory: SessionFactoryDep,
+) -> ResolveUserPermissionsUseCase:
+    return ResolveUserPermissionsUseCase(
+        session_factory=session_factory,
+        user_role_repository_factory=SQLAlchemyUserRoleRepository,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+    )
+
+
+ResolveUserPermissionsUseCaseDep = Annotated[
+    ResolveUserPermissionsUseCase, Depends(get_resolve_user_permissions_use_case)
+]
+
+
+def require_permission(
+    code: str,
+) -> Callable[
+    [AuthenticatedPrincipalDTO, ResolveUserPermissionsUseCase], Awaitable[AuthenticatedPrincipalDTO]
+]:
+    """A tenant-wide permission gate (RBAC Foundation Architecture SS8.1) —
+    the caller must hold ``code`` tenant-wide, not merely at some
+    branch. Use for endpoints with no branch dimension at all (e.g.
+    ``POST /restaurants``).
+
+    Deliberately does **not** special-case ``is_platform_admin`` — that
+    flag gates RestaurantOS's own operators managing customer tenants
+    (the pre-existing Tenant Administration surface); it has nothing to
+    do with a tenant's own staff managing their own restaurant, and
+    granting it an implicit RBAC bypass here would quietly merge two
+    mechanisms this whole effort exists to keep separate (RBAC
+    Foundation Architecture SS10.2).
+    """
+
+    async def _dependency(
+        principal: AuthenticatedPrincipalDep,
+        resolve_permissions: ResolveUserPermissionsUseCaseDep,
+    ) -> AuthenticatedPrincipalDTO:
+        resolved = await resolve_permissions.execute(principal.tenant_id, principal.user_id)
+        if not resolved.has(code):
+            raise PermissionDeniedError(code)
+        return principal
+
+    return _dependency
+
+
+def require_branch_permission(
+    code: str,
+) -> Callable[
+    [str, AuthenticatedPrincipalDTO, ResolveUserPermissionsUseCase],
+    Awaitable[AuthenticatedPrincipalDTO],
+]:
+    """A branch-scoped permission gate — the caller must hold ``code``
+    either tenant-wide or specifically at the request's own
+    ``branch_id`` path parameter (RBAC Foundation Architecture SS7/SS8).
+
+    The ``branch_id`` path segment is never trusted as an authorization
+    *claim* — it only identifies *which resource* the request targets.
+    The actual decision comes entirely from the caller's own resolved
+    grants (Commit 3), checked against that target; a caller with no
+    grant at that branch is denied regardless of what the URL says, and
+    a caller who legitimately holds the permission there is allowed
+    regardless of what *other* branches exist. Tenant scope itself is
+    never taken from this parameter either — it always comes from
+    ``principal.tenant_id``, itself derived from the verified access
+    token (never client-supplied), exactly as every other tenant-scoped
+    dependency in this module already works.
+    """
+
+    async def _dependency(
+        branch_id: Annotated[str, Path(min_length=26, max_length=26)],
+        principal: AuthenticatedPrincipalDep,
+        resolve_permissions: ResolveUserPermissionsUseCaseDep,
+    ) -> AuthenticatedPrincipalDTO:
+        resolved = await resolve_permissions.execute(principal.tenant_id, principal.user_id)
+        if not resolved.has(code, branch_id=branch_id):
+            raise PermissionDeniedError(code, branch_id=branch_id)
+        return principal
+
+    return _dependency
 
 
 # --- Tenant Platform (Sprint 4.1) ---------------------------------------
