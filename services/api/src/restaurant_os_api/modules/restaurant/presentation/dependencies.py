@@ -52,12 +52,14 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     ListAccessibleBranchesUseCase,
     ListRestaurantsUseCase,
     ReopenBranchUseCase,
+    ReplaceOperatingHoursUseCase,
     UpdateBranchUseCase,
     UpdateRestaurantUseCase,
 )
 from restaurant_os_api.modules.restaurant.infrastructure.database.repositories import (
     SQLAlchemyAddressRepository,
     SQLAlchemyBranchRepository,
+    SQLAlchemyOperatingHoursRepository,
     SQLAlchemyRestaurantRepository,
 )
 from restaurant_os_api.platform.idempotency import IdempotencyGuard
@@ -75,6 +77,7 @@ __all__ = [
     "ListAccessibleBranchesUseCaseDep",
     "ListRestaurantsUseCaseDep",
     "ReopenBranchUseCaseDep",
+    "ReplaceOperatingHoursUseCaseDep",
     "RequireBranchManageDep",
     "RequireBranchManageTenantWideDep",
     "RequireBranchReadAtAnyScopeDep",
@@ -190,6 +193,7 @@ def get_get_branch_use_case(session_factory: SessionFactoryDep) -> GetBranchUseC
         session_factory=session_factory,
         branch_repository_factory=SQLAlchemyBranchRepository,
         address_repository_factory=SQLAlchemyAddressRepository,
+        operating_hours_repository_factory=SQLAlchemyOperatingHoursRepository,
     )
 
 
@@ -258,4 +262,26 @@ RequireBranchManageTenantWideDep = Annotated[
 ]
 RequireBranchReadAtAnyScopeDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("branch.read"))
+]
+
+
+# --- Operating Hours (Step 4.3) -------------------------------------------
+# Gated by branch.manage/branch.read (not table.manage) -- confirmed with
+# the user: Architecture SS8's Branch Details screen groups Branch +
+# Address + OperatingHours as one branch-configuration unit, matching how
+# Address is already gated under branch.manage.
+
+
+def get_replace_operating_hours_use_case(
+    session_factory: SessionFactoryDep,
+) -> ReplaceOperatingHoursUseCase:
+    return ReplaceOperatingHoursUseCase(
+        session_factory=session_factory,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        operating_hours_repository_factory=SQLAlchemyOperatingHoursRepository,
+    )
+
+
+ReplaceOperatingHoursUseCaseDep = Annotated[
+    ReplaceOperatingHoursUseCase, Depends(get_replace_operating_hours_use_case)
 ]

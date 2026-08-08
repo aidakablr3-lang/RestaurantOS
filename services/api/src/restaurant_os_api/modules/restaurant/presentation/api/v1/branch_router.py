@@ -32,8 +32,12 @@ from fastapi.responses import JSONResponse
 from restaurant_os_api.core.response import ApiResponse, PaginationMeta
 from restaurant_os_api.modules.restaurant.application.dto import (
     AddressRequestDTO,
+    BranchDetailDTO,
     BranchDTO,
     CreateBranchRequestDTO,
+    OperatingHoursEntryDTO,
+    OperatingHoursEntryRequestDTO,
+    ReplaceOperatingHoursRequestDTO,
     UpdateBranchRequestDTO,
 )
 from restaurant_os_api.modules.restaurant.presentation.dependencies import (
@@ -43,6 +47,7 @@ from restaurant_os_api.modules.restaurant.presentation.dependencies import (
     IdempotencyGuardDep,
     ListAccessibleBranchesUseCaseDep,
     ReopenBranchUseCaseDep,
+    ReplaceOperatingHoursUseCaseDep,
     RequireBranchManageDep,
     RequireBranchManageTenantWideDep,
     RequireBranchReadAtAnyScopeDep,
@@ -52,9 +57,14 @@ from restaurant_os_api.modules.restaurant.presentation.dependencies import (
 from restaurant_os_api.modules.restaurant.presentation.schemas.branch_schemas import (
     AddressRequestSchema,
     AddressResponseSchema,
+    BranchDetailResponseSchema,
     BranchResponseSchema,
     CreateBranchRequestSchema,
     UpdateBranchRequestSchema,
+)
+from restaurant_os_api.modules.restaurant.presentation.schemas.operating_hours_schemas import (
+    OperatingHoursEntryResponseSchema,
+    ReplaceOperatingHoursRequestSchema,
 )
 from restaurant_os_api.platform.idempotency import fingerprint_request
 
@@ -95,6 +105,41 @@ def _branch_to_schema(dto: BranchDTO) -> BranchResponseSchema:
             else None
         ),
         created_at=dto.created_at,
+    )
+
+
+def _operating_hours_entry_to_schema(
+    dto: OperatingHoursEntryDTO,
+) -> OperatingHoursEntryResponseSchema:
+    return OperatingHoursEntryResponseSchema(
+        id=dto.id,
+        day_of_week=dto.day_of_week,
+        is_closed=dto.is_closed,
+        opens_at=dto.opens_at,
+        closes_at=dto.closes_at,
+    )
+
+
+def _branch_detail_to_schema(dto: BranchDetailDTO) -> BranchDetailResponseSchema:
+    return BranchDetailResponseSchema(
+        id=dto.id,
+        tenant_id=dto.tenant_id,
+        restaurant_id=dto.restaurant_id,
+        name=dto.name,
+        status=dto.status,
+        address=(
+            AddressResponseSchema(
+                id=dto.address.id,
+                line1=dto.address.line1,
+                city=dto.address.city,
+                country_code=dto.address.country_code,
+                postal_code=dto.address.postal_code,
+            )
+            if dto.address is not None
+            else None
+        ),
+        created_at=dto.created_at,
+        operating_hours=[_operating_hours_entry_to_schema(e) for e in dto.operating_hours],
     )
 
 
@@ -166,14 +211,14 @@ async def list_branches(
     )
 
 
-@router.get("/api/v1/branches/{branch_id}", response_model=ApiResponse[BranchResponseSchema])
+@router.get("/api/v1/branches/{branch_id}", response_model=ApiResponse[BranchDetailResponseSchema])
 async def get_branch(
     branch_id: BranchIdPath,
     principal: RequireBranchReadDep,
     use_case: GetBranchUseCaseDep,
-) -> ApiResponse[BranchResponseSchema]:
+) -> ApiResponse[BranchDetailResponseSchema]:
     result = await use_case.execute(principal.tenant_id, branch_id)
-    return ApiResponse(data=_branch_to_schema(result))
+    return ApiResponse(data=_branch_detail_to_schema(result))
 
 
 @router.patch("/api/v1/branches/{branch_id}", response_model=ApiResponse[BranchResponseSchema])
@@ -258,6 +303,51 @@ async def reopen_branch(
             tenant_id=principal.tenant_id,
             idempotency_key=idempotency_key,
             request_fingerprint=fingerprint_request({"branchId": branch_id}),
+            execute=execute,
+        )
+    return JSONResponse(status_code=http_status, content=response_body)
+
+
+@router.put(
+    "/api/v1/branches/{branch_id}/operating-hours",
+    response_model=ApiResponse[list[OperatingHoursEntryResponseSchema]],
+)
+async def replace_operating_hours(
+    branch_id: BranchIdPath,
+    body: ReplaceOperatingHoursRequestSchema,
+    principal: RequireBranchManageDep,
+    use_case: ReplaceOperatingHoursUseCaseDep,
+    idempotency_guard: IdempotencyGuardDep,
+    idempotency_key: IdempotencyKeyHeader = None,
+) -> JSONResponse:
+    async def execute() -> tuple[int, dict[str, Any]]:
+        result = await use_case.execute(
+            principal.tenant_id,
+            ReplaceOperatingHoursRequestDTO(
+                branch_id=branch_id,
+                entries=[
+                    OperatingHoursEntryRequestDTO(
+                        day_of_week=e.day_of_week,
+                        is_closed=e.is_closed,
+                        opens_at=e.opens_at,
+                        closes_at=e.closes_at,
+                    )
+                    for e in body.entries
+                ],
+            ),
+        )
+        response = ApiResponse(data=[_operating_hours_entry_to_schema(e) for e in result])
+        return status.HTTP_200_OK, response.model_dump(mode="json", by_alias=True)
+
+    if idempotency_key is None:
+        http_status, response_body = await execute()
+    else:
+        http_status, response_body = await idempotency_guard.run(
+            tenant_id=principal.tenant_id,
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint_request(
+                {"branchId": branch_id, **body.model_dump(mode="json")}
+            ),
             execute=execute,
         )
     return JSONResponse(status_code=http_status, content=response_body)

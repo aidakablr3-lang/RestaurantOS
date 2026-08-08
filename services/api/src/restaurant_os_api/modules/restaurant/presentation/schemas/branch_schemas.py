@@ -12,6 +12,9 @@ from datetime import datetime
 from pydantic import Field
 
 from restaurant_os_api.core.response import CamelModel
+from restaurant_os_api.modules.restaurant.presentation.schemas.operating_hours_schemas import (
+    OperatingHoursEntryResponseSchema,
+)
 
 
 class AddressRequestSchema(CamelModel):
@@ -50,3 +53,19 @@ class BranchResponseSchema(CamelModel):
     status: str
     address: AddressResponseSchema | None
     created_at: datetime
+
+
+class BranchDetailResponseSchema(CamelModel):
+    """``BranchResponseSchema`` plus nested operating hours -- only
+    ``GET /api/v1/branches/{id}`` returns this shape (Step 4.3);
+    create/update/close/reopen return the plain ``BranchResponseSchema``
+    unchanged."""
+
+    id: str
+    tenant_id: str
+    restaurant_id: str
+    name: str
+    status: str
+    address: AddressResponseSchema | None
+    created_at: datetime
+    operating_hours: list[OperatingHoursEntryResponseSchema]
