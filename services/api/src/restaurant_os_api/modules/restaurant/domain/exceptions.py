@@ -22,6 +22,14 @@ class RestaurantDomainError(Exception):
         self.message = message
 
 
+class RestaurantNotFoundError(RestaurantDomainError):
+    error_code = "RESTAURANT_NOT_FOUND"
+
+    def __init__(self, restaurant_id: str) -> None:
+        super().__init__(f"Restaurant '{restaurant_id}' does not exist.")
+        self.restaurant_id = restaurant_id
+
+
 class InvalidRestaurantStatusTransitionError(RestaurantDomainError):
     error_code = "INVALID_RESTAURANT_STATUS_TRANSITION"
 

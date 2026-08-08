@@ -46,6 +46,53 @@ class RestaurantCreated:
 
 
 @dataclass(frozen=True, slots=True)
+class RestaurantUpdated:
+    """Step 4.1 addition, not in Architecture SS11's original table
+    (which named only ``RestaurantCreated``) -- mirrors
+    ``BranchUpdated``'s exact shape. A disclosed, precedented extension:
+    every other mutable entity in this catalogue gets an Updated/
+    status-change event pair, and Restaurant's own omission reads as an
+    oversight in the original planning pass rather than a deliberate
+    asymmetry (nothing in SS11 explains why Restaurant would be
+    treated differently from Branch here)."""
+
+    restaurant_id: str
+    occurred_at: datetime
+
+    event_type: ClassVar[str] = "RestaurantUpdated"
+    aggregate_type: ClassVar[str] = "restaurant"
+
+    @property
+    def aggregate_id(self) -> str:
+        return self.restaurant_id
+
+    def to_payload(self) -> dict[str, Any]:
+        return {"restaurantId": self.restaurant_id, "occurredAt": self.occurred_at.isoformat()}
+
+
+@dataclass(frozen=True, slots=True)
+class RestaurantDiscontinued:
+    """Step 4.1 addition -- see ``RestaurantUpdated``'s docstring for
+    why. Mirrors ``BranchClosed``'s exact shape (Restaurant has only
+    one terminal transition, active -> discontinued, unlike Branch's
+    two, so there is no ``RestaurantReactivated`` counterpart --
+    ``Restaurant.discontinue()`` itself has no reverse transition)."""
+
+    restaurant_id: str
+    occurred_at: datetime
+
+    event_type: ClassVar[str] = "RestaurantDiscontinued"
+    aggregate_type: ClassVar[str] = "restaurant"
+
+    @property
+    def aggregate_id(self) -> str:
+        return self.restaurant_id
+
+    def to_payload(self) -> dict[str, Any]:
+        return {"restaurantId": self.restaurant_id, "occurredAt": self.occurred_at.isoformat()}
+
+
+@dataclass(frozen=True, slots=True)
 class BranchCreated:
     branch_id: str
     restaurant_id: str
