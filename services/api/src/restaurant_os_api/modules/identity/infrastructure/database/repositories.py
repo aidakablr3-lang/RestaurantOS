@@ -11,12 +11,18 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
+from restaurant_os_api.core.ids import generate_ulid
 from restaurant_os_api.modules.identity.domain.entities import (
     FeatureFlag,
+    Permission,
+    Role,
+    RolePermission,
+    RoleScope,
     Session,
     Subscription,
     SubscriptionStatus,
@@ -26,16 +32,21 @@ from restaurant_os_api.modules.identity.domain.entities import (
     TenantStatus,
     TenantTier,
     User,
+    UserRole,
     UserStatus,
 )
 from restaurant_os_api.modules.identity.infrastructure.database.models import (
     FeatureFlagModel,
+    PermissionModel,
+    RoleModel,
+    RolePermissionModel,
     SessionModel,
     SubscriptionModel,
     SystemSettingModel,
     TenantDirectoryEntryModel,
     TenantModel,
     UserModel,
+    UserRoleModel,
 )
 
 
@@ -118,6 +129,49 @@ def _feature_flag_from_model(model: FeatureFlagModel) -> FeatureFlag:
         rollout_percentage=model.rollout_percentage,
         start_date=model.start_date,
         end_date=model.end_date,
+    )
+
+
+def _permission_from_model(model: PermissionModel) -> Permission:
+    return Permission(
+        code=model.code,
+        module=model.module,
+        description=model.description,
+        is_active=model.is_active,
+    )
+
+
+def _role_from_model(model: RoleModel) -> Role:
+    return Role(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        name=model.name,
+        description=model.description,
+        default_scope=RoleScope(model.default_scope),
+        is_system=model.is_system,
+        is_active=model.is_active,
+        created_at=model.created_at,
+    )
+
+
+def _role_permission_from_model(model: RolePermissionModel) -> RolePermission:
+    return RolePermission(
+        id=model.id,
+        role_id=model.role_id,
+        permission_code=model.permission_code,
+        created_at=model.created_at,
+    )
+
+
+def _user_role_from_model(model: UserRoleModel) -> UserRole:
+    return UserRole(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        user_id=model.user_id,
+        role_id=model.role_id,
+        branch_id=model.branch_id,
+        granted_at=model.granted_at,
+        granted_by_user_id=model.granted_by_user_id,
     )
 
 
@@ -476,3 +530,215 @@ class SQLAlchemyTenantDirectoryRepository:
             .values(status=status)
         )
         await self._session.execute(stmt)
+
+
+class SQLAlchemyPermissionRepository:
+    """Implements ``PermissionRepository``. No tenant filter anywhere —
+    pure platform reference data (RBAC Foundation Architecture SS4.2)."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_code(self, code: str) -> Permission | None:
+        model = await self._session.get(PermissionModel, code)
+        return _permission_from_model(model) if model is not None else None
+
+    async def list_active(self) -> list[Permission]:
+        stmt = select(PermissionModel).where(PermissionModel.is_active.is_(True))
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_permission_from_model(m) for m in models]
+
+
+class SQLAlchemyRoleRepository:
+    """Implements ``RoleRepository``.
+
+    Every method's visibility predicate is
+    ``tenant_id == :tenant_id OR tenant_id IS NULL`` — the application-layer
+    mirror of this table's own RLS policy (RBAC Foundation Architecture
+    SS14.2), following ``SQLAlchemyFeatureFlagRepository``'s exact,
+    already-established precedent for the identical nullable-tenant
+    shape.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    def _visible_to(self, tenant_id: str) -> ColumnElement[bool]:
+        return (RoleModel.tenant_id == tenant_id) | (RoleModel.tenant_id.is_(None))
+
+    async def get_by_id(self, tenant_id: str, role_id: str) -> Role | None:
+        stmt = select(RoleModel).where(RoleModel.id == role_id, self._visible_to(tenant_id))
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _role_from_model(model) if model is not None else None
+
+    async def get_by_name(self, tenant_id: str, name: str) -> Role | None:
+        stmt = select(RoleModel).where(RoleModel.name == name, self._visible_to(tenant_id))
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _role_from_model(model) if model is not None else None
+
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[Role], int]:
+        visible = self._visible_to(tenant_id)
+        count_stmt = select(func.count()).select_from(RoleModel).where(visible)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        page_stmt = (
+            select(RoleModel)
+            .where(visible)
+            .order_by(RoleModel.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        models = (await self._session.execute(page_stmt)).scalars().all()
+        return [_role_from_model(m) for m in models], total
+
+    async def create(self, role: Role) -> Role:
+        model = RoleModel(
+            id=role.id,
+            tenant_id=role.tenant_id,
+            name=role.name,
+            description=role.description,
+            default_scope=role.default_scope.value,
+            is_system=role.is_system,
+            is_active=role.is_active,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _role_from_model(model)
+
+    async def update(self, role: Role) -> Role:
+        stmt = (
+            update(RoleModel)
+            .where(RoleModel.id == role.id)
+            .values(
+                name=role.name,
+                description=role.description,
+                default_scope=role.default_scope.value,
+                is_active=role.is_active,
+            )
+        )
+        await self._session.execute(stmt)
+        return role
+
+
+class SQLAlchemyRolePermissionRepository:
+    """Implements ``RolePermissionRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def list_permission_codes_for_role(self, role_id: str) -> frozenset[str]:
+        stmt = (
+            select(RolePermissionModel.permission_code)
+            .join(PermissionModel, PermissionModel.code == RolePermissionModel.permission_code)
+            .where(RolePermissionModel.role_id == role_id, PermissionModel.is_active.is_(True))
+        )
+        codes = (await self._session.execute(stmt)).scalars().all()
+        return frozenset(codes)
+
+    async def add(self, role_permission: RolePermission) -> RolePermission:
+        model = RolePermissionModel(
+            id=role_permission.id,
+            role_id=role_permission.role_id,
+            permission_code=role_permission.permission_code,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _role_permission_from_model(model)
+
+    async def remove(self, role_id: str, permission_code: str) -> None:
+        stmt = delete(RolePermissionModel).where(
+            RolePermissionModel.role_id == role_id,
+            RolePermissionModel.permission_code == permission_code,
+        )
+        await self._session.execute(stmt)
+
+    async def replace_for_role(self, role_id: str, permission_codes: frozenset[str]) -> None:
+        await self._session.execute(
+            delete(RolePermissionModel).where(RolePermissionModel.role_id == role_id)
+        )
+        for code in permission_codes:
+            self._session.add(
+                RolePermissionModel(id=generate_ulid(), role_id=role_id, permission_code=code)
+            )
+        await self._session.flush()
+
+
+class SQLAlchemyUserRoleRepository:
+    """Implements ``UserRoleRepository``.
+
+    ``tenant_id`` is required and applied as an explicit filter on
+    every method — the same belt-and-suspenders discipline as
+    ``SQLAlchemyUserRepository`` (Data Architecture v2.0 SS4.1), even
+    though ``user_roles`` also carries a standard RLS policy.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, user_role_id: str) -> UserRole | None:
+        stmt = select(UserRoleModel).where(
+            UserRoleModel.id == user_role_id,
+            UserRoleModel.tenant_id == tenant_id,
+            UserRoleModel.deleted_at.is_(None),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _user_role_from_model(model) if model is not None else None
+
+    async def list_active_for_user(self, tenant_id: str, user_id: str) -> list[UserRole]:
+        stmt = select(UserRoleModel).where(
+            UserRoleModel.tenant_id == tenant_id,
+            UserRoleModel.user_id == user_id,
+            UserRoleModel.deleted_at.is_(None),
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_user_role_from_model(m) for m in models]
+
+    async def exists(
+        self, tenant_id: str, user_id: str, role_id: str, branch_id: str | None
+    ) -> bool:
+        branch_predicate = (
+            UserRoleModel.branch_id.is_(None)
+            if branch_id is None
+            else UserRoleModel.branch_id == branch_id
+        )
+        stmt = (
+            select(func.count())
+            .select_from(UserRoleModel)
+            .where(
+                UserRoleModel.tenant_id == tenant_id,
+                UserRoleModel.user_id == user_id,
+                UserRoleModel.role_id == role_id,
+                branch_predicate,
+                UserRoleModel.deleted_at.is_(None),
+            )
+        )
+        return (await self._session.execute(stmt)).scalar_one() > 0
+
+    async def create(self, user_role: UserRole) -> UserRole:
+        model = UserRoleModel(
+            id=user_role.id,
+            tenant_id=user_role.tenant_id,
+            user_id=user_role.user_id,
+            role_id=user_role.role_id,
+            branch_id=user_role.branch_id,
+            granted_by_user_id=user_role.granted_by_user_id,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _user_role_from_model(model)
+
+    async def revoke(self, tenant_id: str, user_role_id: str) -> UserRole | None:
+        stmt = (
+            update(UserRoleModel)
+            .where(
+                UserRoleModel.id == user_role_id,
+                UserRoleModel.tenant_id == tenant_id,
+                UserRoleModel.deleted_at.is_(None),
+            )
+            .values(deleted_at=datetime.now(UTC))
+            .returning(UserRoleModel)
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _user_role_from_model(model) if model is not None else None

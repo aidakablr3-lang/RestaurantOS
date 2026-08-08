@@ -32,6 +32,9 @@ from restaurant_os_api.modules.identity.application.use_cases.reactivate_tenant 
 from restaurant_os_api.modules.identity.application.use_cases.refresh_access_token import (
     RefreshAccessTokenUseCase,
 )
+from restaurant_os_api.modules.identity.application.use_cases.resolve_user_permissions import (
+    ResolveUserPermissionsUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.suspend_tenant import (
     SuspendTenantUseCase,
 )
@@ -58,6 +61,7 @@ __all__ = [
     "OnboardTenantUseCase",
     "ReactivateTenantUseCase",
     "RefreshAccessTokenUseCase",
+    "ResolveUserPermissionsUseCase",
     "SuspendTenantUseCase",
     "UpdateTenantSettingsUseCase",
     "UpdateTenantUseCase",

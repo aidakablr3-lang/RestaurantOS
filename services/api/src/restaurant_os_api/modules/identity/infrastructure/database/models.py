@@ -1,15 +1,13 @@
 """SQLAlchemy ORM models for the identity module.
 
-Scope note: Role, Permission, RolePermission, and UserRole are
-deliberately **not** included in this file. UserRole optionally scopes a
-role assignment to a Branch (Data Architecture v2.0 SS3.1), and the
-``branches`` table does not exist until the Restaurant module lands —
-adding that foreign key now would either dangle or force this PR to
-reach into an unrelated module. RBAC is authorization (which permissions
-a session may exercise), not authentication (whether the session is
-valid at all); Sprint 3 implemented only the latter, and Sprint 4.1
-(Tenant Platform) adds a single interim ``is_platform_admin`` flag
-rather than pulling RBAC forward — see the identity module README.
+Sprint 5, Step 2 (RBAC Foundation) adds ``RoleModel``, ``PermissionModel``,
+``RolePermissionModel``, ``UserRoleModel`` below — the follow-up the
+original Sprint 3 scope note (superseded, quoted for history) pointed
+at: "RBAC has no consumer until a protected, non-auth route exists.
+Tracked as a follow-up PR." ``UserRoleModel.branch_id`` is still a
+plain, unconstrained column, not yet FK'd to ``branches`` — that table
+is created by migration 0004 (Restaurant Platform), which also adds
+the FK constraint (see ``0003_rbac_foundation.py``'s own docstring).
 """
 
 from __future__ import annotations
@@ -256,6 +254,129 @@ class TenantDirectoryEntryModel(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="provisioning")
     updated_at: Mapped[datetime] = mapped_column(
         TimestampType(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class PermissionModel(Base):
+    """RBAC Foundation Architecture SS4.2/SS13.1. ``code`` is the primary
+    key (not a ULID) — a deliberate deviation, mirroring the
+    ``ChartOfAccount.account_code`` precedent for a small,
+    human-referenced, platform-seeded reference table. No ``tenant_id``
+    at all: pure platform reference data, same as ``currencies``."""
+
+    __tablename__ = "permissions"
+    __table_args__ = (
+        CheckConstraint(r"code ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'", name="code_is_valid"),
+    )
+
+    code: Mapped[str] = mapped_column(Text, primary_key=True)
+    module: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        TimestampType(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TimestampType(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class RoleModel(Base, ULIDPrimaryKeyMixin, TimestampMixin):
+    """RBAC Foundation Architecture SS4.1. ``tenant_id`` nullable — NULL
+    means platform-wide, visible to every tenant (this table's RLS
+    policy explicitly allows ``tenant_id IS NULL`` rows through,
+    matching ``FeatureFlagModel``'s own precedent exactly). No
+    platform-wide row is created by Sprint 5's own migration seed data
+    — the nullable column exists so that path stays open later."""
+
+    __tablename__ = "roles"
+    __table_args__ = (
+        ulid_check_constraint("id"),
+        CheckConstraint("default_scope IN ('tenant', 'branch')", name="default_scope_is_valid"),
+        Index(
+            "uq_roles_tenant_id_name",
+            "tenant_id",
+            "name",
+            unique=True,
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
+
+    tenant_id: Mapped[str | None] = mapped_column(
+        Text, ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    default_scope: Mapped[str] = mapped_column(Text, nullable=False, server_default="branch")
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+
+
+class RolePermissionModel(Base, ULIDPrimaryKeyMixin):
+    """RBAC Foundation Architecture SS4.3. A pure association row (Data
+    Architecture v2.0 Group F: "no independent audit weight") — no
+    ``TimestampMixin``/``SoftDeleteMixin`` beyond ``created_at``, matching
+    the base catalogue's own ``RolePermission`` classification."""
+
+    __tablename__ = "role_permissions"
+    __table_args__ = (
+        ulid_check_constraint("id"),
+        Index(
+            "uq_role_permissions_role_id_permission_code",
+            "role_id",
+            "permission_code",
+            unique=True,
+        ),
+    )
+
+    role_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    permission_code: Mapped[str] = mapped_column(
+        Text, ForeignKey("permissions.code", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TimestampType(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class UserRoleModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, SoftDeleteMixin):
+    """RBAC Foundation Architecture SS4.4. ``branch_id``: plain,
+    unconstrained ``TEXT`` — FK to ``branches.id`` intentionally
+    deferred to migration 0004 (Restaurant Platform), same rationale as
+    ``SessionModel.device_id``/``SystemSettingModel.branch_id``.
+    ``UNIQUE NULLS NOT DISTINCT (user_id, role_id, branch_id)`` is what
+    makes one user holding a tenant-wide role plus multiple
+    branch-specific roles simultaneously both possible and
+    duplicate-safe at the database level."""
+
+    __tablename__ = "user_roles"
+    __table_args__ = (
+        ulid_check_constraint("id"),
+        Index(
+            "uq_user_roles_user_id_role_id_branch_id",
+            "user_id",
+            "role_id",
+            "branch_id",
+            unique=True,
+            postgresql_nulls_not_distinct=True,
+        ),
+        Index("ix_user_roles_role_id", "role_id"),
+        Index("ix_user_roles_branch_id", "branch_id"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False
+    )
+    branch_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    granted_at: Mapped[datetime] = mapped_column(
+        TimestampType(timezone=True), server_default=func.now(), nullable=False
+    )
+    granted_by_user_id: Mapped[str | None] = mapped_column(
+        Text, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
 
