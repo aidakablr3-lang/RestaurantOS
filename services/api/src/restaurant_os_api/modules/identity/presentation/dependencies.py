@@ -400,6 +400,8 @@ def get_tenant_provisioning_service(
         subscription_repository_factory=SQLAlchemySubscriptionRepository,
         feature_flag_repository_factory=SQLAlchemyFeatureFlagRepository,
         directory_repository_factory=SQLAlchemyTenantDirectoryRepository,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
 
