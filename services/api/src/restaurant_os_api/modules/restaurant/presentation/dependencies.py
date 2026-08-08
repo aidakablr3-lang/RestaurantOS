@@ -46,21 +46,26 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     CloseBranchUseCase,
     CreateBranchUseCase,
     CreateRestaurantUseCase,
+    CreateTableZoneUseCase,
     DiscontinueRestaurantUseCase,
     GetBranchUseCase,
     GetRestaurantUseCase,
+    GetTableZoneUseCase,
     ListAccessibleBranchesUseCase,
     ListRestaurantsUseCase,
+    ListTableZonesUseCase,
     ReopenBranchUseCase,
     ReplaceOperatingHoursUseCase,
     UpdateBranchUseCase,
     UpdateRestaurantUseCase,
+    UpdateTableZoneUseCase,
 )
 from restaurant_os_api.modules.restaurant.infrastructure.database.repositories import (
     SQLAlchemyAddressRepository,
     SQLAlchemyBranchRepository,
     SQLAlchemyOperatingHoursRepository,
     SQLAlchemyRestaurantRepository,
+    SQLAlchemyTableZoneRepository,
 )
 from restaurant_os_api.platform.idempotency import IdempotencyGuard
 from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchemyOutboxWriter
@@ -70,12 +75,15 @@ __all__ = [
     "CloseBranchUseCaseDep",
     "CreateBranchUseCaseDep",
     "CreateRestaurantUseCaseDep",
+    "CreateTableZoneUseCaseDep",
     "DiscontinueRestaurantUseCaseDep",
     "GetBranchUseCaseDep",
     "GetRestaurantUseCaseDep",
+    "GetTableZoneUseCaseDep",
     "IdempotencyGuardDep",
     "ListAccessibleBranchesUseCaseDep",
     "ListRestaurantsUseCaseDep",
+    "ListTableZonesUseCaseDep",
     "ReopenBranchUseCaseDep",
     "ReplaceOperatingHoursUseCaseDep",
     "RequireBranchManageDep",
@@ -84,8 +92,11 @@ __all__ = [
     "RequireBranchReadDep",
     "RequireRestaurantManageDep",
     "RequireRestaurantReadDep",
+    "RequireTableManageDep",
+    "RequireTableReadDep",
     "UpdateBranchUseCaseDep",
     "UpdateRestaurantUseCaseDep",
+    "UpdateTableZoneUseCaseDep",
 ]
 
 
@@ -284,4 +295,65 @@ def get_replace_operating_hours_use_case(
 
 ReplaceOperatingHoursUseCaseDep = Annotated[
     ReplaceOperatingHoursUseCase, Depends(get_replace_operating_hours_use_case)
+]
+
+
+# --- TableZone (Step 4.4) --------------------------------------------------
+# Gated by table.manage/table.read -- the seeded permission descriptions
+# name "dining areas, tables, and QR codes" explicitly (migration 0003),
+# unlike Operating Hours' genuine branch.manage-vs-table.manage ambiguity,
+# so no confirmation was needed here.
+
+
+def get_create_table_zone_use_case(session_factory: SessionFactoryDep) -> CreateTableZoneUseCase:
+    return CreateTableZoneUseCase(
+        session_factory=session_factory,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        table_zone_repository_factory=SQLAlchemyTableZoneRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateTableZoneUseCaseDep = Annotated[
+    CreateTableZoneUseCase, Depends(get_create_table_zone_use_case)
+]
+
+
+def get_get_table_zone_use_case(session_factory: SessionFactoryDep) -> GetTableZoneUseCase:
+    return GetTableZoneUseCase(
+        session_factory=session_factory,
+        table_zone_repository_factory=SQLAlchemyTableZoneRepository,
+    )
+
+
+GetTableZoneUseCaseDep = Annotated[GetTableZoneUseCase, Depends(get_get_table_zone_use_case)]
+
+
+def get_list_table_zones_use_case(session_factory: SessionFactoryDep) -> ListTableZonesUseCase:
+    return ListTableZonesUseCase(
+        session_factory=session_factory,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        table_zone_repository_factory=SQLAlchemyTableZoneRepository,
+    )
+
+
+ListTableZonesUseCaseDep = Annotated[ListTableZonesUseCase, Depends(get_list_table_zones_use_case)]
+
+
+def get_update_table_zone_use_case(session_factory: SessionFactoryDep) -> UpdateTableZoneUseCase:
+    return UpdateTableZoneUseCase(
+        session_factory=session_factory,
+        table_zone_repository_factory=SQLAlchemyTableZoneRepository,
+    )
+
+
+UpdateTableZoneUseCaseDep = Annotated[
+    UpdateTableZoneUseCase, Depends(get_update_table_zone_use_case)
+]
+
+RequireTableManageDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("table.manage"))
+]
+RequireTableReadDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("table.read"))
 ]
