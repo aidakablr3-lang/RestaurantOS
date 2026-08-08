@@ -48,14 +48,6 @@ from restaurant_os_api.platform.database import UnitOfWork
 from restaurant_os_api.platform.tenancy import TenantContext
 
 PASSWORD = "correct horse battery staple"
-# AssignUserRoleRequestSchema.branch_id requires exactly 26 characters
-# (ULID length) -- a real branch_id doesn't exist yet (Branch is
-# Restaurant Platform, not built), but any request that actually
-# reaches the authorization/use-case layer (rather than 422ing on
-# schema validation before ever getting there) must use a
-# schema-valid-length value.
-BRANCH_A = "01ARZ3NDEKTSV4RRFFQ6BRNCHA"
-BRANCH_B = "01ARZ3NDEKTSV4RRFFQ6BRNCHB"
 
 
 @pytest.fixture(scope="module")
@@ -220,6 +212,33 @@ async def _grant_role(
                 granted_by_user_id=None,
             )
         )
+
+
+async def _create_branch(session_factory, *, tenant_id: str) -> str:
+    """A real ``branches`` row. Restaurant Platform migration 0004 added
+    a FK (``user_roles.branch_id`` -> ``branches.id``) plus a
+    tenant-consistency trigger, exactly as RBAC's own migration 0003
+    docstring mandated -- a branch-scoped ``UserRole`` grant can no
+    longer reference a synthetic, non-existent branch id."""
+    restaurant_id = generate_ulid()
+    branch_id = generate_ulid()
+    async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
+        await uow.session.execute(
+            text(
+                "INSERT INTO restaurants (id, tenant_id, legal_name, display_name, "
+                "default_currency_code) VALUES (:id, :tenant_id, 'Test Restaurant', "
+                "'Test Restaurant', 'USD')"
+            ),
+            {"id": restaurant_id, "tenant_id": tenant_id},
+        )
+        await uow.session.execute(
+            text(
+                "INSERT INTO branches (id, tenant_id, restaurant_id, name) "
+                "VALUES (:id, :tenant_id, :restaurant_id, 'Test Branch')"
+            ),
+            {"id": branch_id, "tenant_id": tenant_id, "restaurant_id": restaurant_id},
+        )
+    return branch_id
 
 
 def _auth_headers(token: str) -> dict[str, str]:
@@ -526,12 +545,22 @@ class TestUserRoleGrantAndRevoke:
 
 
 @pytest_asyncio.fixture
+async def branch_a_id(session_factory, tenant_owner: dict) -> str:
+    return await _create_branch(session_factory, tenant_id=tenant_owner["tenant_id"])
+
+
+@pytest_asyncio.fixture
+async def branch_b_id(session_factory, tenant_owner: dict) -> str:
+    return await _create_branch(session_factory, tenant_id=tenant_owner["tenant_id"])
+
+
+@pytest_asyncio.fixture
 async def branch_manager(
-    session_factory, client: TestClient, tenant_owner: dict
+    session_factory, client: TestClient, tenant_owner: dict, branch_a_id: str
 ) -> AsyncGenerator[dict]:
-    """A Branch Manager at 'branch-a' in tenant_owner's tenant, holding
-    roles.assign only at that branch -- a real, branch-scoped grant, not
-    synthetic data."""
+    """A Branch Manager at a real branch in tenant_owner's tenant,
+    holding roles.assign only at that branch -- a real, branch-scoped
+    grant, not synthetic data."""
     email = "bm@example.com"
     user_id = await _seed_user(session_factory, tenant_id=tenant_owner["tenant_id"], email=email)
     await _grant_role(
@@ -540,14 +569,16 @@ async def branch_manager(
         user_id=user_id,
         role_name="Branch Manager",
         permission_codes=frozenset({"branch.read", "table.read", "table.manage", "roles.assign"}),
-        branch_id=BRANCH_A,
+        branch_id=branch_a_id,
     )
     token = await _login(client, tenant_id=tenant_owner["tenant_id"], email=email)
     yield {"tenant_id": tenant_owner["tenant_id"], "user_id": user_id, "token": token}
 
 
 @pytest_asyncio.fixture
-async def waiter(session_factory, client: TestClient, tenant_owner: dict) -> AsyncGenerator[dict]:
+async def waiter(
+    session_factory, client: TestClient, tenant_owner: dict, branch_a_id: str
+) -> AsyncGenerator[dict]:
     """A real Waiter (RBAC_Foundation_Architecture.md SS6.3: table.read,
     menu.read, reservation.manage) -- holds no roles.assign anywhere."""
     email = "waiter@example.com"
@@ -558,7 +589,7 @@ async def waiter(session_factory, client: TestClient, tenant_owner: dict) -> Asy
         user_id=user_id,
         role_name="Waiter",
         permission_codes=frozenset({"table.read", "menu.read", "reservation.manage"}),
-        branch_id=BRANCH_A,
+        branch_id=branch_a_id,
     )
     token = await _login(client, tenant_id=tenant_owner["tenant_id"], email=email)
     yield {"tenant_id": tenant_owner["tenant_id"], "user_id": user_id, "token": token}
@@ -734,7 +765,12 @@ class TestBranchScopedRoleDelegation:
 
     # 2. Branch Manager can assign roles within their own branch when authorized.
     def test_branch_manager_can_assign_a_role_within_their_own_branch(
-        self, client: TestClient, tenant_owner: dict, plain_member: dict, branch_manager: dict
+        self,
+        client: TestClient,
+        tenant_owner: dict,
+        plain_member: dict,
+        branch_manager: dict,
+        branch_a_id: str,
     ) -> None:
         create_response = client.post(
             "/api/v1/rbac/roles",
@@ -751,14 +787,19 @@ class TestBranchScopedRoleDelegation:
         response = client.post(
             "/api/v1/rbac/user-roles",
             headers=_auth_headers(branch_manager["token"]),
-            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": BRANCH_A},
+            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": branch_a_id},
         )
         assert response.status_code == 201, response.text
-        assert response.json()["data"]["branchId"] == BRANCH_A
+        assert response.json()["data"]["branchId"] == branch_a_id
 
     # 3. Branch Manager cannot assign roles in another branch.
     def test_branch_manager_cannot_assign_a_role_in_a_different_branch(
-        self, client: TestClient, tenant_owner: dict, plain_member: dict, branch_manager: dict
+        self,
+        client: TestClient,
+        tenant_owner: dict,
+        plain_member: dict,
+        branch_manager: dict,
+        branch_b_id: str,
     ) -> None:
         create_response = client.post(
             "/api/v1/rbac/roles",
@@ -775,14 +816,19 @@ class TestBranchScopedRoleDelegation:
         response = client.post(
             "/api/v1/rbac/user-roles",
             headers=_auth_headers(branch_manager["token"]),
-            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": BRANCH_B},
+            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": branch_b_id},
         )
         assert response.status_code == 403, response.text
         assert response.json()["error"]["code"] == "INSUFFICIENT_GRANT_AUTHORITY"
 
     # 4. Branch Manager cannot grant a role exceeding their delegation ceiling.
     def test_branch_manager_cannot_grant_a_role_carrying_a_permission_they_lack(
-        self, client: TestClient, tenant_owner: dict, plain_member: dict, branch_manager: dict
+        self,
+        client: TestClient,
+        tenant_owner: dict,
+        plain_member: dict,
+        branch_manager: dict,
+        branch_a_id: str,
     ) -> None:
         create_response = client.post(
             "/api/v1/rbac/roles",
@@ -799,7 +845,7 @@ class TestBranchScopedRoleDelegation:
         response = client.post(
             "/api/v1/rbac/user-roles",
             headers=_auth_headers(branch_manager["token"]),
-            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": BRANCH_A},
+            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": branch_a_id},
         )
         assert response.status_code == 403, response.text
         assert response.json()["error"]["code"] == "INSUFFICIENT_GRANT_AUTHORITY"
@@ -827,6 +873,7 @@ class TestBranchScopedRoleDelegation:
         tenant_owner: dict,
         plain_member: dict,
         branch_manager: dict,
+        branch_a_id: str,
     ) -> None:
         """Structural proof at the branch-scoped granter too, not just
         the tenant-wide one above: a role's *name* is irrelevant --
@@ -848,7 +895,7 @@ class TestBranchScopedRoleDelegation:
         grant_response = client.post(
             "/api/v1/rbac/user-roles",
             headers=_auth_headers(branch_manager["token"]),
-            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": BRANCH_A},
+            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": branch_a_id},
         )
         assert grant_response.status_code == 201, grant_response.text
 
@@ -861,7 +908,12 @@ class TestBranchScopedRoleDelegation:
 
     # 7. Waiter cannot assign roles.
     def test_a_waiter_cannot_assign_roles_at_all(
-        self, client: TestClient, tenant_owner: dict, plain_member: dict, waiter: dict
+        self,
+        client: TestClient,
+        tenant_owner: dict,
+        plain_member: dict,
+        waiter: dict,
+        branch_a_id: str,
     ) -> None:
         create_response = client.post(
             "/api/v1/rbac/roles",
@@ -878,7 +930,7 @@ class TestBranchScopedRoleDelegation:
         response = client.post(
             "/api/v1/rbac/user-roles",
             headers=_auth_headers(waiter["token"]),
-            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": BRANCH_A},
+            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": branch_a_id},
         )
         assert response.status_code == 403, response.text
         assert response.json()["error"]["code"] == "PERMISSION_DENIED"
@@ -899,7 +951,12 @@ class TestBranchScopedRoleDelegation:
 
     # 9. Revocation follows the same branch-scope rules.
     def test_branch_manager_can_revoke_a_grant_within_their_own_branch(
-        self, client: TestClient, tenant_owner: dict, plain_member: dict, branch_manager: dict
+        self,
+        client: TestClient,
+        tenant_owner: dict,
+        plain_member: dict,
+        branch_manager: dict,
+        branch_a_id: str,
     ) -> None:
         create_response = client.post(
             "/api/v1/rbac/roles",
@@ -915,7 +972,7 @@ class TestBranchScopedRoleDelegation:
         grant_response = client.post(
             "/api/v1/rbac/user-roles",
             headers=_auth_headers(tenant_owner["token"]),
-            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": BRANCH_A},
+            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": branch_a_id},
         )
         user_role_id = grant_response.json()["data"]["id"]
 
@@ -926,7 +983,12 @@ class TestBranchScopedRoleDelegation:
         assert response.status_code == 200, response.text
 
     def test_branch_manager_cannot_revoke_a_grant_in_a_different_branch(
-        self, client: TestClient, tenant_owner: dict, plain_member: dict, branch_manager: dict
+        self,
+        client: TestClient,
+        tenant_owner: dict,
+        plain_member: dict,
+        branch_manager: dict,
+        branch_b_id: str,
     ) -> None:
         create_response = client.post(
             "/api/v1/rbac/roles",
@@ -942,7 +1004,7 @@ class TestBranchScopedRoleDelegation:
         grant_response = client.post(
             "/api/v1/rbac/user-roles",
             headers=_auth_headers(tenant_owner["token"]),
-            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": BRANCH_B},
+            json={"userId": plain_member["user_id"], "roleId": role_id, "branchId": branch_b_id},
         )
         user_role_id = grant_response.json()["data"]["id"]
 

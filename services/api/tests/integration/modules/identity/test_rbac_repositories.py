@@ -110,6 +110,36 @@ async def _create_user_role(
         return await repo.create(user_role)
 
 
+async def _create_branch(session_factory, tenant_id: str) -> str:
+    """A real ``branches`` row (Restaurant Platform migration 0004) --
+    required since 0004 closed the cross-migration dependency 0003's
+    own docstring disclosed: ``user_roles.branch_id`` now has a real FK
+    plus a trigger enforcing it belongs to the same tenant as the grant
+    itself. Direct raw SQL, not the restaurant module's own repository,
+    matching this file's existing "insert directly for FK-satisfying
+    fixture data" convention (``_create_tenant``, ``_create_role``)
+    rather than introducing a cross-module test dependency."""
+    restaurant_id = generate_ulid()
+    branch_id = generate_ulid()
+    async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
+        await uow.session.execute(
+            text(
+                "INSERT INTO restaurants (id, tenant_id, legal_name, display_name, "
+                "default_currency_code) VALUES (:id, :tenant_id, 'Test Restaurant', "
+                "'Test Restaurant', 'USD')"
+            ),
+            {"id": restaurant_id, "tenant_id": tenant_id},
+        )
+        await uow.session.execute(
+            text(
+                "INSERT INTO branches (id, tenant_id, restaurant_id, name) "
+                "VALUES (:id, :tenant_id, :restaurant_id, 'Test Branch')"
+            ),
+            {"id": branch_id, "tenant_id": tenant_id, "restaurant_id": restaurant_id},
+        )
+    return branch_id
+
+
 async def _create_user(session_factory, tenant_id: str, email: str) -> str:
     user_id = generate_ulid()
     async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
@@ -415,9 +445,10 @@ class TestUserRoleRepository:
         tenant_role = await _create_role(session_factory, tenant.id, name="Owner")
         branch_role = await _create_role(session_factory, tenant.id, name="Manager")
         user_id = await _create_user(session_factory, tenant.id, "user@example.com")
+        branch_id = await _create_branch(session_factory, tenant.id)
         await _create_user_role(session_factory, tenant.id, user_id, tenant_role.id, branch_id=None)
         await _create_user_role(
-            session_factory, tenant.id, user_id, branch_role.id, branch_id="branch-a"
+            session_factory, tenant.id, user_id, branch_role.id, branch_id=branch_id
         )
 
         async with UnitOfWork(session_factory, TenantContext(tenant.id)) as uow:
@@ -426,18 +457,20 @@ class TestUserRoleRepository:
 
         assert len(grants) == 2
         branch_ids = {g.branch_id for g in grants}
-        assert branch_ids == {None, "branch-a"}
+        assert branch_ids == {None, branch_id}
 
     async def test_exists_mirrors_the_database_unique_constraint(self, session_factory) -> None:
         tenant = await _create_tenant(session_factory)
         role = await _create_role(session_factory, tenant.id)
         user_id = await _create_user(session_factory, tenant.id, "user@example.com")
-        await _create_user_role(session_factory, tenant.id, user_id, role.id, branch_id="branch-a")
+        branch_id = await _create_branch(session_factory, tenant.id)
+        other_branch_id = await _create_branch(session_factory, tenant.id)
+        await _create_user_role(session_factory, tenant.id, user_id, role.id, branch_id=branch_id)
 
         async with UnitOfWork(session_factory, TenantContext(tenant.id)) as uow:
             repo = SQLAlchemyUserRoleRepository(uow.session)
-            assert await repo.exists(tenant.id, user_id, role.id, "branch-a") is True
-            assert await repo.exists(tenant.id, user_id, role.id, "branch-b") is False
+            assert await repo.exists(tenant.id, user_id, role.id, branch_id) is True
+            assert await repo.exists(tenant.id, user_id, role.id, other_branch_id) is False
             assert await repo.exists(tenant.id, user_id, role.id, None) is False
 
     async def test_duplicate_grant_at_the_same_scope_raises_integrity_error(
@@ -460,12 +493,14 @@ class TestUserRoleRepository:
         tenant = await _create_tenant(session_factory)
         role = await _create_role(session_factory, tenant.id)
         user_id = await _create_user(session_factory, tenant.id, "user@example.com")
+        branch_a_id = await _create_branch(session_factory, tenant.id)
+        branch_b_id = await _create_branch(session_factory, tenant.id)
 
         grant_a = await _create_user_role(
-            session_factory, tenant.id, user_id, role.id, branch_id="branch-a"
+            session_factory, tenant.id, user_id, role.id, branch_id=branch_a_id
         )
         grant_b = await _create_user_role(
-            session_factory, tenant.id, user_id, role.id, branch_id="branch-b"
+            session_factory, tenant.id, user_id, role.id, branch_id=branch_b_id
         )
         assert grant_a.id != grant_b.id
 
