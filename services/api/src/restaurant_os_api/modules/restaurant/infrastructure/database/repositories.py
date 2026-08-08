@@ -408,6 +408,44 @@ class SQLAlchemyBranchRepository:
         models = (await self._session.execute(page_stmt)).scalars().all()
         return [_branch_from_model(m) for m in models], total
 
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[Branch], int]:
+        """Every branch across every restaurant the tenant owns --
+        backs the tenant-wide-grant case of ``ListAccessibleBranchesUseCase``
+        (Step 4 Decision Lock, Decision 2: a tenant-wide permission holder
+        sees all of the tenant's branches, not just one restaurant's)."""
+        filters = (BranchModel.tenant_id == tenant_id, BranchModel.deleted_at.is_(None))
+        count_stmt = select(func.count()).select_from(BranchModel).where(*filters)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        page_stmt = (
+            select(BranchModel)
+            .where(*filters)
+            .order_by(BranchModel.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        models = (await self._session.execute(page_stmt)).scalars().all()
+        return [_branch_from_model(m) for m in models], total
+
+    async def list_by_ids(self, tenant_id: str, branch_ids: frozenset[str]) -> list[Branch]:
+        """Backs the branch-scoped-grant case of
+        ``ListAccessibleBranchesUseCase`` -- resolves the caller's own
+        specific, unioned set of granted branch ids (RBAC's
+        ``ResolvedPermissions.branch_ids_with()``) into full ``Branch``
+        rows, still tenant-filtered as the belt-and-suspenders check
+        (RLS is the other half)."""
+        if not branch_ids:
+            return []
+        stmt = select(BranchModel).where(
+            BranchModel.tenant_id == tenant_id,
+            BranchModel.id.in_(branch_ids),
+            BranchModel.deleted_at.is_(None),
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_branch_from_model(m) for m in models]
+
 
 class SQLAlchemyOperatingHoursRepository:
     """Implements ``OperatingHoursRepository``."""

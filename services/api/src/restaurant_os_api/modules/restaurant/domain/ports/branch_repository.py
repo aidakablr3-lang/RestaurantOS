@@ -26,3 +26,16 @@ class BranchRepository(Protocol):
     async def list_for_restaurant(
         self, tenant_id: str, restaurant_id: str, *, offset: int, limit: int
     ) -> tuple[list[Branch], int]: ...
+
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[Branch], int]:
+        """Every branch across every restaurant the tenant owns (Step 4
+        Decision Lock, Decision 2's tenant-wide-grant case)."""
+        ...
+
+    async def list_by_ids(self, tenant_id: str, branch_ids: frozenset[str]) -> list[Branch]:
+        """Resolves a specific, caller-granted set of branch ids into
+        full ``Branch`` rows (Step 4 Decision Lock, Decision 2's
+        branch-scoped-grant case)."""
+        ...

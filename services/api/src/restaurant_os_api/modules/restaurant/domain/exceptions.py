@@ -58,6 +58,14 @@ class InvalidQRCodeStatusTransitionError(RestaurantDomainError):
         self.to_status = to_status
 
 
+class BranchNotFoundError(RestaurantDomainError):
+    error_code = "BRANCH_NOT_FOUND"
+
+    def __init__(self, branch_id: str) -> None:
+        super().__init__(f"Branch '{branch_id}' does not exist.")
+        self.branch_id = branch_id
+
+
 class InvalidReservationStatusTransitionError(RestaurantDomainError):
     """A reasonable, standard reservation state machine
     (requested -> confirmed -> seated -> completed, with no_show/canceled
