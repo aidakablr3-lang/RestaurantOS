@@ -16,6 +16,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from restaurant_os_api.modules.restaurant.application.dto.operating_hours_dto import (
+    OperatingHoursEntryDTO,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class AddressRequestDTO:
@@ -57,6 +61,26 @@ class BranchDTO:
     status: str
     address: AddressDTO | None
     created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class BranchDetailDTO:
+    """``BranchDTO`` plus its operating hours -- ``GetBranchUseCase``'s
+    own return type only (Step 4.3). Not used by create/update/close/
+    reopen, which never load operating hours and would otherwise return
+    a misleadingly-empty list for a branch that already has real ones
+    set. Architecture SS7 defines no dedicated ``GET .../operating-hours``
+    endpoint; SS8's Branch Details screen shows "Branch + Address +
+    OperatingHours" as one nested view, which is what this DTO backs."""
+
+    id: str
+    tenant_id: str
+    restaurant_id: str
+    name: str
+    status: str
+    address: AddressDTO | None
+    created_at: datetime
+    operating_hours: list[OperatingHoursEntryDTO]
 
 
 @dataclass(frozen=True, slots=True)

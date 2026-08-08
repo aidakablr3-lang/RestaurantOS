@@ -25,6 +25,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.list_restaurants
 from restaurant_os_api.modules.restaurant.application.use_cases.reopen_branch import (
     ReopenBranchUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.replace_operating_hours import (
+    ReplaceOperatingHoursUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.update_branch import (
     UpdateBranchUseCase,
 )
@@ -42,6 +45,7 @@ __all__ = [
     "ListAccessibleBranchesUseCase",
     "ListRestaurantsUseCase",
     "ReopenBranchUseCase",
+    "ReplaceOperatingHoursUseCase",
     "UpdateBranchUseCase",
     "UpdateRestaurantUseCase",
 ]
