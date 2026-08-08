@@ -15,6 +15,7 @@ from restaurant_os_api.modules.restaurant.domain.entities import (
     Branch,
     OperatingHours,
     Restaurant,
+    TableZone,
 )
 from restaurant_os_api.platform.events import DomainEvent
 
@@ -165,6 +166,48 @@ class InMemoryOperatingHoursRepository:
         self, tenant_id: str, branch_id: str, rows: list[OperatingHours]
     ) -> None:
         self._rows_by_branch[branch_id] = list(rows)
+
+
+class InMemoryTableZoneRepository:
+    def __init__(self, table_zones: dict[str, TableZone] | None = None) -> None:
+        self._table_zones = table_zones or {}
+
+    async def get_by_id(self, tenant_id: str, table_zone_id: str) -> TableZone | None:
+        table_zone = self._table_zones.get(table_zone_id)
+        if table_zone is None or table_zone.tenant_id != tenant_id:
+            return None
+        return table_zone
+
+    async def get_by_branch_id_and_name(
+        self, tenant_id: str, branch_id: str, name: str
+    ) -> TableZone | None:
+        for table_zone in self._table_zones.values():
+            if (
+                table_zone.tenant_id == tenant_id
+                and table_zone.branch_id == branch_id
+                and table_zone.name == name
+            ):
+                return table_zone
+        return None
+
+    async def create(self, table_zone: TableZone) -> TableZone:
+        self._table_zones[table_zone.id] = table_zone
+        return table_zone
+
+    async def update(self, table_zone: TableZone) -> TableZone:
+        self._table_zones[table_zone.id] = table_zone
+        return table_zone
+
+    async def list_for_branch(
+        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+    ) -> tuple[list[TableZone], int]:
+        visible = [
+            tz
+            for tz in self._table_zones.values()
+            if tz.tenant_id == tenant_id and tz.branch_id == branch_id
+        ]
+        visible.sort(key=lambda tz: tz.display_order)
+        return visible[offset : offset + limit], len(visible)
 
 
 @dataclass
