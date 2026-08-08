@@ -272,8 +272,10 @@ class MenuItemBranchPriceModel(
         Text, ForeignKey("menu_items.id", ondelete="RESTRICT"), nullable=False
     )
     price_amount: Mapped[Decimal] = mapped_column(Numeric(19, 4), nullable=False)
-    effective_from: Mapped[datetime] = mapped_column(nullable=False)
-    effective_to: Mapped[datetime | None] = mapped_column(nullable=True)
+    effective_from: Mapped[datetime] = mapped_column(TimestampType(timezone=True), nullable=False)
+    effective_to: Mapped[datetime | None] = mapped_column(
+        TimestampType(timezone=True), nullable=True
+    )
 
 
 class MenuItemAvailabilityModel(
@@ -293,8 +295,10 @@ class MenuItemAvailabilityModel(
         Text, ForeignKey("menu_items.id", ondelete="RESTRICT"), nullable=False
     )
     is_available: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    effective_from: Mapped[datetime] = mapped_column(nullable=False)
-    effective_to: Mapped[datetime | None] = mapped_column(nullable=True)
+    effective_from: Mapped[datetime] = mapped_column(TimestampType(timezone=True), nullable=False)
+    effective_to: Mapped[datetime | None] = mapped_column(
+        TimestampType(timezone=True), nullable=True
+    )
 
 
 class ReservationModel(
@@ -323,7 +327,7 @@ class ReservationModel(
     # unpopulated, no FK, matching MenuItemModel.recipe_id's own pattern.
     customer_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     party_size: Mapped[int] = mapped_column(Integer, nullable=False)
-    requested_at: Mapped[datetime] = mapped_column(nullable=False)
+    requested_at: Mapped[datetime] = mapped_column(TimestampType(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="requested")
 
 

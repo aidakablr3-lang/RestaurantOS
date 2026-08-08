@@ -31,12 +31,19 @@ Now that it does, this migration's upgrade():
 Both are reversed first in downgrade(), before the 15 new tables (and
 therefore ``branches``) are dropped.
 
-RLS: every new table gets the identical
+RLS: every new table except ``qr_codes`` gets the identical
 ``tenant_id = current_setting('app.tenant_id', true)`` policy already
 used throughout 0001-0003 -- no second isolation mechanism
 (Restaurant Platform Architecture SS4.2). Branch-level access is a
 role-shaped, application-layer filter, not a second RLS policy (SS4.4)
 -- no branch-scoped RLS predicate exists on any table here, by design.
+``qr_codes`` deliberately has **no** RLS at all: a standard policy
+would make the unauthenticated guest token-resolution path (SS3.1) --
+looked up by ``token`` alone, before tenant context is known --
+structurally impossible, since with no context set every row is
+hidden by RLS, including the one being resolved. Caught by this
+migration's own test suite, not assumed correct; see the module-level
+comment above ``_TENANT_SCOPED_RLS_TABLES`` for the full reasoning.
 
 Seed data: none. Every Restaurant Platform entity is tenant-created,
 not platform-seeded (SS14).
@@ -45,6 +52,7 @@ not platform-seeded (SS14).
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.sql.naming import conv
@@ -89,7 +97,6 @@ _TENANT_SCOPED_RLS_TABLES = (
     "operating_hours",
     "table_zones",
     "tables",
-    "qr_codes",
     "menu_categories",
     "menu_items",
     "modifier_groups",
@@ -102,9 +109,30 @@ _TENANT_SCOPED_RLS_TABLES = (
 # precedent in 0003 -- a pure join with tenant_id present for
 # consistency but access control enforced entirely at the application
 # layer via the menu_item_id/modifier_group_id's own resolved scope.
+#
+# qr_codes: also deliberately no RLS -- caught by this migration's own
+# test suite, not assumed correct. Restaurant Platform Architecture
+# SS3.1's QRCode entry is explicit that the *resolution* read path (an
+# unauthenticated guest scanning a code, looking it up by `token` alone)
+# is "a distinct, unauthenticated endpoint... this is an explicit,
+# narrow exception to 'every query goes through TenantContext'". A
+# standard tenant_id = current_setting('app.tenant_id', true) policy
+# makes that path structurally impossible: with no tenant context set
+# (which is exactly the resolution path's own precondition --
+# tenant_id isn't known yet), current_setting() returns NULL and every
+# row is hidden, including the very row the guest is trying to resolve.
+# There is no RLS predicate that can distinguish "the trusted resolution
+# code path" from "everyone else" -- Postgres RLS only sees column
+# values and session settings, not which application code issued the
+# query. Tenant scoping for the *management* read path (admin-web) is
+# therefore enforced at the application layer only for this one table
+# (every repository method still filters `WHERE tenant_id = :tenant_id`
+# explicitly), the same single-layer precedent `permissions` already
+# established in 0003 for a different reason (pure platform reference
+# data there; a structurally-pre-tenant-context read path here).
 
 
-def _timestamp_columns() -> list[sa.Column]:
+def _timestamp_columns() -> list[sa.Column[Any]]:
     return [
         sa.Column(
             "created_at",
