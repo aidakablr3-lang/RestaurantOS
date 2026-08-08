@@ -9,7 +9,11 @@ from restaurant_os_api.modules.identity.application.dto.feature_flag_dto import 
     FeatureFlagStatusDTO,
 )
 from restaurant_os_api.modules.identity.application.dto.rbac_dto import (
+    AssignUserRoleRequestDTO,
+    CreateRoleRequestDTO,
+    ReplaceRolePermissionsRequestDTO,
     ResolvedPermissions,
+    RevokeUserRoleRequestDTO,
     RoleDTO,
     UserRoleDTO,
 )
@@ -30,14 +34,18 @@ from restaurant_os_api.modules.identity.application.dto.tenant_dto import (
 )
 
 __all__ = [
+    "AssignUserRoleRequestDTO",
     "AuthenticatedPrincipalDTO",
+    "CreateRoleRequestDTO",
     "FeatureFlagStatusDTO",
     "ListTenantsRequestDTO",
     "LoginRequestDTO",
     "LogoutRequestDTO",
     "OnboardTenantRequestDTO",
     "RefreshRequestDTO",
+    "ReplaceRolePermissionsRequestDTO",
     "ResolvedPermissions",
+    "RevokeUserRoleRequestDTO",
     "RoleDTO",
     "SubscriptionDTO",
     "SystemSettingDTO",

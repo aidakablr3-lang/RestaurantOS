@@ -70,3 +70,33 @@ class UserRoleDTO:
     branch_id: str | None
     granted_at: str
     granted_by_user_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class AssignUserRoleRequestDTO:
+    granter_user_id: str
+    target_user_id: str
+    role_id: str
+    branch_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RevokeUserRoleRequestDTO:
+    revoker_user_id: str
+    user_role_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class CreateRoleRequestDTO:
+    creator_user_id: str
+    name: str
+    description: str | None
+    default_scope: str
+    permission_codes: frozenset[str] = field(default_factory=frozenset)
+
+
+@dataclass(frozen=True, slots=True)
+class ReplaceRolePermissionsRequestDTO:
+    actor_user_id: str
+    role_id: str
+    permission_codes: frozenset[str] = field(default_factory=frozenset)

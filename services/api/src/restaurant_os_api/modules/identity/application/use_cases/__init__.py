@@ -1,3 +1,6 @@
+from restaurant_os_api.modules.identity.application.use_cases.assign_user_role import (
+    AssignUserRoleUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.get_subscription_status import (
     GetSubscriptionStatusUseCase,
 )
@@ -35,6 +38,9 @@ from restaurant_os_api.modules.identity.application.use_cases.refresh_access_tok
 from restaurant_os_api.modules.identity.application.use_cases.resolve_user_permissions import (
     ResolveUserPermissionsUseCase,
 )
+from restaurant_os_api.modules.identity.application.use_cases.revoke_user_role import (
+    RevokeUserRoleUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.suspend_tenant import (
     SuspendTenantUseCase,
 )
@@ -49,6 +55,7 @@ from restaurant_os_api.modules.identity.application.use_cases.verify_access_toke
 )
 
 __all__ = [
+    "AssignUserRoleUseCase",
     "GetSubscriptionStatusUseCase",
     "GetTenantQuotaUsageUseCase",
     "GetTenantSettingsUseCase",
@@ -62,6 +69,7 @@ __all__ = [
     "ReactivateTenantUseCase",
     "RefreshAccessTokenUseCase",
     "ResolveUserPermissionsUseCase",
+    "RevokeUserRoleUseCase",
     "SuspendTenantUseCase",
     "UpdateTenantSettingsUseCase",
     "UpdateTenantUseCase",
