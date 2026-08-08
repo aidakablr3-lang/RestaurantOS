@@ -201,6 +201,13 @@ async def _clean_tables(engine: AsyncEngine) -> AsyncGenerator[None]:
     yield
     async with engine.begin() as conn:
         await conn.exec_driver_sql(
-            "TRUNCATE TABLE outbox_events, tenant_directory_entries, feature_flags, "
-            "system_settings, subscriptions, sessions, users, tenants RESTART IDENTITY CASCADE"
+            "TRUNCATE TABLE outbox_events, user_roles, role_permissions, roles, "
+            "tenant_directory_entries, feature_flags, system_settings, subscriptions, "
+            "sessions, users, tenants RESTART IDENTITY CASCADE"
         )
+        # `permissions` is deliberately excluded: it's fixed platform
+        # reference data seeded once by the 0003 migration (RBAC
+        # Foundation Architecture SS4.2, "same as currencies"), not
+        # per-test data -- truncating it would break every RBAC test
+        # after the first, since role_permissions.permission_code is an
+        # ON DELETE RESTRICT foreign key into it.
