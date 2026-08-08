@@ -3,7 +3,7 @@ fakes, no network/DB access."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 
 import pytest
 
@@ -23,6 +23,7 @@ from restaurant_os_api.modules.restaurant.domain.entities import (
     Address,
     Branch,
     BranchStatus,
+    OperatingHours,
     Restaurant,
     RestaurantStatus,
 )
@@ -43,6 +44,7 @@ from tests.unit.modules.restaurant.fakes import (
     FakeOutboxWriter,
     InMemoryAddressRepository,
     InMemoryBranchRepository,
+    InMemoryOperatingHoursRepository,
     InMemoryRestaurantRepository,
     fake_session_factory_returning,
 )
@@ -187,6 +189,7 @@ class TestGetBranchUseCase:
             session_factory=_session_factory(),
             branch_repository_factory=lambda _s: branch_repo,
             address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            operating_hours_repository_factory=lambda _s: InMemoryOperatingHoursRepository(),
         )
 
         result = await use_case.execute(TENANT_ID, BRANCH_ID)
@@ -205,6 +208,7 @@ class TestGetBranchUseCase:
             session_factory=_session_factory(),
             branch_repository_factory=lambda _s: branch_repo,
             address_repository_factory=lambda _s: address_repo,
+            operating_hours_repository_factory=lambda _s: InMemoryOperatingHoursRepository(),
         )
 
         result = await use_case.execute(TENANT_ID, BRANCH_ID)
@@ -216,6 +220,7 @@ class TestGetBranchUseCase:
             session_factory=_session_factory(),
             branch_repository_factory=lambda _s: InMemoryBranchRepository(),
             address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            operating_hours_repository_factory=lambda _s: InMemoryOperatingHoursRepository(),
         )
 
         with pytest.raises(BranchNotFoundError):
@@ -227,10 +232,60 @@ class TestGetBranchUseCase:
             session_factory=_session_factory(),
             branch_repository_factory=lambda _s: branch_repo,
             address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            operating_hours_repository_factory=lambda _s: InMemoryOperatingHoursRepository(),
         )
 
         with pytest.raises(BranchNotFoundError):
             await use_case.execute(TENANT_ID, BRANCH_ID)
+
+    async def test_includes_nested_operating_hours_ordered_by_day(self) -> None:
+        branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch()})
+        now = datetime.now(UTC)
+        rows = [
+            OperatingHours(
+                id="01ARZ3NDEKTSV4RRFFQ6OPHR02",
+                tenant_id=TENANT_ID,
+                branch_id=BRANCH_ID,
+                day_of_week=2,
+                is_closed=False,
+                created_at=now,
+                opens_at=time(9, 0),
+                closes_at=time(17, 0),
+            ),
+            OperatingHours(
+                id="01ARZ3NDEKTSV4RRFFQ6OPHR01",
+                tenant_id=TENANT_ID,
+                branch_id=BRANCH_ID,
+                day_of_week=1,
+                is_closed=True,
+                created_at=now,
+            ),
+        ]
+        operating_hours_repo = InMemoryOperatingHoursRepository({BRANCH_ID: rows})
+        use_case = GetBranchUseCase(
+            session_factory=_session_factory(),
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            operating_hours_repository_factory=lambda _s: operating_hours_repo,
+        )
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID)
+
+        assert [e.day_of_week for e in result.operating_hours] == [1, 2]
+        assert result.operating_hours[0].is_closed is True
+        assert result.operating_hours[1].opens_at == time(9, 0)
+
+    async def test_returns_empty_operating_hours_when_none_configured(self) -> None:
+        branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch()})
+        use_case = GetBranchUseCase(
+            session_factory=_session_factory(),
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            operating_hours_repository_factory=lambda _s: InMemoryOperatingHoursRepository(),
+        )
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID)
+        assert result.operating_hours == []
 
 
 class TestUpdateBranchUseCase:

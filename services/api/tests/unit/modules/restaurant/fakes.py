@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from restaurant_os_api.modules.restaurant.domain.entities import Address, Branch, Restaurant
+from restaurant_os_api.modules.restaurant.domain.entities import (
+    Address,
+    Branch,
+    OperatingHours,
+    Restaurant,
+)
 from restaurant_os_api.platform.events import DomainEvent
 
 
@@ -142,6 +147,24 @@ class InMemoryBranchRepository:
         return [
             b for b in self._branches.values() if b.tenant_id == tenant_id and b.id in branch_ids
         ]
+
+
+class InMemoryOperatingHoursRepository:
+    def __init__(self, rows: dict[str, list[OperatingHours]] | None = None) -> None:
+        # Keyed by branch_id, mirroring the SQLAlchemy repository's own
+        # per-branch scoping -- there is no single-row lookup in the
+        # Protocol, only whole-branch list/replace.
+        self._rows_by_branch: dict[str, list[OperatingHours]] = rows or {}
+
+    async def list_for_branch(self, tenant_id: str, branch_id: str) -> list[OperatingHours]:
+        rows = self._rows_by_branch.get(branch_id, [])
+        visible = [r for r in rows if r.tenant_id == tenant_id]
+        return sorted(visible, key=lambda r: r.day_of_week)
+
+    async def replace_for_branch(
+        self, tenant_id: str, branch_id: str, rows: list[OperatingHours]
+    ) -> None:
+        self._rows_by_branch[branch_id] = list(rows)
 
 
 @dataclass
