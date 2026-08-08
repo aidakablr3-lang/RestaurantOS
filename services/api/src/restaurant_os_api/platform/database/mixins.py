@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import TIMESTAMP as TimestampType
-from sqlalchemy import CheckConstraint, ForeignKey, Text
+from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Text
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 from sqlalchemy.sql import func
 
@@ -95,3 +95,35 @@ class SoftDeleteMixin:
     """
 
     deleted_at: Mapped[datetime | None] = mapped_column(TimestampType(timezone=True), default=None)
+
+
+class BranchScopedMixin:
+    """A required ``branch_id`` foreign key, indexed — layered on top of
+    ``TenantScopedMixin``, never used alone (Restaurant Platform
+    Architecture SS9.1). Extends the existing dual-isolation model, not
+    a second one: ``branch_id`` is an application-layer filter within an
+    already-tenant-scoped, RLS-protected query (Restaurant Platform
+    Architecture SS4.4) — there is no branch-level RLS policy.
+    """
+
+    @declared_attr
+    def branch_id(cls) -> Mapped[str]:
+        return mapped_column(
+            Text,
+            ForeignKey("branches.id", ondelete="RESTRICT"),
+            nullable=False,
+            index=True,
+        )
+
+
+class SyncVersionedMixin:
+    """An optimistic-concurrency counter for entities the Conflict
+    Resolution Registry classifies as "Exclusive shared state"
+    (Technical Architecture v2.0 Group A) — ``Table.status`` and
+    ``Reservation.table_id`` assignment are the two Restaurant Platform
+    examples (Restaurant Platform Architecture SS9.2/SS10). Not applied
+    to "Configuration/reference data" entities, which are never subject
+    to a genuine two-writer race the way table status is.
+    """
+
+    sync_version: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
