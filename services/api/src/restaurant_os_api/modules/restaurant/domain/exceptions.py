@@ -107,6 +107,28 @@ class OperatingHoursConflictError(RestaurantDomainError):
         self.day_of_week = day_of_week
 
 
+class TableZoneNotFoundError(RestaurantDomainError):
+    error_code = "TABLE_ZONE_NOT_FOUND"
+
+    def __init__(self, table_zone_id: str) -> None:
+        super().__init__(f"TableZone '{table_zone_id}' does not exist.")
+        self.table_zone_id = table_zone_id
+
+
+class TableZoneNameConflictError(RestaurantDomainError):
+    """Mirrors the DB's own ``UNIQUE (branch_id, name)`` constraint
+    (Restaurant Platform Architecture SS3.1's ``TableZone`` entry),
+    checked proactively the same way ``BranchNameConflictError``
+    checks ``UNIQUE (restaurant_id, name)``."""
+
+    error_code = "TABLE_ZONE_NAME_CONFLICT"
+
+    def __init__(self, branch_id: str, name: str) -> None:
+        super().__init__(f"A table zone named '{name}' already exists for branch '{branch_id}'.")
+        self.branch_id = branch_id
+        self.name = name
+
+
 class InvalidReservationStatusTransitionError(RestaurantDomainError):
     """A reasonable, standard reservation state machine
     (requested -> confirmed -> seated -> completed, with no_show/canceled
