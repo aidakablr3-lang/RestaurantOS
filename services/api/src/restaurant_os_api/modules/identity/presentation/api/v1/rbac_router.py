@@ -23,6 +23,22 @@ authentication: a user is always allowed to see their own resolved
 grants, which is exactly what lets ``apps/admin-web`` decide what UI to
 render (RBAC_Foundation_Architecture.md section 8.2 — nothing is ever
 trusted from the JWT for this decision).
+
+**Two different flavors of the ``roles.assign`` gate, corrected in the
+RBAC Sprint 5 Step 2 follow-up pass (AI_HANDOFF.md section 21,
+"Finding 2"):** role *catalogue* management (``POST``/``GET
+/rbac/roles``, ``GET /rbac/roles/{id}``, ``PUT
+/rbac/roles/{id}/permissions``, ``GET /rbac/permissions``) stays on
+``RequireRolesAssignDep`` — a plain, **tenant-wide** ``roles.assign``
+check — because a ``Role`` row has no ``branch_id`` at all (SS4.1) and
+``RoleGrantPolicy`` applies no scope ceiling to authoring/editing a
+role definition. ``POST``/``DELETE /rbac/user-roles*`` (the two routes
+that actually create or remove a scoped ``UserRole`` grant) use
+``RequireRolesAssignAtAnyScopeDep`` instead — a caller holding
+``roles.assign`` at a *branch* is coarsely let past this gate, with the
+real, fine-grained scope/delegation decision made exactly once, inside
+``RoleGrantPolicy`` (see ``require_permission_at_any_scope``'s own
+docstring in ``dependencies.py`` for the full reasoning).
 """
 
 from __future__ import annotations
@@ -51,6 +67,7 @@ from restaurant_os_api.modules.identity.presentation.dependencies import (
     ResolveUserPermissionsUseCaseDep,
     RevokeUserRoleUseCaseDep,
     require_permission,
+    require_permission_at_any_scope,
 )
 from restaurant_os_api.modules.identity.presentation.schemas.rbac_schemas import (
     AssignUserRoleRequestSchema,
@@ -69,10 +86,18 @@ UserRoleIdPath = Annotated[str, Path(min_length=26, max_length=26)]
 
 # `require_permission("roles.assign")` returns an ordinary
 # AuthenticatedPrincipalDTO on success (Commit 4) -- reused here as the
-# dependency for every mutating/inspection route below, exactly like
+# dependency for every role-catalogue route below, exactly like
 # `PlatformAdminDep` is reused across `admin_tenant_router.py`.
 RequireRolesAssignDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission("roles.assign"))
+]
+
+# Branch-aware variant (Commit 9, "Finding 2" fix) -- used only by the
+# two routes that create/remove a scoped UserRole grant. See
+# `require_permission_at_any_scope`'s own docstring for why this exists
+# and why it is deliberately coarse-grained.
+RequireRolesAssignAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("roles.assign"))
 ]
 
 
@@ -190,7 +215,7 @@ async def replace_role_permissions(
 )
 async def assign_user_role(
     body: AssignUserRoleRequestSchema,
-    principal: RequireRolesAssignDep,
+    principal: RequireRolesAssignAtAnyScopeDep,
     use_case: AssignUserRoleUseCaseDep,
 ) -> ApiResponse[UserRoleResponseSchema]:
     result = await use_case.execute(
@@ -222,7 +247,7 @@ async def assign_user_role(
 )
 async def revoke_user_role(
     user_role_id: UserRoleIdPath,
-    principal: RequireRolesAssignDep,
+    principal: RequireRolesAssignAtAnyScopeDep,
     use_case: RevokeUserRoleUseCaseDep,
 ) -> ApiResponse[None]:
     await use_case.execute(

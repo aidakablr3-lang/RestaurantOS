@@ -17,6 +17,25 @@ this check's latency (a direct DB read in this sprint; TAD v2.0's
 Redis-cached version of this check is a follow-up performance
 optimization once Redis is actually introduced, per the approved plan's
 scope note).
+
+**RBAC interaction, made explicit (RBAC Foundation Architecture SS9,
+confirmed by RBAC Sprint 5 Step 2's test matrix and approved by the
+user as intentional security behavior — not a bug, not to be
+"softened" into eventual propagation):** the check below is *strict
+equality* (``!=``), not "is the live version at least the token's
+version." Granting or revoking a role bumps the affected user's
+``permission_version`` (``AssignUserRoleUseCase``/
+``RevokeUserRoleUseCase``), which immediately stales every access token
+already issued to that user — the *very next* request with the old
+token gets ``InvalidAccessTokenError`` below, forcing re-authentication.
+A fresh token obtained after that always carries the current
+permission set (permission resolution is never cached — see
+``ResolveUserPermissionsUseCase``), but the *old* token does not
+"eventually" pick up the change; it simply stops working. This is a
+deliberately stronger guarantee than eventual consistency, not a weaker
+one. See ``tests/unit/.../test_verify_access_token.py`` for the
+regression lock and ``tests/integration/.../test_rbac_router.py`` for
+the same contract proven end-to-end over real HTTP.
 """
 
 from __future__ import annotations

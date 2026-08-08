@@ -299,6 +299,8 @@ Per explicit instruction: **no role or permission list is ever embedded in the J
 
 **Mechanically:** every RBAC mutation use case (§13) calls the existing `UserRepository.bump_permission_version(user_id)` in the **same transaction** as the `UserRole`/`RolePermission` write, exactly the same transactional-outbox-adjacent discipline already used for tenant suspension/reactivation (Sprint 4.1). No new mechanism is designed — this section's entire content is "apply the existing one here too," stated explicitly so it isn't missed during implementation.
 
+**Addendum (verified, not just designed — RBAC Sprint 5 Step 2's test matrix, user-approved as intentional):** `verify_access_token.py`'s check is *strict equality*, not "live version is at least the token's version" (`verify_access_token.py:72`). The practical consequence, confirmed by both a fast unit test (`test_verify_access_token.py`) and a real end-to-end HTTP test (`test_rbac_router.py`): granting or revoking a role does **not** make the change visible to the caller's *existing, already-issued* access token on its next request — that token is immediately stale (401 `INVALID_ACCESS_TOKEN`), and the caller must re-authenticate. The fresh token from that re-authentication always carries the change with zero propagation lag (permission resolution is never cached), but "no separate propagation mechanism needed" (as stated above) should be read as being about the *resolution query*, not as a claim that an in-flight session silently sees the update without re-logging in. `apps/admin-web`'s `api-client.ts` already treats `INVALID_ACCESS_TOKEN` as session-dead and redirects to `/login`, which is the correct, already-existing handling for this exact case.
+
 ---
 
 ## 10. Platform Admin Migration Strategy

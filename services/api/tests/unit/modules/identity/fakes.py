@@ -11,7 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from restaurant_os_api.modules.identity.application.interfaces import AccessTokenClaims
+from restaurant_os_api.modules.identity.application.interfaces import (
+    AccessTokenClaims,
+    TokenDecodeError,
+)
 from restaurant_os_api.modules.identity.domain.entities import (
     Permission,
     Role,
@@ -148,13 +151,23 @@ class FakeTokenService:
 
     issued_claims: list[AccessTokenClaims] = field(default_factory=list)
     _refresh_counter: int = 0
+    decode_result: AccessTokenClaims | TokenDecodeError | None = None
+    """Set by a test before calling ``decode_access_token`` -- either the
+    claims to return, or a ``TokenDecodeError`` instance to raise. Left
+    unset (``None``), decoding still raises ``NotImplementedError``,
+    preserving the original "not exercised by login/refresh/logout"
+    invariant for every test that never configures it."""
 
     def issue_access_token(self, claims: AccessTokenClaims) -> str:
         self.issued_claims.append(claims)
         return f"access-token::{claims.subject_user_id}::{claims.session_id}"
 
     def decode_access_token(self, token: str) -> AccessTokenClaims:
-        raise NotImplementedError("Not exercised by the login/refresh/logout use cases.")
+        if self.decode_result is None:
+            raise NotImplementedError("Not exercised by the login/refresh/logout use cases.")
+        if isinstance(self.decode_result, TokenDecodeError):
+            raise self.decode_result
+        return self.decode_result
 
     def generate_refresh_token(self) -> str:
         self._refresh_counter += 1

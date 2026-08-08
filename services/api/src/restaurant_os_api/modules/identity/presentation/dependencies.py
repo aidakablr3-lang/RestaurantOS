@@ -303,6 +303,65 @@ def require_branch_permission(
     return _dependency
 
 
+def require_permission_at_any_scope(
+    code: str,
+) -> Callable[
+    [AuthenticatedPrincipalDTO, ResolveUserPermissionsUseCase], Awaitable[AuthenticatedPrincipalDTO]
+]:
+    """A coarse "holds this permission *somewhere*" gate — tenant-wide,
+    or at any single branch. Fixes the gap RBAC Sprint 5 Step 2's own
+    test matrix found (AI_HANDOFF.md SS21, "Finding 2"): a Branch
+    Manager holding ``roles.assign`` only at their branch was rejected
+    by the plain tenant-wide ``require_permission`` before ever reaching
+    ``AssignUserRoleUseCase``/``RevokeUserRoleUseCase`` — even though
+    those use cases' own ``RoleGrantPolicy`` scope ceiling has always
+    correctly supported a branch-scoped granter (Commit 5).
+
+    Deliberately does **not** itself decide *which* branch(es) the
+    caller may act on, or apply the delegation ceiling — RBAC
+    Foundation Architecture SS16.1 states that guard explicitly belongs
+    to "the grant use case," not the router: "This is enforced
+    server-side in the grant use case, not assumed from frontend
+    behavior." This dependency exists only to keep a caller who holds
+    ``roles.assign`` **nowhere at all** (Waiter, Cashier, Kitchen Staff)
+    out entirely, at the same coarse-grained layer
+    ``require_permission``/``require_branch_permission`` already
+    operate at. The real, fine-grained decision — which specific branch,
+    whether the requested grant's permissions are within the caller's
+    own delegation ceiling, whether a tenant-wide grant is being
+    attempted by a branch-only holder — is made exactly once, inside
+    ``RoleGrantPolicy.ensure_can_grant``/``ensure_can_revoke``, against
+    the caller's full resolved permission set and the specific
+    ``branch_id`` in the request body (for grant) or the existing
+    grant's own ``branch_id`` (for revoke) — neither of which is a URL
+    path parameter, which is exactly why this cannot reuse
+    ``require_branch_permission`` as-is (that dependency reads
+    ``branch_id`` from the URL, and no such URL parameter exists on
+    either ``POST /rbac/user-roles`` or
+    ``DELETE /rbac/user-roles/{user_role_id}``).
+
+    Role *catalogue* management (creating a role, listing roles,
+    replacing a role's permission set) intentionally keeps using the
+    plain tenant-wide ``require_permission`` — a ``Role`` row has no
+    ``branch_id`` at all in the schema (SS4.1), and
+    ``RoleGrantPolicy`` itself applies no scope ceiling to authoring or
+    editing a role definition (only to granting/revoking it to a
+    specific user at a specific scope). Only the two routes that
+    actually create/remove a scoped ``UserRole`` grant need this gate.
+    """
+
+    async def _dependency(
+        principal: AuthenticatedPrincipalDep,
+        resolve_permissions: ResolveUserPermissionsUseCaseDep,
+    ) -> AuthenticatedPrincipalDTO:
+        resolved = await resolve_permissions.execute(principal.tenant_id, principal.user_id)
+        if not resolved.has(code) and not resolved.branch_ids_with(code):
+            raise PermissionDeniedError(code)
+        return principal
+
+    return _dependency
+
+
 def get_create_role_use_case(
     session_factory: SessionFactoryDep,
     resolve_permissions: ResolveUserPermissionsUseCaseDep,
