@@ -26,6 +26,12 @@ from restaurant_os_api.modules.identity.presentation.api.v1.self_service_tenant_
 from restaurant_os_api.modules.restaurant.presentation.api.v1.branch_router import (
     router as branch_router,
 )
+from restaurant_os_api.modules.restaurant.presentation.api.v1.menu_category_router import (
+    router as menu_category_router,
+)
+from restaurant_os_api.modules.restaurant.presentation.api.v1.menu_item_router import (
+    router as menu_item_router,
+)
 from restaurant_os_api.modules.restaurant.presentation.api.v1.qr_code_router import (
     router as qr_code_router,
 )
@@ -71,6 +77,8 @@ def create_app() -> FastAPI:
     app.include_router(table_router)
     app.include_router(qr_code_router)
     app.include_router(qr_resolution_router)
+    app.include_router(menu_category_router)
+    app.include_router(menu_item_router)
 
     @app.get("/health/live", include_in_schema=False)
     async def health_live() -> dict[str, str]:

@@ -46,16 +46,22 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     ChangeTableStatusUseCase,
     CloseBranchUseCase,
     CreateBranchUseCase,
+    CreateMenuCategoryUseCase,
+    CreateMenuItemUseCase,
     CreateQRCodeUseCase,
     CreateRestaurantUseCase,
     CreateTableUseCase,
     CreateTableZoneUseCase,
     DiscontinueRestaurantUseCase,
     GetBranchUseCase,
+    GetMenuCategoryUseCase,
+    GetMenuItemUseCase,
     GetRestaurantUseCase,
     GetTableUseCase,
     GetTableZoneUseCase,
     ListAccessibleBranchesUseCase,
+    ListMenuCategoriesUseCase,
+    ListMenuItemsUseCase,
     ListQRCodesUseCase,
     ListRestaurantsUseCase,
     ListTablesUseCase,
@@ -64,6 +70,8 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     ReplaceOperatingHoursUseCase,
     ResolveQRCodeUseCase,
     UpdateBranchUseCase,
+    UpdateMenuCategoryUseCase,
+    UpdateMenuItemUseCase,
     UpdateRestaurantUseCase,
     UpdateTableUseCase,
     UpdateTableZoneUseCase,
@@ -71,6 +79,8 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
 from restaurant_os_api.modules.restaurant.infrastructure.database.repositories import (
     SQLAlchemyAddressRepository,
     SQLAlchemyBranchRepository,
+    SQLAlchemyMenuCategoryRepository,
+    SQLAlchemyMenuItemRepository,
     SQLAlchemyOperatingHoursRepository,
     SQLAlchemyQRCodeRepository,
     SQLAlchemyRestaurantRepository,
@@ -86,17 +96,23 @@ __all__ = [
     "ChangeTableStatusUseCaseDep",
     "CloseBranchUseCaseDep",
     "CreateBranchUseCaseDep",
+    "CreateMenuCategoryUseCaseDep",
+    "CreateMenuItemUseCaseDep",
     "CreateQRCodeUseCaseDep",
     "CreateRestaurantUseCaseDep",
     "CreateTableUseCaseDep",
     "CreateTableZoneUseCaseDep",
     "DiscontinueRestaurantUseCaseDep",
     "GetBranchUseCaseDep",
+    "GetMenuCategoryUseCaseDep",
+    "GetMenuItemUseCaseDep",
     "GetRestaurantUseCaseDep",
     "GetTableUseCaseDep",
     "GetTableZoneUseCaseDep",
     "IdempotencyGuardDep",
     "ListAccessibleBranchesUseCaseDep",
+    "ListMenuCategoriesUseCaseDep",
+    "ListMenuItemsUseCaseDep",
     "ListQRCodesUseCaseDep",
     "ListRestaurantsUseCaseDep",
     "ListTableZonesUseCaseDep",
@@ -108,6 +124,8 @@ __all__ = [
     "RequireBranchManageTenantWideDep",
     "RequireBranchReadAtAnyScopeDep",
     "RequireBranchReadDep",
+    "RequireMenuManageDep",
+    "RequireMenuReadDep",
     "RequireRestaurantManageDep",
     "RequireRestaurantReadDep",
     "RequireTableManageAtAnyScopeDep",
@@ -116,6 +134,8 @@ __all__ = [
     "RequireTableReadDep",
     "ResolveQRCodeUseCaseDep",
     "UpdateBranchUseCaseDep",
+    "UpdateMenuCategoryUseCaseDep",
+    "UpdateMenuItemUseCaseDep",
     "UpdateRestaurantUseCaseDep",
     "UpdateTableUseCaseDep",
     "UpdateTableZoneUseCaseDep",
@@ -533,3 +553,119 @@ def get_resolve_qr_code_use_case(
 
 
 ResolveQRCodeUseCaseDep = Annotated[ResolveQRCodeUseCase, Depends(get_resolve_qr_code_use_case)]
+
+
+# --- Menu Catalogue: MenuCategory + MenuItem (Step 4.8) ---------------------
+# Neither entity has a branch dimension (Architecture SS3.1 -- both belong to
+# Restaurant, deliberately not Branch, per SS3's "no Menu wrapper" decision),
+# so every gate here is the plain tenant-wide require_permission("menu.read"/
+# "menu.manage"), the same shape RequireRestaurantManageDep/
+# RequireRestaurantReadDep already use for the same reason. ModifierGroup,
+# Modifier, MenuItemModifierGroup, MenuItemBranchPrice, MenuItemAvailability,
+# and Reservation are explicitly out of this step's approved scope.
+
+
+def get_create_menu_category_use_case(
+    session_factory: SessionFactoryDep,
+) -> CreateMenuCategoryUseCase:
+    return CreateMenuCategoryUseCase(
+        session_factory=session_factory,
+        restaurant_repository_factory=SQLAlchemyRestaurantRepository,
+        menu_category_repository_factory=SQLAlchemyMenuCategoryRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateMenuCategoryUseCaseDep = Annotated[
+    CreateMenuCategoryUseCase, Depends(get_create_menu_category_use_case)
+]
+
+
+def get_get_menu_category_use_case(session_factory: SessionFactoryDep) -> GetMenuCategoryUseCase:
+    return GetMenuCategoryUseCase(
+        session_factory=session_factory,
+        menu_category_repository_factory=SQLAlchemyMenuCategoryRepository,
+    )
+
+
+GetMenuCategoryUseCaseDep = Annotated[
+    GetMenuCategoryUseCase, Depends(get_get_menu_category_use_case)
+]
+
+
+def get_list_menu_categories_use_case(
+    session_factory: SessionFactoryDep,
+) -> ListMenuCategoriesUseCase:
+    return ListMenuCategoriesUseCase(
+        session_factory=session_factory,
+        restaurant_repository_factory=SQLAlchemyRestaurantRepository,
+        menu_category_repository_factory=SQLAlchemyMenuCategoryRepository,
+    )
+
+
+ListMenuCategoriesUseCaseDep = Annotated[
+    ListMenuCategoriesUseCase, Depends(get_list_menu_categories_use_case)
+]
+
+
+def get_update_menu_category_use_case(
+    session_factory: SessionFactoryDep,
+) -> UpdateMenuCategoryUseCase:
+    return UpdateMenuCategoryUseCase(
+        session_factory=session_factory,
+        menu_category_repository_factory=SQLAlchemyMenuCategoryRepository,
+    )
+
+
+UpdateMenuCategoryUseCaseDep = Annotated[
+    UpdateMenuCategoryUseCase, Depends(get_update_menu_category_use_case)
+]
+
+
+def get_create_menu_item_use_case(session_factory: SessionFactoryDep) -> CreateMenuItemUseCase:
+    return CreateMenuItemUseCase(
+        session_factory=session_factory,
+        menu_category_repository_factory=SQLAlchemyMenuCategoryRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateMenuItemUseCaseDep = Annotated[CreateMenuItemUseCase, Depends(get_create_menu_item_use_case)]
+
+
+def get_get_menu_item_use_case(session_factory: SessionFactoryDep) -> GetMenuItemUseCase:
+    return GetMenuItemUseCase(
+        session_factory=session_factory,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+    )
+
+
+GetMenuItemUseCaseDep = Annotated[GetMenuItemUseCase, Depends(get_get_menu_item_use_case)]
+
+
+def get_list_menu_items_use_case(session_factory: SessionFactoryDep) -> ListMenuItemsUseCase:
+    return ListMenuItemsUseCase(
+        session_factory=session_factory,
+        menu_category_repository_factory=SQLAlchemyMenuCategoryRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+    )
+
+
+ListMenuItemsUseCaseDep = Annotated[ListMenuItemsUseCase, Depends(get_list_menu_items_use_case)]
+
+
+def get_update_menu_item_use_case(session_factory: SessionFactoryDep) -> UpdateMenuItemUseCase:
+    return UpdateMenuItemUseCase(
+        session_factory=session_factory,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+UpdateMenuItemUseCaseDep = Annotated[UpdateMenuItemUseCase, Depends(get_update_menu_item_use_case)]
+
+RequireMenuManageDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission("menu.manage"))
+]
+RequireMenuReadDep = Annotated[AuthenticatedPrincipalDTO, Depends(require_permission("menu.read"))]
