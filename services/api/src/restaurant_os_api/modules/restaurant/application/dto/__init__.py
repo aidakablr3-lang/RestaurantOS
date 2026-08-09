@@ -12,6 +12,7 @@ from restaurant_os_api.modules.restaurant.application.dto.operating_hours_dto im
     OperatingHoursEntryRequestDTO,
     ReplaceOperatingHoursRequestDTO,
 )
+from restaurant_os_api.modules.restaurant.application.dto.qr_code_dto import QRCodeDTO
 from restaurant_os_api.modules.restaurant.application.dto.restaurant_dto import (
     CreateRestaurantRequestDTO,
     RestaurantDTO,
@@ -45,6 +46,7 @@ __all__ = [
     "CreateTableZoneRequestDTO",
     "OperatingHoursEntryDTO",
     "OperatingHoursEntryRequestDTO",
+    "QRCodeDTO",
     "ReplaceOperatingHoursRequestDTO",
     "RestaurantDTO",
     "RestaurantListResultDTO",

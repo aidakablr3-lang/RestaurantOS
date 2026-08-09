@@ -7,6 +7,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.close_branch imp
 from restaurant_os_api.modules.restaurant.application.use_cases.create_branch import (
     CreateBranchUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.create_qr_code import (
+    CreateQRCodeUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.create_restaurant import (
     CreateRestaurantUseCase,
 )
@@ -33,6 +36,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.get_table_zone i
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.list_accessible_branches import (
     ListAccessibleBranchesUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.list_qr_codes import (
+    ListQRCodesUseCase,
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.list_restaurants import (
     ListRestaurantsUseCase,
@@ -66,6 +72,7 @@ __all__ = [
     "ChangeTableStatusUseCase",
     "CloseBranchUseCase",
     "CreateBranchUseCase",
+    "CreateQRCodeUseCase",
     "CreateRestaurantUseCase",
     "CreateTableUseCase",
     "CreateTableZoneUseCase",
@@ -75,6 +82,7 @@ __all__ = [
     "GetTableUseCase",
     "GetTableZoneUseCase",
     "ListAccessibleBranchesUseCase",
+    "ListQRCodesUseCase",
     "ListRestaurantsUseCase",
     "ListTableZonesUseCase",
     "ListTablesUseCase",
