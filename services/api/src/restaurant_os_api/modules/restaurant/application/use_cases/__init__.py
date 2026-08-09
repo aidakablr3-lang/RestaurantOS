@@ -55,6 +55,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.reopen_branch im
 from restaurant_os_api.modules.restaurant.application.use_cases.replace_operating_hours import (
     ReplaceOperatingHoursUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.resolve_qr_code import (
+    ResolveQRCodeUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.update_branch import (
     UpdateBranchUseCase,
 )
@@ -88,6 +91,7 @@ __all__ = [
     "ListTablesUseCase",
     "ReopenBranchUseCase",
     "ReplaceOperatingHoursUseCase",
+    "ResolveQRCodeUseCase",
     "UpdateBranchUseCase",
     "UpdateRestaurantUseCase",
     "UpdateTableUseCase",
