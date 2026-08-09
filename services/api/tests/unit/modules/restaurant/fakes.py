@@ -15,6 +15,7 @@ from restaurant_os_api.modules.restaurant.domain.entities import (
     Address,
     Branch,
     OperatingHours,
+    QRCode,
     Restaurant,
     Table,
     TableZone,
@@ -259,6 +260,40 @@ class InMemoryTableRepository:
             for t in self._tables.values()
             if t.tenant_id == tenant_id and t.table_zone_id == table_zone_id
         ]
+
+
+class InMemoryQRCodeRepository:
+    def __init__(self, qr_codes: dict[str, QRCode] | None = None) -> None:
+        self._qr_codes = qr_codes or {}
+
+    async def get_by_id(self, tenant_id: str, qr_code_id: str) -> QRCode | None:
+        qr_code = self._qr_codes.get(qr_code_id)
+        if qr_code is None or qr_code.tenant_id != tenant_id:
+            return None
+        return qr_code
+
+    async def get_by_token(self, token: str) -> QRCode | None:
+        for qr_code in self._qr_codes.values():
+            if qr_code.token == token:
+                return qr_code
+        return None
+
+    async def create(self, qr_code: QRCode) -> QRCode:
+        self._qr_codes[qr_code.id] = qr_code
+        return qr_code
+
+    async def update(self, qr_code: QRCode) -> QRCode:
+        self._qr_codes[qr_code.id] = qr_code
+        return qr_code
+
+    async def list_for_table(self, tenant_id: str, table_id: str) -> list[QRCode]:
+        visible = [
+            c
+            for c in self._qr_codes.values()
+            if c.tenant_id == tenant_id and c.table_id == table_id
+        ]
+        visible.sort(key=lambda c: c.created_at, reverse=True)
+        return visible
 
 
 @dataclass
