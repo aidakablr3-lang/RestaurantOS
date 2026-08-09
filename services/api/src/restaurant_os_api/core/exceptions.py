@@ -83,6 +83,10 @@ _STATUS_BY_ERROR_CODE: dict[str, int] = {
     "TABLE_ZONE_NAME_CONFLICT": status.HTTP_409_CONFLICT,
     "TABLE_NOT_FOUND": status.HTTP_404_NOT_FOUND,
     "TABLE_NUMBER_ALREADY_EXISTS": status.HTTP_409_CONFLICT,
+    # Menu Catalogue (Sprint 5, Step 4.8) additions:
+    "MENU_CATEGORY_NOT_FOUND": status.HTTP_404_NOT_FOUND,
+    "MENU_CATEGORY_NAME_CONFLICT": status.HTTP_409_CONFLICT,
+    "MENU_ITEM_NOT_FOUND": status.HTTP_404_NOT_FOUND,
     # Shared idempotency infrastructure (Sprint 5, Step 4.0) additions:
     "IDEMPOTENCY_KEY_CONFLICT": status.HTTP_409_CONFLICT,
     "IDEMPOTENT_REQUEST_IN_PROGRESS": status.HTTP_409_CONFLICT,

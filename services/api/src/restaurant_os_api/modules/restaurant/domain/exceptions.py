@@ -157,6 +157,44 @@ class TableNumberConflictError(RestaurantDomainError):
         self.table_number = table_number
 
 
+class MenuCategoryNotFoundError(RestaurantDomainError):
+    error_code = "MENU_CATEGORY_NOT_FOUND"
+
+    def __init__(self, menu_category_id: str) -> None:
+        super().__init__(f"MenuCategory '{menu_category_id}' does not exist.")
+        self.menu_category_id = menu_category_id
+
+
+class MenuCategoryNameConflictError(RestaurantDomainError):
+    """Mirrors the DB's own ``UNIQUE (restaurant_id, name)`` constraint
+    (Restaurant Platform Architecture SS3.1's ``MenuCategory`` entry),
+    checked proactively the same way ``BranchNameConflictError``/
+    ``TableZoneNameConflictError`` check their own uniqueness
+    constraints."""
+
+    error_code = "MENU_CATEGORY_NAME_CONFLICT"
+
+    def __init__(self, restaurant_id: str, name: str) -> None:
+        super().__init__(
+            f"A menu category named '{name}' already exists for restaurant '{restaurant_id}'."
+        )
+        self.restaurant_id = restaurant_id
+        self.name = name
+
+
+class MenuItemNotFoundError(RestaurantDomainError):
+    """Architecture SS7 names this exact error code as one of its own
+    worked examples ("new codes following the established
+    SCREAMING_SNAKE convention (BRANCH_NOT_FOUND,
+    TABLE_NUMBER_ALREADY_EXISTS, MENU_ITEM_NOT_FOUND, ...)")."""
+
+    error_code = "MENU_ITEM_NOT_FOUND"
+
+    def __init__(self, menu_item_id: str) -> None:
+        super().__init__(f"MenuItem '{menu_item_id}' does not exist.")
+        self.menu_item_id = menu_item_id
+
+
 class InvalidReservationStatusTransitionError(RestaurantDomainError):
     """A reasonable, standard reservation state machine
     (requested -> confirmed -> seated -> completed, with no_show/canceled
