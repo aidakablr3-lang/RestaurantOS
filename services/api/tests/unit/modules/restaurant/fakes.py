@@ -16,6 +16,8 @@ from restaurant_os_api.modules.restaurant.domain.entities import (
     Branch,
     MenuCategory,
     MenuItem,
+    Modifier,
+    ModifierGroup,
     OperatingHours,
     QRCode,
     Restaurant,
@@ -335,6 +337,76 @@ class InMemoryMenuItemRepository:
         ]
         visible.sort(key=lambda i: i.display_order)
         return visible[offset : offset + limit], len(visible)
+
+
+class InMemoryModifierGroupRepository:
+    def __init__(self, modifier_groups: dict[str, ModifierGroup] | None = None) -> None:
+        self._modifier_groups = modifier_groups or {}
+
+    async def get_by_id(self, tenant_id: str, modifier_group_id: str) -> ModifierGroup | None:
+        modifier_group = self._modifier_groups.get(modifier_group_id)
+        if modifier_group is None or modifier_group.tenant_id != tenant_id:
+            return None
+        return modifier_group
+
+    async def create(self, modifier_group: ModifierGroup) -> ModifierGroup:
+        self._modifier_groups[modifier_group.id] = modifier_group
+        return modifier_group
+
+    async def update(self, modifier_group: ModifierGroup) -> ModifierGroup:
+        self._modifier_groups[modifier_group.id] = modifier_group
+        return modifier_group
+
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[ModifierGroup], int]:
+        visible = [g for g in self._modifier_groups.values() if g.tenant_id == tenant_id]
+        visible.sort(key=lambda g: g.created_at, reverse=True)
+        return visible[offset : offset + limit], len(visible)
+
+
+class InMemoryModifierRepository:
+    def __init__(self, modifiers: dict[str, Modifier] | None = None) -> None:
+        self._modifiers = modifiers or {}
+
+    async def get_by_id(self, tenant_id: str, modifier_id: str) -> Modifier | None:
+        modifier = self._modifiers.get(modifier_id)
+        if modifier is None or modifier.tenant_id != tenant_id:
+            return None
+        return modifier
+
+    async def create(self, modifier: Modifier) -> Modifier:
+        self._modifiers[modifier.id] = modifier
+        return modifier
+
+    async def update(self, modifier: Modifier) -> Modifier:
+        self._modifiers[modifier.id] = modifier
+        return modifier
+
+    async def list_for_group(self, tenant_id: str, modifier_group_id: str) -> list[Modifier]:
+        return [
+            m
+            for m in self._modifiers.values()
+            if m.tenant_id == tenant_id and m.modifier_group_id == modifier_group_id
+        ]
+
+
+class InMemoryMenuItemModifierGroupRepository:
+    def __init__(self, attachments: dict[str, frozenset[str]] | None = None) -> None:
+        # Keyed by menu_item_id -> frozenset of modifier_group_ids.
+        self._attachments: dict[str, frozenset[str]] = attachments or {}
+        self.replace_calls: list[tuple[str, str, frozenset[str]]] = []
+
+    async def list_modifier_group_ids_for_menu_item(
+        self, tenant_id: str, menu_item_id: str
+    ) -> frozenset[str]:
+        return self._attachments.get(menu_item_id, frozenset())
+
+    async def replace_for_menu_item(
+        self, tenant_id: str, menu_item_id: str, modifier_group_ids: frozenset[str]
+    ) -> None:
+        self.replace_calls.append((tenant_id, menu_item_id, modifier_group_ids))
+        self._attachments[menu_item_id] = modifier_group_ids
 
 
 class InMemoryQRCodeRepository:
