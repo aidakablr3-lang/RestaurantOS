@@ -46,6 +46,7 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     ChangeTableStatusUseCase,
     CloseBranchUseCase,
     CreateBranchUseCase,
+    CreateQRCodeUseCase,
     CreateRestaurantUseCase,
     CreateTableUseCase,
     CreateTableZoneUseCase,
@@ -55,6 +56,7 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     GetTableUseCase,
     GetTableZoneUseCase,
     ListAccessibleBranchesUseCase,
+    ListQRCodesUseCase,
     ListRestaurantsUseCase,
     ListTablesUseCase,
     ListTableZonesUseCase,
@@ -69,6 +71,7 @@ from restaurant_os_api.modules.restaurant.infrastructure.database.repositories i
     SQLAlchemyAddressRepository,
     SQLAlchemyBranchRepository,
     SQLAlchemyOperatingHoursRepository,
+    SQLAlchemyQRCodeRepository,
     SQLAlchemyRestaurantRepository,
     SQLAlchemyTableRepository,
     SQLAlchemyTableZoneRepository,
@@ -81,6 +84,7 @@ __all__ = [
     "ChangeTableStatusUseCaseDep",
     "CloseBranchUseCaseDep",
     "CreateBranchUseCaseDep",
+    "CreateQRCodeUseCaseDep",
     "CreateRestaurantUseCaseDep",
     "CreateTableUseCaseDep",
     "CreateTableZoneUseCaseDep",
@@ -91,6 +95,7 @@ __all__ = [
     "GetTableZoneUseCaseDep",
     "IdempotencyGuardDep",
     "ListAccessibleBranchesUseCaseDep",
+    "ListQRCodesUseCaseDep",
     "ListRestaurantsUseCaseDep",
     "ListTableZonesUseCaseDep",
     "ListTablesUseCaseDep",
@@ -104,6 +109,7 @@ __all__ = [
     "RequireRestaurantReadDep",
     "RequireTableManageAtAnyScopeDep",
     "RequireTableManageDep",
+    "RequireTableReadAtAnyScopeDep",
     "RequireTableReadDep",
     "UpdateBranchUseCaseDep",
     "UpdateRestaurantUseCaseDep",
@@ -446,4 +452,50 @@ ChangeTableStatusUseCaseDep = Annotated[
 
 RequireTableManageAtAnyScopeDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("table.manage"))
+]
+
+
+# --- QR Code management (Step 4.6) ------------------------------------------
+# Architecture SS7 puts both management routes at a *flat*
+# /api/v1/tables/{id}/qr-codes path -- no branch_id in the URL, so both use
+# the same coarse-gate/fine-grained-use-case split as ChangeTableStatusUseCase
+# (Step 4.5). The unauthenticated resolution endpoint (GET /api/v1/qr/{token})
+# is explicitly out of scope for this step -- see ADR 0001 and the user's own
+# Step 4.6/4.7 split.
+
+
+def get_create_qr_code_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> CreateQRCodeUseCase:
+    return CreateQRCodeUseCase(
+        session_factory=session_factory,
+        table_repository_factory=SQLAlchemyTableRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        qr_code_repository_factory=SQLAlchemyQRCodeRepository,
+        resolve_user_permissions=resolve_permissions,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateQRCodeUseCaseDep = Annotated[CreateQRCodeUseCase, Depends(get_create_qr_code_use_case)]
+
+
+def get_list_qr_codes_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ListQRCodesUseCase:
+    return ListQRCodesUseCase(
+        session_factory=session_factory,
+        table_repository_factory=SQLAlchemyTableRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        qr_code_repository_factory=SQLAlchemyQRCodeRepository,
+        resolve_user_permissions=resolve_permissions,
+    )
+
+
+ListQRCodesUseCaseDep = Annotated[ListQRCodesUseCase, Depends(get_list_qr_codes_use_case)]
+
+RequireTableReadAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("table.read"))
 ]
