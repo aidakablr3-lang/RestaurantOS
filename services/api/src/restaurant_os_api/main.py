@@ -29,6 +29,9 @@ from restaurant_os_api.modules.restaurant.presentation.api.v1.branch_router impo
 from restaurant_os_api.modules.restaurant.presentation.api.v1.restaurant_router import (
     router as restaurant_router,
 )
+from restaurant_os_api.modules.restaurant.presentation.api.v1.table_router import (
+    router as table_router,
+)
 from restaurant_os_api.modules.restaurant.presentation.api.v1.table_zone_router import (
     router as table_zone_router,
 )
@@ -59,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(restaurant_router)
     app.include_router(branch_router)
     app.include_router(table_zone_router)
+    app.include_router(table_router)
 
     @app.get("/health/live", include_in_schema=False)
     async def health_live() -> dict[str, str]:

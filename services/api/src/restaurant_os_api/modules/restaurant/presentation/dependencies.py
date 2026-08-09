@@ -43,21 +43,26 @@ from restaurant_os_api.modules.identity.presentation.dependencies import (
     require_permission_at_any_scope,
 )
 from restaurant_os_api.modules.restaurant.application.use_cases import (
+    ChangeTableStatusUseCase,
     CloseBranchUseCase,
     CreateBranchUseCase,
     CreateRestaurantUseCase,
+    CreateTableUseCase,
     CreateTableZoneUseCase,
     DiscontinueRestaurantUseCase,
     GetBranchUseCase,
     GetRestaurantUseCase,
+    GetTableUseCase,
     GetTableZoneUseCase,
     ListAccessibleBranchesUseCase,
     ListRestaurantsUseCase,
+    ListTablesUseCase,
     ListTableZonesUseCase,
     ReopenBranchUseCase,
     ReplaceOperatingHoursUseCase,
     UpdateBranchUseCase,
     UpdateRestaurantUseCase,
+    UpdateTableUseCase,
     UpdateTableZoneUseCase,
 )
 from restaurant_os_api.modules.restaurant.infrastructure.database.repositories import (
@@ -65,6 +70,7 @@ from restaurant_os_api.modules.restaurant.infrastructure.database.repositories i
     SQLAlchemyBranchRepository,
     SQLAlchemyOperatingHoursRepository,
     SQLAlchemyRestaurantRepository,
+    SQLAlchemyTableRepository,
     SQLAlchemyTableZoneRepository,
 )
 from restaurant_os_api.platform.idempotency import IdempotencyGuard
@@ -72,18 +78,22 @@ from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchem
 
 __all__ = [
     "AuthenticatedPrincipalDep",
+    "ChangeTableStatusUseCaseDep",
     "CloseBranchUseCaseDep",
     "CreateBranchUseCaseDep",
     "CreateRestaurantUseCaseDep",
+    "CreateTableUseCaseDep",
     "CreateTableZoneUseCaseDep",
     "DiscontinueRestaurantUseCaseDep",
     "GetBranchUseCaseDep",
     "GetRestaurantUseCaseDep",
+    "GetTableUseCaseDep",
     "GetTableZoneUseCaseDep",
     "IdempotencyGuardDep",
     "ListAccessibleBranchesUseCaseDep",
     "ListRestaurantsUseCaseDep",
     "ListTableZonesUseCaseDep",
+    "ListTablesUseCaseDep",
     "ReopenBranchUseCaseDep",
     "ReplaceOperatingHoursUseCaseDep",
     "RequireBranchManageDep",
@@ -92,10 +102,12 @@ __all__ = [
     "RequireBranchReadDep",
     "RequireRestaurantManageDep",
     "RequireRestaurantReadDep",
+    "RequireTableManageAtAnyScopeDep",
     "RequireTableManageDep",
     "RequireTableReadDep",
     "UpdateBranchUseCaseDep",
     "UpdateRestaurantUseCaseDep",
+    "UpdateTableUseCaseDep",
     "UpdateTableZoneUseCaseDep",
 ]
 
@@ -356,4 +368,82 @@ RequireTableManageDep = Annotated[
 ]
 RequireTableReadDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_branch_permission("table.read"))
+]
+
+
+# --- Table (Step 4.5) -------------------------------------------------------
+# CRUD routes are nested under branch_id (same table.manage/table.read gate
+# as TableZone). The one exception is the status-change route, which
+# Architecture SS7 puts at a *flat* /api/v1/tables/{id}/status path -- no
+# branch_id in the URL for require_branch_permission to read. That route
+# uses the coarse require_permission_at_any_scope("table.manage") gate here
+# plus ChangeTableStatusUseCase's own fine-grained resolve_and_authorize_branch
+# call, mirroring ListAccessibleBranchesUseCase's established split.
+
+
+def get_create_table_use_case(session_factory: SessionFactoryDep) -> CreateTableUseCase:
+    return CreateTableUseCase(
+        session_factory=session_factory,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        table_zone_repository_factory=SQLAlchemyTableZoneRepository,
+        table_repository_factory=SQLAlchemyTableRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateTableUseCaseDep = Annotated[CreateTableUseCase, Depends(get_create_table_use_case)]
+
+
+def get_get_table_use_case(session_factory: SessionFactoryDep) -> GetTableUseCase:
+    return GetTableUseCase(
+        session_factory=session_factory,
+        table_repository_factory=SQLAlchemyTableRepository,
+    )
+
+
+GetTableUseCaseDep = Annotated[GetTableUseCase, Depends(get_get_table_use_case)]
+
+
+def get_list_tables_use_case(session_factory: SessionFactoryDep) -> ListTablesUseCase:
+    return ListTablesUseCase(
+        session_factory=session_factory,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        table_repository_factory=SQLAlchemyTableRepository,
+    )
+
+
+ListTablesUseCaseDep = Annotated[ListTablesUseCase, Depends(get_list_tables_use_case)]
+
+
+def get_update_table_use_case(session_factory: SessionFactoryDep) -> UpdateTableUseCase:
+    return UpdateTableUseCase(
+        session_factory=session_factory,
+        table_repository_factory=SQLAlchemyTableRepository,
+        table_zone_repository_factory=SQLAlchemyTableZoneRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+UpdateTableUseCaseDep = Annotated[UpdateTableUseCase, Depends(get_update_table_use_case)]
+
+
+def get_change_table_status_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ChangeTableStatusUseCase:
+    return ChangeTableStatusUseCase(
+        session_factory=session_factory,
+        table_repository_factory=SQLAlchemyTableRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_permissions,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+ChangeTableStatusUseCaseDep = Annotated[
+    ChangeTableStatusUseCase, Depends(get_change_table_status_use_case)
+]
+
+RequireTableManageAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("table.manage"))
 ]
