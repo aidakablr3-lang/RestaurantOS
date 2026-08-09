@@ -92,6 +92,8 @@ _STATUS_BY_ERROR_CODE: dict[str, int] = {
     # Shared idempotency infrastructure (Sprint 5, Step 4.0) additions:
     "IDEMPOTENCY_KEY_CONFLICT": status.HTTP_409_CONFLICT,
     "IDEMPOTENT_REQUEST_IN_PROGRESS": status.HTTP_409_CONFLICT,
+    # MenuItemBranchPrice/MenuItemAvailability (Sprint 5, Step 4.10) additions:
+    "EFFECTIVE_WINDOW_OVERLAP": status.HTTP_409_CONFLICT,
 }
 
 _DEFAULT_STATUS = status.HTTP_422_UNPROCESSABLE_ENTITY

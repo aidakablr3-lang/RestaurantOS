@@ -217,6 +217,30 @@ class ModifierNotFoundError(RestaurantDomainError):
         self.modifier_id = modifier_id
 
 
+class EffectiveWindowOverlapError(RestaurantDomainError):
+    """Mirrors the DB's own GiST ``EXCLUDE`` constraint on
+    ``menu_item_branch_prices``/``menu_item_availabilities``
+    (migration 0005: ``excl_menu_item_branch_prices_no_overlap``/
+    ``excl_menu_item_availabilities_no_overlap``) -- the Step 4
+    Decision Lock's "reject-on-overlap" policy, checked proactively so
+    two windows for the same ``(menu_item_id, branch_id)`` that share
+    any instant raise a clean domain error before ever reaching
+    Postgres in the common case; the constraint itself remains the
+    actual, race-free guarantee, the same "proactive check + DB
+    constraint as the real backstop" shape as
+    ``BranchNameConflictError``."""
+
+    error_code = "EFFECTIVE_WINDOW_OVERLAP"
+
+    def __init__(self, menu_item_id: str, branch_id: str) -> None:
+        super().__init__(
+            f"An override window for menu item '{menu_item_id}' at branch '{branch_id}' "
+            "already covers part of the requested effective window."
+        )
+        self.menu_item_id = menu_item_id
+        self.branch_id = branch_id
+
+
 class InvalidReservationStatusTransitionError(RestaurantDomainError):
     """A reasonable, standard reservation state machine
     (requested -> confirmed -> seated -> completed, with no_show/canceled

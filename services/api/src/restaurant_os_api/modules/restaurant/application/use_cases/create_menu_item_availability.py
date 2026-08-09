@@ -10,6 +10,12 @@ branch-scoped change) -- the event's own ``branch_id`` field is
 nullable only for a *global* change, which nothing in this step
 produces (the base ``menu_items.is_available`` flag is edited via
 ``UpdateMenuItemUseCase``/``MenuItemUpdated`` instead, per Step 4.8).
+
+Before inserting, checks the new window against every existing row for
+the same ``(menu_item_id, branch_id)`` and raises
+``EffectiveWindowOverlapError`` on any overlap -- the availability
+twin of ``CreateMenuItemBranchPriceUseCase``'s own pre-check (see that
+use case's docstring and ``effective_window.py``).
 """
 
 from __future__ import annotations
@@ -30,12 +36,16 @@ from restaurant_os_api.modules.restaurant.application.dto import (
     CreateMenuItemAvailabilityRequestDTO,
     MenuItemAvailabilityDTO,
 )
+from restaurant_os_api.modules.restaurant.application.effective_window import windows_overlap
 from restaurant_os_api.modules.restaurant.application.use_cases._menu_item_availability_mapper import (
     menu_item_availability_to_dto,
 )
 from restaurant_os_api.modules.restaurant.domain.entities import MenuItemAvailability
 from restaurant_os_api.modules.restaurant.domain.events import MenuItemAvailabilityChanged
-from restaurant_os_api.modules.restaurant.domain.exceptions import MenuItemNotFoundError
+from restaurant_os_api.modules.restaurant.domain.exceptions import (
+    EffectiveWindowOverlapError,
+    MenuItemNotFoundError,
+)
 from restaurant_os_api.modules.restaurant.domain.ports import (
     BranchRepository,
     MenuItemAvailabilityRepository,
@@ -90,6 +100,20 @@ class CreateMenuItemAvailabilityUseCase:
                 resolved_permissions=resolved_permissions,
                 permission_code=PERMISSION_CODE,
             )
+
+            existing_rows = await availability_repo.list_for_menu_item(
+                tenant_id, request.menu_item_id
+            )
+            for existing in existing_rows:
+                if existing.branch_id != request.branch_id:
+                    continue
+                if windows_overlap(
+                    request.effective_from,
+                    request.effective_to,
+                    existing.effective_from,
+                    existing.effective_to,
+                ):
+                    raise EffectiveWindowOverlapError(request.menu_item_id, request.branch_id)
 
             row = await availability_repo.create(
                 MenuItemAvailability(

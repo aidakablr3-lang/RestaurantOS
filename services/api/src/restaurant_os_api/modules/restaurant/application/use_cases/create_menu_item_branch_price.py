@@ -18,6 +18,13 @@ already established for its own flat, no-branch-in-URL route.
 
 Publishes ``MenuItemBranchPriceChanged`` (SS11 names this event
 explicitly).
+
+Before inserting, checks the new window against every existing row for
+the same ``(menu_item_id, branch_id)`` and raises
+``EffectiveWindowOverlapError`` on any overlap -- migration 0005's own
+"Step 4 Decision Lock" commits to exactly this "friendly pre-check" in
+front of the table's GiST ``EXCLUDE`` constraint, which remains the
+actual, race-free guarantee (see ``effective_window.py``).
 """
 
 from __future__ import annotations
@@ -38,12 +45,16 @@ from restaurant_os_api.modules.restaurant.application.dto import (
     CreateMenuItemBranchPriceRequestDTO,
     MenuItemBranchPriceDTO,
 )
+from restaurant_os_api.modules.restaurant.application.effective_window import windows_overlap
 from restaurant_os_api.modules.restaurant.application.use_cases._menu_item_branch_price_mapper import (
     menu_item_branch_price_to_dto,
 )
 from restaurant_os_api.modules.restaurant.domain.entities import MenuItemBranchPrice
 from restaurant_os_api.modules.restaurant.domain.events import MenuItemBranchPriceChanged
-from restaurant_os_api.modules.restaurant.domain.exceptions import MenuItemNotFoundError
+from restaurant_os_api.modules.restaurant.domain.exceptions import (
+    EffectiveWindowOverlapError,
+    MenuItemNotFoundError,
+)
 from restaurant_os_api.modules.restaurant.domain.ports import (
     BranchRepository,
     MenuItemBranchPriceRepository,
@@ -98,6 +109,18 @@ class CreateMenuItemBranchPriceUseCase:
                 resolved_permissions=resolved_permissions,
                 permission_code=PERMISSION_CODE,
             )
+
+            existing_rows = await price_repo.list_for_menu_item(tenant_id, request.menu_item_id)
+            for existing in existing_rows:
+                if existing.branch_id != request.branch_id:
+                    continue
+                if windows_overlap(
+                    request.effective_from,
+                    request.effective_to,
+                    existing.effective_from,
+                    existing.effective_to,
+                ):
+                    raise EffectiveWindowOverlapError(request.menu_item_id, request.branch_id)
 
             row = await price_repo.create(
                 MenuItemBranchPrice(
