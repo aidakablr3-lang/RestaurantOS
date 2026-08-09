@@ -13,6 +13,12 @@ from restaurant_os_api.modules.restaurant.application.use_cases.create_menu_cate
 from restaurant_os_api.modules.restaurant.application.use_cases.create_menu_item import (
     CreateMenuItemUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.create_modifier import (
+    CreateModifierUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.create_modifier_group import (
+    CreateModifierGroupUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.create_qr_code import (
     CreateQRCodeUseCase,
 )
@@ -37,6 +43,12 @@ from restaurant_os_api.modules.restaurant.application.use_cases.get_menu_categor
 from restaurant_os_api.modules.restaurant.application.use_cases.get_menu_item import (
     GetMenuItemUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.get_modifier import (
+    GetModifierUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.get_modifier_group import (
+    GetModifierGroupUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.get_restaurant import (
     GetRestaurantUseCase,
 )
@@ -55,6 +67,12 @@ from restaurant_os_api.modules.restaurant.application.use_cases.list_menu_catego
 from restaurant_os_api.modules.restaurant.application.use_cases.list_menu_items import (
     ListMenuItemsUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.list_modifier_groups import (
+    ListModifierGroupsUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.list_modifiers import (
+    ListModifiersUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.list_qr_codes import (
     ListQRCodesUseCase,
 )
@@ -70,6 +88,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.list_tables impo
 from restaurant_os_api.modules.restaurant.application.use_cases.reopen_branch import (
     ReopenBranchUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.replace_menu_item_modifier_groups import (
+    ReplaceMenuItemModifierGroupsUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.replace_operating_hours import (
     ReplaceOperatingHoursUseCase,
 )
@@ -84,6 +105,12 @@ from restaurant_os_api.modules.restaurant.application.use_cases.update_menu_cate
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.update_menu_item import (
     UpdateMenuItemUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.update_modifier import (
+    UpdateModifierUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.update_modifier_group import (
+    UpdateModifierGroupUseCase,
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.update_restaurant import (
     UpdateRestaurantUseCase,
@@ -101,6 +128,8 @@ __all__ = [
     "CreateBranchUseCase",
     "CreateMenuCategoryUseCase",
     "CreateMenuItemUseCase",
+    "CreateModifierGroupUseCase",
+    "CreateModifierUseCase",
     "CreateQRCodeUseCase",
     "CreateRestaurantUseCase",
     "CreateTableUseCase",
@@ -109,22 +138,29 @@ __all__ = [
     "GetBranchUseCase",
     "GetMenuCategoryUseCase",
     "GetMenuItemUseCase",
+    "GetModifierGroupUseCase",
+    "GetModifierUseCase",
     "GetRestaurantUseCase",
     "GetTableUseCase",
     "GetTableZoneUseCase",
     "ListAccessibleBranchesUseCase",
     "ListMenuCategoriesUseCase",
     "ListMenuItemsUseCase",
+    "ListModifierGroupsUseCase",
+    "ListModifiersUseCase",
     "ListQRCodesUseCase",
     "ListRestaurantsUseCase",
     "ListTableZonesUseCase",
     "ListTablesUseCase",
     "ReopenBranchUseCase",
+    "ReplaceMenuItemModifierGroupsUseCase",
     "ReplaceOperatingHoursUseCase",
     "ResolveQRCodeUseCase",
     "UpdateBranchUseCase",
     "UpdateMenuCategoryUseCase",
     "UpdateMenuItemUseCase",
+    "UpdateModifierGroupUseCase",
+    "UpdateModifierUseCase",
     "UpdateRestaurantUseCase",
     "UpdateTableUseCase",
     "UpdateTableZoneUseCase",

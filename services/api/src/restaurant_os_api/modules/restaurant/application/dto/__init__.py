@@ -19,6 +19,21 @@ from restaurant_os_api.modules.restaurant.application.dto.menu_item_dto import (
     MenuItemListResultDTO,
     UpdateMenuItemRequestDTO,
 )
+from restaurant_os_api.modules.restaurant.application.dto.menu_item_modifier_group_dto import (
+    MenuItemModifierGroupsDTO,
+    ReplaceMenuItemModifierGroupsRequestDTO,
+)
+from restaurant_os_api.modules.restaurant.application.dto.modifier_dto import (
+    CreateModifierRequestDTO,
+    ModifierDTO,
+    UpdateModifierRequestDTO,
+)
+from restaurant_os_api.modules.restaurant.application.dto.modifier_group_dto import (
+    CreateModifierGroupRequestDTO,
+    ModifierGroupDTO,
+    ModifierGroupListResultDTO,
+    UpdateModifierGroupRequestDTO,
+)
 from restaurant_os_api.modules.restaurant.application.dto.operating_hours_dto import (
     OperatingHoursEntryDTO,
     OperatingHoursEntryRequestDTO,
@@ -58,6 +73,8 @@ __all__ = [
     "CreateBranchRequestDTO",
     "CreateMenuCategoryRequestDTO",
     "CreateMenuItemRequestDTO",
+    "CreateModifierGroupRequestDTO",
+    "CreateModifierRequestDTO",
     "CreateRestaurantRequestDTO",
     "CreateTableRequestDTO",
     "CreateTableZoneRequestDTO",
@@ -65,10 +82,15 @@ __all__ = [
     "MenuCategoryListResultDTO",
     "MenuItemDTO",
     "MenuItemListResultDTO",
+    "MenuItemModifierGroupsDTO",
+    "ModifierDTO",
+    "ModifierGroupDTO",
+    "ModifierGroupListResultDTO",
     "OperatingHoursEntryDTO",
     "OperatingHoursEntryRequestDTO",
     "QRCodeDTO",
     "QRCodeResolutionDTO",
+    "ReplaceMenuItemModifierGroupsRequestDTO",
     "ReplaceOperatingHoursRequestDTO",
     "RestaurantDTO",
     "RestaurantListResultDTO",
@@ -79,6 +101,8 @@ __all__ = [
     "UpdateBranchRequestDTO",
     "UpdateMenuCategoryRequestDTO",
     "UpdateMenuItemRequestDTO",
+    "UpdateModifierGroupRequestDTO",
+    "UpdateModifierRequestDTO",
     "UpdateRestaurantRequestDTO",
     "UpdateTableRequestDTO",
     "UpdateTableZoneRequestDTO",
