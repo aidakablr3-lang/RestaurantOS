@@ -7,6 +7,18 @@ from restaurant_os_api.modules.restaurant.application.dto.branch_dto import (
     CreateBranchRequestDTO,
     UpdateBranchRequestDTO,
 )
+from restaurant_os_api.modules.restaurant.application.dto.menu_category_dto import (
+    CreateMenuCategoryRequestDTO,
+    MenuCategoryDTO,
+    MenuCategoryListResultDTO,
+    UpdateMenuCategoryRequestDTO,
+)
+from restaurant_os_api.modules.restaurant.application.dto.menu_item_dto import (
+    CreateMenuItemRequestDTO,
+    MenuItemDTO,
+    MenuItemListResultDTO,
+    UpdateMenuItemRequestDTO,
+)
 from restaurant_os_api.modules.restaurant.application.dto.operating_hours_dto import (
     OperatingHoursEntryDTO,
     OperatingHoursEntryRequestDTO,
@@ -44,9 +56,15 @@ __all__ = [
     "BranchListResultDTO",
     "ChangeTableStatusRequestDTO",
     "CreateBranchRequestDTO",
+    "CreateMenuCategoryRequestDTO",
+    "CreateMenuItemRequestDTO",
     "CreateRestaurantRequestDTO",
     "CreateTableRequestDTO",
     "CreateTableZoneRequestDTO",
+    "MenuCategoryDTO",
+    "MenuCategoryListResultDTO",
+    "MenuItemDTO",
+    "MenuItemListResultDTO",
     "OperatingHoursEntryDTO",
     "OperatingHoursEntryRequestDTO",
     "QRCodeDTO",
@@ -59,6 +77,8 @@ __all__ = [
     "TableZoneDTO",
     "TableZoneListResultDTO",
     "UpdateBranchRequestDTO",
+    "UpdateMenuCategoryRequestDTO",
+    "UpdateMenuItemRequestDTO",
     "UpdateRestaurantRequestDTO",
     "UpdateTableRequestDTO",
     "UpdateTableZoneRequestDTO",

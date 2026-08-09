@@ -7,6 +7,12 @@ from restaurant_os_api.modules.restaurant.application.use_cases.close_branch imp
 from restaurant_os_api.modules.restaurant.application.use_cases.create_branch import (
     CreateBranchUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.create_menu_category import (
+    CreateMenuCategoryUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.create_menu_item import (
+    CreateMenuItemUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.create_qr_code import (
     CreateQRCodeUseCase,
 )
@@ -25,6 +31,12 @@ from restaurant_os_api.modules.restaurant.application.use_cases.discontinue_rest
 from restaurant_os_api.modules.restaurant.application.use_cases.get_branch import (
     GetBranchUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.get_menu_category import (
+    GetMenuCategoryUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.get_menu_item import (
+    GetMenuItemUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.get_restaurant import (
     GetRestaurantUseCase,
 )
@@ -36,6 +48,12 @@ from restaurant_os_api.modules.restaurant.application.use_cases.get_table_zone i
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.list_accessible_branches import (
     ListAccessibleBranchesUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.list_menu_categories import (
+    ListMenuCategoriesUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.list_menu_items import (
+    ListMenuItemsUseCase,
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.list_qr_codes import (
     ListQRCodesUseCase,
@@ -61,6 +79,12 @@ from restaurant_os_api.modules.restaurant.application.use_cases.resolve_qr_code 
 from restaurant_os_api.modules.restaurant.application.use_cases.update_branch import (
     UpdateBranchUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.update_menu_category import (
+    UpdateMenuCategoryUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.update_menu_item import (
+    UpdateMenuItemUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.update_restaurant import (
     UpdateRestaurantUseCase,
 )
@@ -75,16 +99,22 @@ __all__ = [
     "ChangeTableStatusUseCase",
     "CloseBranchUseCase",
     "CreateBranchUseCase",
+    "CreateMenuCategoryUseCase",
+    "CreateMenuItemUseCase",
     "CreateQRCodeUseCase",
     "CreateRestaurantUseCase",
     "CreateTableUseCase",
     "CreateTableZoneUseCase",
     "DiscontinueRestaurantUseCase",
     "GetBranchUseCase",
+    "GetMenuCategoryUseCase",
+    "GetMenuItemUseCase",
     "GetRestaurantUseCase",
     "GetTableUseCase",
     "GetTableZoneUseCase",
     "ListAccessibleBranchesUseCase",
+    "ListMenuCategoriesUseCase",
+    "ListMenuItemsUseCase",
     "ListQRCodesUseCase",
     "ListRestaurantsUseCase",
     "ListTableZonesUseCase",
@@ -93,6 +123,8 @@ __all__ = [
     "ReplaceOperatingHoursUseCase",
     "ResolveQRCodeUseCase",
     "UpdateBranchUseCase",
+    "UpdateMenuCategoryUseCase",
+    "UpdateMenuItemUseCase",
     "UpdateRestaurantUseCase",
     "UpdateTableUseCase",
     "UpdateTableZoneUseCase",
