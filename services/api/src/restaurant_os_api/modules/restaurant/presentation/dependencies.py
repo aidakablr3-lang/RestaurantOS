@@ -62,6 +62,7 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     ListTableZonesUseCase,
     ReopenBranchUseCase,
     ReplaceOperatingHoursUseCase,
+    ResolveQRCodeUseCase,
     UpdateBranchUseCase,
     UpdateRestaurantUseCase,
     UpdateTableUseCase,
@@ -78,6 +79,7 @@ from restaurant_os_api.modules.restaurant.infrastructure.database.repositories i
 )
 from restaurant_os_api.platform.idempotency import IdempotencyGuard
 from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchemyOutboxWriter
+from restaurant_os_api.platform.rate_limiting import QRResolutionRateLimiter
 
 __all__ = [
     "AuthenticatedPrincipalDep",
@@ -99,6 +101,7 @@ __all__ = [
     "ListRestaurantsUseCaseDep",
     "ListTableZonesUseCaseDep",
     "ListTablesUseCaseDep",
+    "QRResolutionRateLimiterDep",
     "ReopenBranchUseCaseDep",
     "ReplaceOperatingHoursUseCaseDep",
     "RequireBranchManageDep",
@@ -111,6 +114,7 @@ __all__ = [
     "RequireTableManageDep",
     "RequireTableReadAtAnyScopeDep",
     "RequireTableReadDep",
+    "ResolveQRCodeUseCaseDep",
     "UpdateBranchUseCaseDep",
     "UpdateRestaurantUseCaseDep",
     "UpdateTableUseCaseDep",
@@ -499,3 +503,33 @@ ListQRCodesUseCaseDep = Annotated[ListQRCodesUseCase, Depends(get_list_qr_codes_
 RequireTableReadAtAnyScopeDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("table.read"))
 ]
+
+
+# --- QR Code resolution (Step 4.7) ------------------------------------------
+# Deliberately no RequireXxxDep of any kind is used anywhere in this section
+# -- GET /api/v1/qr/{token} (ADR 0001) is unauthenticated by design, and
+# nothing here consults AuthenticatedPrincipalDep, RBAC, or tenant context.
+# The only guard is QRResolutionRateLimiter, itself unauthenticated.
+
+
+def get_qr_resolution_rate_limiter(session_factory: SessionFactoryDep) -> QRResolutionRateLimiter:
+    return QRResolutionRateLimiter(session_factory)
+
+
+QRResolutionRateLimiterDep = Annotated[
+    QRResolutionRateLimiter, Depends(get_qr_resolution_rate_limiter)
+]
+
+
+def get_resolve_qr_code_use_case(
+    session_factory: SessionFactoryDep,
+    rate_limiter: QRResolutionRateLimiterDep,
+) -> ResolveQRCodeUseCase:
+    return ResolveQRCodeUseCase(
+        session_factory=session_factory,
+        qr_code_repository_factory=SQLAlchemyQRCodeRepository,
+        rate_limiter=rate_limiter,
+    )
+
+
+ResolveQRCodeUseCaseDep = Annotated[ResolveQRCodeUseCase, Depends(get_resolve_qr_code_use_case)]
