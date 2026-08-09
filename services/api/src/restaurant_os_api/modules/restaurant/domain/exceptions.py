@@ -129,6 +129,34 @@ class TableZoneNameConflictError(RestaurantDomainError):
         self.name = name
 
 
+class TableNotFoundError(RestaurantDomainError):
+    error_code = "TABLE_NOT_FOUND"
+
+    def __init__(self, table_id: str) -> None:
+        super().__init__(f"Table '{table_id}' does not exist.")
+        self.table_id = table_id
+
+
+class TableNumberConflictError(RestaurantDomainError):
+    """Mirrors the DB's own ``UNIQUE (branch_id, table_number)`` constraint
+    (Restaurant Platform Architecture SS3.1's ``Table`` entry), checked
+    proactively the same way ``BranchNameConflictError``/
+    ``TableZoneNameConflictError`` check their own uniqueness
+    constraints. Architecture SS7 names this exact error code as one of
+    its own worked examples ("new codes following the established
+    SCREAMING_SNAKE convention (BRANCH_NOT_FOUND,
+    TABLE_NUMBER_ALREADY_EXISTS, MENU_ITEM_NOT_FOUND, ...)")."""
+
+    error_code = "TABLE_NUMBER_ALREADY_EXISTS"
+
+    def __init__(self, branch_id: str, table_number: str) -> None:
+        super().__init__(
+            f"A table numbered '{table_number}' already exists for branch '{branch_id}'."
+        )
+        self.branch_id = branch_id
+        self.table_number = table_number
+
+
 class InvalidReservationStatusTransitionError(RestaurantDomainError):
     """A reasonable, standard reservation state machine
     (requested -> confirmed -> seated -> completed, with no_show/canceled
