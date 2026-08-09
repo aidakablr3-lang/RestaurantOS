@@ -10,11 +10,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from restaurant_os_api.modules.identity.application.dto import ResolvedPermissions
 from restaurant_os_api.modules.restaurant.domain.entities import (
     Address,
     Branch,
     OperatingHours,
     Restaurant,
+    Table,
     TableZone,
 )
 from restaurant_os_api.platform.events import DomainEvent
@@ -208,6 +210,68 @@ class InMemoryTableZoneRepository:
         ]
         visible.sort(key=lambda tz: tz.display_order)
         return visible[offset : offset + limit], len(visible)
+
+
+class InMemoryTableRepository:
+    def __init__(self, tables: dict[str, Table] | None = None) -> None:
+        self._tables = tables or {}
+
+    async def get_by_id(self, tenant_id: str, table_id: str) -> Table | None:
+        table = self._tables.get(table_id)
+        if table is None or table.tenant_id != tenant_id:
+            return None
+        return table
+
+    async def get_by_branch_id_and_table_number(
+        self, tenant_id: str, branch_id: str, table_number: str
+    ) -> Table | None:
+        for table in self._tables.values():
+            if (
+                table.tenant_id == tenant_id
+                and table.branch_id == branch_id
+                and table.table_number == table_number
+            ):
+                return table
+        return None
+
+    async def create(self, table: Table) -> Table:
+        self._tables[table.id] = table
+        return table
+
+    async def update(self, table: Table) -> Table:
+        self._tables[table.id] = table
+        return table
+
+    async def list_for_branch(
+        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+    ) -> tuple[list[Table], int]:
+        visible = [
+            t
+            for t in self._tables.values()
+            if t.tenant_id == tenant_id and t.branch_id == branch_id
+        ]
+        visible.sort(key=lambda t: t.table_number)
+        return visible[offset : offset + limit], len(visible)
+
+    async def list_for_table_zone(self, tenant_id: str, table_zone_id: str) -> list[Table]:
+        return [
+            t
+            for t in self._tables.values()
+            if t.tenant_id == tenant_id and t.table_zone_id == table_zone_id
+        ]
+
+
+@dataclass
+class FakeResolveUserPermissionsUseCase:
+    """Returns a fixed ``ResolvedPermissions`` regardless of input --
+    enough for unit-testing callers that only need *some* resolved
+    grant, not the full RBAC resolution pipeline (that has its own
+    dedicated test suite in ``modules.identity``)."""
+
+    resolved: ResolvedPermissions = field(default_factory=ResolvedPermissions)
+
+    async def execute(self, tenant_id: str, user_id: str) -> ResolvedPermissions:
+        return self.resolved
 
 
 @dataclass
