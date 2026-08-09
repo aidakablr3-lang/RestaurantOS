@@ -197,11 +197,18 @@ async def _clean_tables(engine: AsyncEngine) -> AsyncGenerator[None]:
     the ones actually exercising RLS. Covers every table Sprint 4.1
     (Tenant Platform) added, not just the Sprint 3 identity/auth set --
     this fixture predates those tables and was never extended for them.
+
+    ``qr_resolution_rate_limits`` (Sprint 5 Step 4.7) has no RLS at all
+    (ADR 0001) and no ``tenant_id`` column to scope by, so it needs
+    truncating here for the same reason every other table does --
+    otherwise one test's rate-limit counters would carry into the
+    next test reusing the same IP/token strings.
     """
     yield
     async with engine.begin() as conn:
         await conn.exec_driver_sql(
-            "TRUNCATE TABLE idempotency_keys, outbox_events, reservations, "
+            "TRUNCATE TABLE qr_resolution_rate_limits, idempotency_keys, outbox_events, "
+            "reservations, "
             "menu_item_modifier_groups, "
             "menu_item_availabilities, menu_item_branch_prices, modifiers, modifier_groups, "
             "menu_items, menu_categories, qr_codes, tables, table_zones, operating_hours, "

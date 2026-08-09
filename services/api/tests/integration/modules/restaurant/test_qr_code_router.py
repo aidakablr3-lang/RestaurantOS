@@ -7,8 +7,9 @@ flat paths per Architecture SS7, gated by the coarse
 ``require_permission_at_any_scope`` plus
 ``resolve_and_authorize_branch``'s fine-grained check, same as the
 Table status-change route (Step 4.5). The unauthenticated resolution
-endpoint (``GET /api/v1/qr/{token}``) is explicitly out of scope for
-this step -- one test in this file asserts it does not exist yet.
+endpoint (``GET /api/v1/qr/{token}``), added in Step 4.7, has its own
+dedicated file, ``test_qr_resolution_router.py`` -- this file only
+confirms the two route groups stay isolated from each other.
 """
 
 from __future__ import annotations
@@ -670,16 +671,34 @@ class TestListQRCodes:
         assert response.status_code == 403
 
 
-class TestNoResolutionEndpointInThisStep:
-    def test_the_unauthenticated_resolution_route_does_not_exist_yet(
+class TestResolutionEndpointIsIsolatedFromManagement:
+    """Step 4.7 adds ``GET /api/v1/qr/{token}`` -- this class only
+    confirms it is physically isolated from the authenticated
+    management routes tested above (no shared auth/permission gate, a
+    different response envelope). The resolution endpoint's own
+    behavior has its own dedicated test file, ``test_qr_resolution_router.py``.
+    """
+
+    def test_the_resolution_route_now_exists_and_is_unauthenticated(
         self, client: TestClient
     ) -> None:
         response = client.get("/api/v1/qr/some-token-value")
+        # A public route: an unresolvable token is a clean 404, never a
+        # 401 -- there is no authentication gate to fail here.
         assert response.status_code == 404
+        assert response.json() == {"error": "not_found"}
 
-    def test_openapi_schema_has_no_resolution_path(self, client: TestClient) -> None:
+    def test_the_resolution_route_does_not_use_the_standard_api_envelope(
+        self, client: TestClient
+    ) -> None:
+        response = client.get("/api/v1/qr/some-token-value")
+        assert "data" not in response.json()
+        assert "error" in response.json()
+
+    def test_openapi_schema_now_has_the_resolution_path(self, client: TestClient) -> None:
         schema = client.get("/openapi.json").json()
-        assert "/api/v1/qr/{token}" not in schema["paths"]
+        assert "/api/v1/qr/{token}" in schema["paths"]
+        assert schema["paths"]["/api/v1/qr/{token}"]["get"].get("security") in (None, [])
 
 
 class TestQRCodeConstraintsRemainIntact:

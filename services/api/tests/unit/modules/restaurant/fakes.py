@@ -21,6 +21,7 @@ from restaurant_os_api.modules.restaurant.domain.entities import (
     TableZone,
 )
 from restaurant_os_api.platform.events import DomainEvent
+from restaurant_os_api.platform.rate_limiting import RateLimitExceededError
 
 
 class FakeAsyncSession:
@@ -307,6 +308,29 @@ class FakeResolveUserPermissionsUseCase:
 
     async def execute(self, tenant_id: str, user_id: str) -> ResolvedPermissions:
         return self.resolved
+
+
+@dataclass
+class FakeQRResolutionRateLimiter:
+    """Records every ``check``/``record_failure`` call; raises
+    ``RateLimitExceededError`` when told to, for testing
+    ``ResolveQRCodeUseCase``'s own handling of that exception without a
+    real Postgres-backed counter table."""
+
+    raise_on_check: bool = False
+    raise_on_record_failure: bool = False
+    check_calls: list[tuple[str, str]] = field(default_factory=list)
+    record_failure_calls: list[tuple[str, str]] = field(default_factory=list)
+
+    async def check(self, *, source_ip: str, token: str) -> None:
+        self.check_calls.append((source_ip, token))
+        if self.raise_on_check:
+            raise RateLimitExceededError()
+
+    async def record_failure(self, *, source_ip: str, token: str) -> None:
+        self.record_failure_calls.append((source_ip, token))
+        if self.raise_on_record_failure:
+            raise RateLimitExceededError()
 
 
 @dataclass
