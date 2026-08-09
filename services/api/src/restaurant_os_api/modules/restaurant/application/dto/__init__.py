@@ -18,6 +18,13 @@ from restaurant_os_api.modules.restaurant.application.dto.restaurant_dto import 
     RestaurantListResultDTO,
     UpdateRestaurantRequestDTO,
 )
+from restaurant_os_api.modules.restaurant.application.dto.table_dto import (
+    ChangeTableStatusRequestDTO,
+    CreateTableRequestDTO,
+    TableDTO,
+    TableListResultDTO,
+    UpdateTableRequestDTO,
+)
 from restaurant_os_api.modules.restaurant.application.dto.table_zone_dto import (
     CreateTableZoneRequestDTO,
     TableZoneDTO,
@@ -31,17 +38,22 @@ __all__ = [
     "BranchDTO",
     "BranchDetailDTO",
     "BranchListResultDTO",
+    "ChangeTableStatusRequestDTO",
     "CreateBranchRequestDTO",
     "CreateRestaurantRequestDTO",
+    "CreateTableRequestDTO",
     "CreateTableZoneRequestDTO",
     "OperatingHoursEntryDTO",
     "OperatingHoursEntryRequestDTO",
     "ReplaceOperatingHoursRequestDTO",
     "RestaurantDTO",
     "RestaurantListResultDTO",
+    "TableDTO",
+    "TableListResultDTO",
     "TableZoneDTO",
     "TableZoneListResultDTO",
     "UpdateBranchRequestDTO",
     "UpdateRestaurantRequestDTO",
+    "UpdateTableRequestDTO",
     "UpdateTableZoneRequestDTO",
 ]

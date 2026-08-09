@@ -1,3 +1,6 @@
+from restaurant_os_api.modules.restaurant.application.use_cases.change_table_status import (
+    ChangeTableStatusUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.close_branch import (
     CloseBranchUseCase,
 )
@@ -6,6 +9,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.create_branch im
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.create_restaurant import (
     CreateRestaurantUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.create_table import (
+    CreateTableUseCase,
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.create_table_zone import (
     CreateTableZoneUseCase,
@@ -19,6 +25,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.get_branch impor
 from restaurant_os_api.modules.restaurant.application.use_cases.get_restaurant import (
     GetRestaurantUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.get_table import (
+    GetTableUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.get_table_zone import (
     GetTableZoneUseCase,
 )
@@ -30,6 +39,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.list_restaurants
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.list_table_zones import (
     ListTableZonesUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.list_tables import (
+    ListTablesUseCase,
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.reopen_branch import (
     ReopenBranchUseCase,
@@ -43,25 +55,33 @@ from restaurant_os_api.modules.restaurant.application.use_cases.update_branch im
 from restaurant_os_api.modules.restaurant.application.use_cases.update_restaurant import (
     UpdateRestaurantUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.update_table import (
+    UpdateTableUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.update_table_zone import (
     UpdateTableZoneUseCase,
 )
 
 __all__ = [
+    "ChangeTableStatusUseCase",
     "CloseBranchUseCase",
     "CreateBranchUseCase",
     "CreateRestaurantUseCase",
+    "CreateTableUseCase",
     "CreateTableZoneUseCase",
     "DiscontinueRestaurantUseCase",
     "GetBranchUseCase",
     "GetRestaurantUseCase",
+    "GetTableUseCase",
     "GetTableZoneUseCase",
     "ListAccessibleBranchesUseCase",
     "ListRestaurantsUseCase",
     "ListTableZonesUseCase",
+    "ListTablesUseCase",
     "ReopenBranchUseCase",
     "ReplaceOperatingHoursUseCase",
     "UpdateBranchUseCase",
     "UpdateRestaurantUseCase",
+    "UpdateTableUseCase",
     "UpdateTableZoneUseCase",
 ]
