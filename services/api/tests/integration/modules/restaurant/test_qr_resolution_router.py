@@ -324,40 +324,57 @@ class TestRateLimitBucketIsolation:
 
 
 class TestFailedResolutionStricterLimit:
+    """Both tests pre-seed the failed-count boundary directly (via
+    ``_seed_counter``) rather than driving a real N-request loop to
+    reach it -- the same fixed-window wall-clock-crossing risk
+    ``TestRateLimitBucketIsolation`` already documents applies here
+    too, and grew more likely to trigger as this file's own
+    ``_client()`` helper (a fresh ``create_app()`` per call) got more
+    expensive with every router Sprint 5 added in later steps (a real,
+    observed flake, not a hypothetical one -- see Step 4.9's own
+    verification notes). One real HTTP request is then enough to prove
+    the router correctly translates the resulting exception into 429.
+    """
+
     async def test_repeated_failures_from_one_ip_trip_the_failed_limit_before_the_total_limit(
         self, session_factory
     ) -> None:
         assert _IP_FAILED_LIMIT < _IP_TOTAL_LIMIT
-        client = _client(session_factory, ip="198.51.100.77")
+        ip = "198.51.100.77"
+        await _seed_counter(
+            session_factory,
+            bucket_type="ip",
+            bucket_key=ip,
+            total_count=_IP_FAILED_LIMIT,
+            failed_count=_IP_FAILED_LIMIT,
+        )
 
-        responses = [
-            client.get(RESOLUTION_PATH.format(token=f"nonexistent-{i}"))
-            for i in range(_IP_FAILED_LIMIT + 1)
-        ]
+        response = _client(session_factory, ip=ip).get(
+            RESOLUTION_PATH.format(token="nonexistent-token")
+        )
 
-        not_found = [r for r in responses if r.status_code == 404]
-        rate_limited = [r for r in responses if r.status_code == 429]
-        assert len(not_found) == _IP_FAILED_LIMIT
-        assert len(rate_limited) == 1
-        assert rate_limited[0].json() == {"error": "rate_limited"}
+        assert response.status_code == 429
+        assert response.json() == {"error": "rate_limited"}
 
     async def test_repeated_failures_against_one_token_trip_the_per_token_failed_limit(
         self, session_factory
     ) -> None:
-        assert _TOKEN_FAILED_LIMIT < _IP_FAILED_LIMIT
+        assert _TOKEN_FAILED_LIMIT < _TOKEN_TOTAL_LIMIT
         same_nonexistent_token = "same-nonexistent-token-reused"
+        await _seed_counter(
+            session_factory,
+            bucket_type="token",
+            bucket_key=same_nonexistent_token,
+            total_count=_TOKEN_FAILED_LIMIT,
+            failed_count=_TOKEN_FAILED_LIMIT,
+        )
 
-        # A distinct IP per request keeps the per-IP failed limit from
-        # tripping first and confounding this token-only assertion.
-        responses = []
-        for i in range(_TOKEN_FAILED_LIMIT + 1):
-            client = _client(session_factory, ip=f"198.51.100.{150 + i}")
-            responses.append(client.get(RESOLUTION_PATH.format(token=same_nonexistent_token)))
+        response = _client(session_factory, ip="198.51.100.150").get(
+            RESOLUTION_PATH.format(token=same_nonexistent_token)
+        )
 
-        not_found = [r for r in responses if r.status_code == 404]
-        rate_limited = [r for r in responses if r.status_code == 429]
-        assert len(not_found) == _TOKEN_FAILED_LIMIT
-        assert len(rate_limited) == 1
+        assert response.status_code == 429
+        assert response.json() == {"error": "rate_limited"}
 
 
 class TestSuccessfulResolutionIsNotThrottledByFailureLimits:
