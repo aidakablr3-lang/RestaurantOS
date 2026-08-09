@@ -13,6 +13,14 @@ from restaurant_os_api.modules.restaurant.application.dto.menu_category_dto impo
     MenuCategoryListResultDTO,
     UpdateMenuCategoryRequestDTO,
 )
+from restaurant_os_api.modules.restaurant.application.dto.menu_item_availability_dto import (
+    CreateMenuItemAvailabilityRequestDTO,
+    MenuItemAvailabilityDTO,
+)
+from restaurant_os_api.modules.restaurant.application.dto.menu_item_branch_price_dto import (
+    CreateMenuItemBranchPriceRequestDTO,
+    MenuItemBranchPriceDTO,
+)
 from restaurant_os_api.modules.restaurant.application.dto.menu_item_dto import (
     CreateMenuItemRequestDTO,
     MenuItemDTO,
@@ -72,6 +80,8 @@ __all__ = [
     "ChangeTableStatusRequestDTO",
     "CreateBranchRequestDTO",
     "CreateMenuCategoryRequestDTO",
+    "CreateMenuItemAvailabilityRequestDTO",
+    "CreateMenuItemBranchPriceRequestDTO",
     "CreateMenuItemRequestDTO",
     "CreateModifierGroupRequestDTO",
     "CreateModifierRequestDTO",
@@ -80,6 +90,8 @@ __all__ = [
     "CreateTableZoneRequestDTO",
     "MenuCategoryDTO",
     "MenuCategoryListResultDTO",
+    "MenuItemAvailabilityDTO",
+    "MenuItemBranchPriceDTO",
     "MenuItemDTO",
     "MenuItemListResultDTO",
     "MenuItemModifierGroupsDTO",
