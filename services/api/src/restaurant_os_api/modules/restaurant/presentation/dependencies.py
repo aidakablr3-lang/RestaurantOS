@@ -47,6 +47,8 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     CloseBranchUseCase,
     CreateBranchUseCase,
     CreateMenuCategoryUseCase,
+    CreateMenuItemAvailabilityUseCase,
+    CreateMenuItemBranchPriceUseCase,
     CreateMenuItemUseCase,
     CreateModifierGroupUseCase,
     CreateModifierUseCase,
@@ -65,6 +67,8 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     GetTableZoneUseCase,
     ListAccessibleBranchesUseCase,
     ListMenuCategoriesUseCase,
+    ListMenuItemAvailabilitiesUseCase,
+    ListMenuItemBranchPricesUseCase,
     ListMenuItemsUseCase,
     ListModifierGroupsUseCase,
     ListModifiersUseCase,
@@ -89,6 +93,8 @@ from restaurant_os_api.modules.restaurant.infrastructure.database.repositories i
     SQLAlchemyAddressRepository,
     SQLAlchemyBranchRepository,
     SQLAlchemyMenuCategoryRepository,
+    SQLAlchemyMenuItemAvailabilityRepository,
+    SQLAlchemyMenuItemBranchPriceRepository,
     SQLAlchemyMenuItemModifierGroupRepository,
     SQLAlchemyMenuItemRepository,
     SQLAlchemyModifierGroupRepository,
@@ -109,6 +115,8 @@ __all__ = [
     "CloseBranchUseCaseDep",
     "CreateBranchUseCaseDep",
     "CreateMenuCategoryUseCaseDep",
+    "CreateMenuItemAvailabilityUseCaseDep",
+    "CreateMenuItemBranchPriceUseCaseDep",
     "CreateMenuItemUseCaseDep",
     "CreateModifierGroupUseCaseDep",
     "CreateModifierUseCaseDep",
@@ -128,6 +136,8 @@ __all__ = [
     "IdempotencyGuardDep",
     "ListAccessibleBranchesUseCaseDep",
     "ListMenuCategoriesUseCaseDep",
+    "ListMenuItemAvailabilitiesUseCaseDep",
+    "ListMenuItemBranchPricesUseCaseDep",
     "ListMenuItemsUseCaseDep",
     "ListModifierGroupsUseCaseDep",
     "ListModifiersUseCaseDep",
@@ -143,7 +153,9 @@ __all__ = [
     "RequireBranchManageTenantWideDep",
     "RequireBranchReadAtAnyScopeDep",
     "RequireBranchReadDep",
+    "RequireMenuManageAtAnyScopeDep",
     "RequireMenuManageDep",
+    "RequireMenuReadAtAnyScopeDep",
     "RequireMenuReadDep",
     "RequireRestaurantManageDep",
     "RequireRestaurantReadDep",
@@ -814,4 +826,92 @@ def get_replace_menu_item_modifier_groups_use_case(
 
 ReplaceMenuItemModifierGroupsUseCaseDep = Annotated[
     ReplaceMenuItemModifierGroupsUseCase, Depends(get_replace_menu_item_modifier_groups_use_case)
+]
+
+
+# --- MenuItemBranchPrice + MenuItemAvailability (Step 4.10) -----------------
+# Both routes are flat (no branch_id in the URL -- it arrives in the body),
+# the same shape ChangeTableStatusUseCase (Step 4.5) already established, so
+# both use the coarse require_permission_at_any_scope("menu.manage"/
+# "menu.read") gate here plus each use case's own fine-grained
+# resolve_and_authorize_branch (create) or tenant-wide-vs-branch-scoped
+# filtering (list) call.
+
+
+def get_create_menu_item_branch_price_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> CreateMenuItemBranchPriceUseCase:
+    return CreateMenuItemBranchPriceUseCase(
+        session_factory=session_factory,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        menu_item_branch_price_repository_factory=SQLAlchemyMenuItemBranchPriceRepository,
+        resolve_user_permissions=resolve_permissions,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateMenuItemBranchPriceUseCaseDep = Annotated[
+    CreateMenuItemBranchPriceUseCase, Depends(get_create_menu_item_branch_price_use_case)
+]
+
+
+def get_list_menu_item_branch_prices_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ListMenuItemBranchPricesUseCase:
+    return ListMenuItemBranchPricesUseCase(
+        session_factory=session_factory,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        menu_item_branch_price_repository_factory=SQLAlchemyMenuItemBranchPriceRepository,
+        resolve_user_permissions=resolve_permissions,
+    )
+
+
+ListMenuItemBranchPricesUseCaseDep = Annotated[
+    ListMenuItemBranchPricesUseCase, Depends(get_list_menu_item_branch_prices_use_case)
+]
+
+
+def get_create_menu_item_availability_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> CreateMenuItemAvailabilityUseCase:
+    return CreateMenuItemAvailabilityUseCase(
+        session_factory=session_factory,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        menu_item_availability_repository_factory=SQLAlchemyMenuItemAvailabilityRepository,
+        resolve_user_permissions=resolve_permissions,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateMenuItemAvailabilityUseCaseDep = Annotated[
+    CreateMenuItemAvailabilityUseCase, Depends(get_create_menu_item_availability_use_case)
+]
+
+
+def get_list_menu_item_availabilities_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ListMenuItemAvailabilitiesUseCase:
+    return ListMenuItemAvailabilitiesUseCase(
+        session_factory=session_factory,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        menu_item_availability_repository_factory=SQLAlchemyMenuItemAvailabilityRepository,
+        resolve_user_permissions=resolve_permissions,
+    )
+
+
+ListMenuItemAvailabilitiesUseCaseDep = Annotated[
+    ListMenuItemAvailabilitiesUseCase, Depends(get_list_menu_item_availabilities_use_case)
+]
+
+RequireMenuManageAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("menu.manage"))
+]
+RequireMenuReadAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("menu.read"))
 ]
