@@ -16,6 +16,8 @@ from restaurant_os_api.modules.restaurant.domain.entities import (
     Branch,
     MenuCategory,
     MenuItem,
+    MenuItemAvailability,
+    MenuItemBranchPrice,
     Modifier,
     ModifierGroup,
     OperatingHours,
@@ -337,6 +339,54 @@ class InMemoryMenuItemRepository:
         ]
         visible.sort(key=lambda i: i.display_order)
         return visible[offset : offset + limit], len(visible)
+
+
+class InMemoryMenuItemBranchPriceRepository:
+    def __init__(self, rows: dict[str, MenuItemBranchPrice] | None = None) -> None:
+        self._rows = rows or {}
+
+    async def get_by_id(self, tenant_id: str, row_id: str) -> MenuItemBranchPrice | None:
+        row = self._rows.get(row_id)
+        if row is None or row.tenant_id != tenant_id:
+            return None
+        return row
+
+    async def create(self, row: MenuItemBranchPrice) -> MenuItemBranchPrice:
+        self._rows[row.id] = row
+        return row
+
+    async def list_for_menu_item(
+        self, tenant_id: str, menu_item_id: str
+    ) -> list[MenuItemBranchPrice]:
+        return [
+            r
+            for r in self._rows.values()
+            if r.tenant_id == tenant_id and r.menu_item_id == menu_item_id
+        ]
+
+
+class InMemoryMenuItemAvailabilityRepository:
+    def __init__(self, rows: dict[str, MenuItemAvailability] | None = None) -> None:
+        self._rows = rows or {}
+
+    async def get_by_id(self, tenant_id: str, row_id: str) -> MenuItemAvailability | None:
+        row = self._rows.get(row_id)
+        if row is None or row.tenant_id != tenant_id:
+            return None
+        return row
+
+    async def create(self, row: MenuItemAvailability) -> MenuItemAvailability:
+        self._rows[row.id] = row
+        return row
+
+    async def list_for_menu_item(
+        self, tenant_id: str, menu_item_id: str
+    ) -> list[MenuItemAvailability]:
+        return [
+            r
+            for r in self._rows.values()
+            if r.tenant_id == tenant_id and r.menu_item_id == menu_item_id
+        ]
 
 
 class InMemoryModifierGroupRepository:
