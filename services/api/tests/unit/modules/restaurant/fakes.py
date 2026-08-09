@@ -14,6 +14,8 @@ from restaurant_os_api.modules.identity.application.dto import ResolvedPermissio
 from restaurant_os_api.modules.restaurant.domain.entities import (
     Address,
     Branch,
+    MenuCategory,
+    MenuItem,
     OperatingHours,
     QRCode,
     Restaurant,
@@ -261,6 +263,78 @@ class InMemoryTableRepository:
             for t in self._tables.values()
             if t.tenant_id == tenant_id and t.table_zone_id == table_zone_id
         ]
+
+
+class InMemoryMenuCategoryRepository:
+    def __init__(self, menu_categories: dict[str, MenuCategory] | None = None) -> None:
+        self._menu_categories = menu_categories or {}
+
+    async def get_by_id(self, tenant_id: str, menu_category_id: str) -> MenuCategory | None:
+        menu_category = self._menu_categories.get(menu_category_id)
+        if menu_category is None or menu_category.tenant_id != tenant_id:
+            return None
+        return menu_category
+
+    async def get_by_restaurant_id_and_name(
+        self, tenant_id: str, restaurant_id: str, name: str
+    ) -> MenuCategory | None:
+        for menu_category in self._menu_categories.values():
+            if (
+                menu_category.tenant_id == tenant_id
+                and menu_category.restaurant_id == restaurant_id
+                and menu_category.name == name
+            ):
+                return menu_category
+        return None
+
+    async def create(self, menu_category: MenuCategory) -> MenuCategory:
+        self._menu_categories[menu_category.id] = menu_category
+        return menu_category
+
+    async def update(self, menu_category: MenuCategory) -> MenuCategory:
+        self._menu_categories[menu_category.id] = menu_category
+        return menu_category
+
+    async def list_for_restaurant(
+        self, tenant_id: str, restaurant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[MenuCategory], int]:
+        visible = [
+            c
+            for c in self._menu_categories.values()
+            if c.tenant_id == tenant_id and c.restaurant_id == restaurant_id
+        ]
+        visible.sort(key=lambda c: c.display_order)
+        return visible[offset : offset + limit], len(visible)
+
+
+class InMemoryMenuItemRepository:
+    def __init__(self, menu_items: dict[str, MenuItem] | None = None) -> None:
+        self._menu_items = menu_items or {}
+
+    async def get_by_id(self, tenant_id: str, menu_item_id: str) -> MenuItem | None:
+        menu_item = self._menu_items.get(menu_item_id)
+        if menu_item is None or menu_item.tenant_id != tenant_id:
+            return None
+        return menu_item
+
+    async def create(self, menu_item: MenuItem) -> MenuItem:
+        self._menu_items[menu_item.id] = menu_item
+        return menu_item
+
+    async def update(self, menu_item: MenuItem) -> MenuItem:
+        self._menu_items[menu_item.id] = menu_item
+        return menu_item
+
+    async def list_for_category(
+        self, tenant_id: str, menu_category_id: str, *, offset: int, limit: int
+    ) -> tuple[list[MenuItem], int]:
+        visible = [
+            i
+            for i in self._menu_items.values()
+            if i.tenant_id == tenant_id and i.menu_category_id == menu_category_id
+        ]
+        visible.sort(key=lambda i: i.display_order)
+        return visible[offset : offset + limit], len(visible)
 
 
 class InMemoryQRCodeRepository:
