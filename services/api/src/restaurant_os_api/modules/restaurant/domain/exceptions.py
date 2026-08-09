@@ -195,6 +195,28 @@ class MenuItemNotFoundError(RestaurantDomainError):
         self.menu_item_id = menu_item_id
 
 
+class ModifierGroupNotFoundError(RestaurantDomainError):
+    """Architecture SS3.1's own ``ModifierGroup`` entry deliberately does
+    not enforce name uniqueness ("a group named 'Size' legitimately
+    repeats across unrelated item families"), so unlike
+    ``MenuCategory``/``Branch``/``TableZone``/``Table``, there is no
+    accompanying ``NameConflictError`` here."""
+
+    error_code = "MODIFIER_GROUP_NOT_FOUND"
+
+    def __init__(self, modifier_group_id: str) -> None:
+        super().__init__(f"ModifierGroup '{modifier_group_id}' does not exist.")
+        self.modifier_group_id = modifier_group_id
+
+
+class ModifierNotFoundError(RestaurantDomainError):
+    error_code = "MODIFIER_NOT_FOUND"
+
+    def __init__(self, modifier_id: str) -> None:
+        super().__init__(f"Modifier '{modifier_id}' does not exist.")
+        self.modifier_id = modifier_id
+
+
 class InvalidReservationStatusTransitionError(RestaurantDomainError):
     """A reasonable, standard reservation state machine
     (requested -> confirmed -> seated -> completed, with no_show/canceled
