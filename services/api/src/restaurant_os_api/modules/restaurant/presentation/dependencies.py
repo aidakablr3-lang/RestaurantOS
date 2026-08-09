@@ -48,6 +48,8 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     CreateBranchUseCase,
     CreateMenuCategoryUseCase,
     CreateMenuItemUseCase,
+    CreateModifierGroupUseCase,
+    CreateModifierUseCase,
     CreateQRCodeUseCase,
     CreateRestaurantUseCase,
     CreateTableUseCase,
@@ -56,22 +58,29 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     GetBranchUseCase,
     GetMenuCategoryUseCase,
     GetMenuItemUseCase,
+    GetModifierGroupUseCase,
+    GetModifierUseCase,
     GetRestaurantUseCase,
     GetTableUseCase,
     GetTableZoneUseCase,
     ListAccessibleBranchesUseCase,
     ListMenuCategoriesUseCase,
     ListMenuItemsUseCase,
+    ListModifierGroupsUseCase,
+    ListModifiersUseCase,
     ListQRCodesUseCase,
     ListRestaurantsUseCase,
     ListTablesUseCase,
     ListTableZonesUseCase,
     ReopenBranchUseCase,
+    ReplaceMenuItemModifierGroupsUseCase,
     ReplaceOperatingHoursUseCase,
     ResolveQRCodeUseCase,
     UpdateBranchUseCase,
     UpdateMenuCategoryUseCase,
     UpdateMenuItemUseCase,
+    UpdateModifierGroupUseCase,
+    UpdateModifierUseCase,
     UpdateRestaurantUseCase,
     UpdateTableUseCase,
     UpdateTableZoneUseCase,
@@ -80,7 +89,10 @@ from restaurant_os_api.modules.restaurant.infrastructure.database.repositories i
     SQLAlchemyAddressRepository,
     SQLAlchemyBranchRepository,
     SQLAlchemyMenuCategoryRepository,
+    SQLAlchemyMenuItemModifierGroupRepository,
     SQLAlchemyMenuItemRepository,
+    SQLAlchemyModifierGroupRepository,
+    SQLAlchemyModifierRepository,
     SQLAlchemyOperatingHoursRepository,
     SQLAlchemyQRCodeRepository,
     SQLAlchemyRestaurantRepository,
@@ -98,6 +110,8 @@ __all__ = [
     "CreateBranchUseCaseDep",
     "CreateMenuCategoryUseCaseDep",
     "CreateMenuItemUseCaseDep",
+    "CreateModifierGroupUseCaseDep",
+    "CreateModifierUseCaseDep",
     "CreateQRCodeUseCaseDep",
     "CreateRestaurantUseCaseDep",
     "CreateTableUseCaseDep",
@@ -106,6 +120,8 @@ __all__ = [
     "GetBranchUseCaseDep",
     "GetMenuCategoryUseCaseDep",
     "GetMenuItemUseCaseDep",
+    "GetModifierGroupUseCaseDep",
+    "GetModifierUseCaseDep",
     "GetRestaurantUseCaseDep",
     "GetTableUseCaseDep",
     "GetTableZoneUseCaseDep",
@@ -113,12 +129,15 @@ __all__ = [
     "ListAccessibleBranchesUseCaseDep",
     "ListMenuCategoriesUseCaseDep",
     "ListMenuItemsUseCaseDep",
+    "ListModifierGroupsUseCaseDep",
+    "ListModifiersUseCaseDep",
     "ListQRCodesUseCaseDep",
     "ListRestaurantsUseCaseDep",
     "ListTableZonesUseCaseDep",
     "ListTablesUseCaseDep",
     "QRResolutionRateLimiterDep",
     "ReopenBranchUseCaseDep",
+    "ReplaceMenuItemModifierGroupsUseCaseDep",
     "ReplaceOperatingHoursUseCaseDep",
     "RequireBranchManageDep",
     "RequireBranchManageTenantWideDep",
@@ -136,6 +155,8 @@ __all__ = [
     "UpdateBranchUseCaseDep",
     "UpdateMenuCategoryUseCaseDep",
     "UpdateMenuItemUseCaseDep",
+    "UpdateModifierGroupUseCaseDep",
+    "UpdateModifierUseCaseDep",
     "UpdateRestaurantUseCaseDep",
     "UpdateTableUseCaseDep",
     "UpdateTableZoneUseCaseDep",
@@ -560,9 +581,9 @@ ResolveQRCodeUseCaseDep = Annotated[ResolveQRCodeUseCase, Depends(get_resolve_qr
 # Restaurant, deliberately not Branch, per SS3's "no Menu wrapper" decision),
 # so every gate here is the plain tenant-wide require_permission("menu.read"/
 # "menu.manage"), the same shape RequireRestaurantManageDep/
-# RequireRestaurantReadDep already use for the same reason. ModifierGroup,
-# Modifier, MenuItemModifierGroup, MenuItemBranchPrice, MenuItemAvailability,
-# and Reservation are explicitly out of this step's approved scope.
+# RequireRestaurantReadDep already use for the same reason. ModifierGroup/
+# Modifier/MenuItemModifierGroup are wired below (Step 4.9). MenuItemBranchPrice,
+# MenuItemAvailability, and Reservation remain out of scope.
 
 
 def get_create_menu_category_use_case(
@@ -669,3 +690,128 @@ RequireMenuManageDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission("menu.manage"))
 ]
 RequireMenuReadDep = Annotated[AuthenticatedPrincipalDTO, Depends(require_permission("menu.read"))]
+
+
+# --- Modifiers: ModifierGroup + Modifier + attachment (Step 4.9) ------------
+# ModifierGroup/Modifier have no branch dimension either (Architecture SS3.1
+# -- both belong directly to the tenant, Data Architecture v2.0 Group F), so
+# every gate here reuses the same menu.read/menu.manage pair Step 4.8 already
+# wired -- the permission's own seeded description ("modifiers, pricing, and
+# availability") already covers this. MenuItemBranchPrice, MenuItemAvailability,
+# and Reservation remain out of scope.
+
+
+def get_create_modifier_group_use_case(
+    session_factory: SessionFactoryDep,
+) -> CreateModifierGroupUseCase:
+    return CreateModifierGroupUseCase(
+        session_factory=session_factory,
+        modifier_group_repository_factory=SQLAlchemyModifierGroupRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateModifierGroupUseCaseDep = Annotated[
+    CreateModifierGroupUseCase, Depends(get_create_modifier_group_use_case)
+]
+
+
+def get_get_modifier_group_use_case(
+    session_factory: SessionFactoryDep,
+) -> GetModifierGroupUseCase:
+    return GetModifierGroupUseCase(
+        session_factory=session_factory,
+        modifier_group_repository_factory=SQLAlchemyModifierGroupRepository,
+    )
+
+
+GetModifierGroupUseCaseDep = Annotated[
+    GetModifierGroupUseCase, Depends(get_get_modifier_group_use_case)
+]
+
+
+def get_list_modifier_groups_use_case(
+    session_factory: SessionFactoryDep,
+) -> ListModifierGroupsUseCase:
+    return ListModifierGroupsUseCase(
+        session_factory=session_factory,
+        modifier_group_repository_factory=SQLAlchemyModifierGroupRepository,
+    )
+
+
+ListModifierGroupsUseCaseDep = Annotated[
+    ListModifierGroupsUseCase, Depends(get_list_modifier_groups_use_case)
+]
+
+
+def get_update_modifier_group_use_case(
+    session_factory: SessionFactoryDep,
+) -> UpdateModifierGroupUseCase:
+    return UpdateModifierGroupUseCase(
+        session_factory=session_factory,
+        modifier_group_repository_factory=SQLAlchemyModifierGroupRepository,
+    )
+
+
+UpdateModifierGroupUseCaseDep = Annotated[
+    UpdateModifierGroupUseCase, Depends(get_update_modifier_group_use_case)
+]
+
+
+def get_create_modifier_use_case(session_factory: SessionFactoryDep) -> CreateModifierUseCase:
+    return CreateModifierUseCase(
+        session_factory=session_factory,
+        modifier_group_repository_factory=SQLAlchemyModifierGroupRepository,
+        modifier_repository_factory=SQLAlchemyModifierRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateModifierUseCaseDep = Annotated[CreateModifierUseCase, Depends(get_create_modifier_use_case)]
+
+
+def get_get_modifier_use_case(session_factory: SessionFactoryDep) -> GetModifierUseCase:
+    return GetModifierUseCase(
+        session_factory=session_factory,
+        modifier_repository_factory=SQLAlchemyModifierRepository,
+    )
+
+
+GetModifierUseCaseDep = Annotated[GetModifierUseCase, Depends(get_get_modifier_use_case)]
+
+
+def get_list_modifiers_use_case(session_factory: SessionFactoryDep) -> ListModifiersUseCase:
+    return ListModifiersUseCase(
+        session_factory=session_factory,
+        modifier_group_repository_factory=SQLAlchemyModifierGroupRepository,
+        modifier_repository_factory=SQLAlchemyModifierRepository,
+    )
+
+
+ListModifiersUseCaseDep = Annotated[ListModifiersUseCase, Depends(get_list_modifiers_use_case)]
+
+
+def get_update_modifier_use_case(session_factory: SessionFactoryDep) -> UpdateModifierUseCase:
+    return UpdateModifierUseCase(
+        session_factory=session_factory,
+        modifier_repository_factory=SQLAlchemyModifierRepository,
+    )
+
+
+UpdateModifierUseCaseDep = Annotated[UpdateModifierUseCase, Depends(get_update_modifier_use_case)]
+
+
+def get_replace_menu_item_modifier_groups_use_case(
+    session_factory: SessionFactoryDep,
+) -> ReplaceMenuItemModifierGroupsUseCase:
+    return ReplaceMenuItemModifierGroupsUseCase(
+        session_factory=session_factory,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        modifier_group_repository_factory=SQLAlchemyModifierGroupRepository,
+        menu_item_modifier_group_repository_factory=SQLAlchemyMenuItemModifierGroupRepository,
+    )
+
+
+ReplaceMenuItemModifierGroupsUseCaseDep = Annotated[
+    ReplaceMenuItemModifierGroupsUseCase, Depends(get_replace_menu_item_modifier_groups_use_case)
+]
