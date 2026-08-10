@@ -53,6 +53,7 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     CreateModifierGroupUseCase,
     CreateModifierUseCase,
     CreateQRCodeUseCase,
+    CreateReservationUseCase,
     CreateRestaurantUseCase,
     CreateTableUseCase,
     CreateTableZoneUseCase,
@@ -62,6 +63,7 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     GetMenuItemUseCase,
     GetModifierGroupUseCase,
     GetModifierUseCase,
+    GetReservationUseCase,
     GetRestaurantUseCase,
     GetTableUseCase,
     GetTableZoneUseCase,
@@ -73,6 +75,7 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     ListModifierGroupsUseCase,
     ListModifiersUseCase,
     ListQRCodesUseCase,
+    ListReservationsUseCase,
     ListRestaurantsUseCase,
     ListTablesUseCase,
     ListTableZonesUseCase,
@@ -85,6 +88,7 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     UpdateMenuItemUseCase,
     UpdateModifierGroupUseCase,
     UpdateModifierUseCase,
+    UpdateReservationUseCase,
     UpdateRestaurantUseCase,
     UpdateTableUseCase,
     UpdateTableZoneUseCase,
@@ -101,6 +105,7 @@ from restaurant_os_api.modules.restaurant.infrastructure.database.repositories i
     SQLAlchemyModifierRepository,
     SQLAlchemyOperatingHoursRepository,
     SQLAlchemyQRCodeRepository,
+    SQLAlchemyReservationRepository,
     SQLAlchemyRestaurantRepository,
     SQLAlchemyTableRepository,
     SQLAlchemyTableZoneRepository,
@@ -121,6 +126,7 @@ __all__ = [
     "CreateModifierGroupUseCaseDep",
     "CreateModifierUseCaseDep",
     "CreateQRCodeUseCaseDep",
+    "CreateReservationUseCaseDep",
     "CreateRestaurantUseCaseDep",
     "CreateTableUseCaseDep",
     "CreateTableZoneUseCaseDep",
@@ -130,6 +136,7 @@ __all__ = [
     "GetMenuItemUseCaseDep",
     "GetModifierGroupUseCaseDep",
     "GetModifierUseCaseDep",
+    "GetReservationUseCaseDep",
     "GetRestaurantUseCaseDep",
     "GetTableUseCaseDep",
     "GetTableZoneUseCaseDep",
@@ -142,6 +149,7 @@ __all__ = [
     "ListModifierGroupsUseCaseDep",
     "ListModifiersUseCaseDep",
     "ListQRCodesUseCaseDep",
+    "ListReservationsUseCaseDep",
     "ListRestaurantsUseCaseDep",
     "ListTableZonesUseCaseDep",
     "ListTablesUseCaseDep",
@@ -157,6 +165,8 @@ __all__ = [
     "RequireMenuManageDep",
     "RequireMenuReadAtAnyScopeDep",
     "RequireMenuReadDep",
+    "RequireReservationManageDep",
+    "RequireReservationReadDep",
     "RequireRestaurantManageDep",
     "RequireRestaurantReadDep",
     "RequireTableManageAtAnyScopeDep",
@@ -169,6 +179,7 @@ __all__ = [
     "UpdateMenuItemUseCaseDep",
     "UpdateModifierGroupUseCaseDep",
     "UpdateModifierUseCaseDep",
+    "UpdateReservationUseCaseDep",
     "UpdateRestaurantUseCaseDep",
     "UpdateTableUseCaseDep",
     "UpdateTableZoneUseCaseDep",
@@ -914,4 +925,78 @@ RequireMenuManageAtAnyScopeDep = Annotated[
 ]
 RequireMenuReadAtAnyScopeDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("menu.read"))
+]
+
+
+# --- Reservation (Step 4.11) -------------------------------------------------
+# All three routes (POST/GET-list/PATCH) are nested under branch_id, the same
+# shape Table's own CRUD routes use -- no flat status-change route exists for
+# Reservation (Architecture SS7 gives it none), so every gate here is the
+# plain require_branch_permission("reservation.manage"/"reservation.read"),
+# never the coarse at-any-scope + resolve_and_authorize_branch split
+# ChangeTableStatusUseCase needs for its one flat route.
+
+
+def get_create_reservation_use_case(
+    session_factory: SessionFactoryDep,
+) -> CreateReservationUseCase:
+    return CreateReservationUseCase(
+        session_factory=session_factory,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        table_repository_factory=SQLAlchemyTableRepository,
+        reservation_repository_factory=SQLAlchemyReservationRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateReservationUseCaseDep = Annotated[
+    CreateReservationUseCase, Depends(get_create_reservation_use_case)
+]
+
+
+def get_get_reservation_use_case(session_factory: SessionFactoryDep) -> GetReservationUseCase:
+    return GetReservationUseCase(
+        session_factory=session_factory,
+        reservation_repository_factory=SQLAlchemyReservationRepository,
+    )
+
+
+GetReservationUseCaseDep = Annotated[GetReservationUseCase, Depends(get_get_reservation_use_case)]
+
+
+def get_list_reservations_use_case(
+    session_factory: SessionFactoryDep,
+) -> ListReservationsUseCase:
+    return ListReservationsUseCase(
+        session_factory=session_factory,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        reservation_repository_factory=SQLAlchemyReservationRepository,
+    )
+
+
+ListReservationsUseCaseDep = Annotated[
+    ListReservationsUseCase, Depends(get_list_reservations_use_case)
+]
+
+
+def get_update_reservation_use_case(
+    session_factory: SessionFactoryDep,
+) -> UpdateReservationUseCase:
+    return UpdateReservationUseCase(
+        session_factory=session_factory,
+        reservation_repository_factory=SQLAlchemyReservationRepository,
+        table_repository_factory=SQLAlchemyTableRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+UpdateReservationUseCaseDep = Annotated[
+    UpdateReservationUseCase, Depends(get_update_reservation_use_case)
+]
+
+RequireReservationManageDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("reservation.manage"))
+]
+RequireReservationReadDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("reservation.read"))
 ]

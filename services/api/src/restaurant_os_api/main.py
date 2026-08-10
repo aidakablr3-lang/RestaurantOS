@@ -44,6 +44,9 @@ from restaurant_os_api.modules.restaurant.presentation.api.v1.qr_code_router imp
 from restaurant_os_api.modules.restaurant.presentation.api.v1.qr_resolution_router import (
     router as qr_resolution_router,
 )
+from restaurant_os_api.modules.restaurant.presentation.api.v1.reservation_router import (
+    router as reservation_router,
+)
 from restaurant_os_api.modules.restaurant.presentation.api.v1.restaurant_router import (
     router as restaurant_router,
 )
@@ -87,6 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(menu_item_router)
     app.include_router(modifier_group_router)
     app.include_router(modifier_router)
+    app.include_router(reservation_router)
 
     @app.get("/health/live", include_in_schema=False)
     async def health_live() -> dict[str, str]:
