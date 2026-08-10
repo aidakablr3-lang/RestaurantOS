@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { PencilIcon, PlusIcon, StoreIcon, XCircleIcon } from "lucide-react"
+import { BookOpenIcon, PencilIcon, PlusIcon, StoreIcon, XCircleIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { BranchStatusBadge } from "@/components/branch-status-badge"
@@ -218,6 +218,7 @@ export default function RestaurantDetailsPage() {
   const perms = usePermissionHelpers()
   const canManageRestaurant = perms.hasTenantWide("restaurant.manage")
   const canManageBranch = perms.hasTenantWide("branch.manage")
+  const canReadMenu = perms.hasTenantWide("menu.read")
 
   const { data, isLoading, isError, error, refetch } = useRestaurant(restaurantId)
   const restaurant = data?.data
@@ -289,6 +290,16 @@ export default function RestaurantDetailsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {canReadMenu ? (
+            <Button
+              variant="outline"
+              render={<Link href={`/restaurants/${restaurant.id}/menu`} />}
+              nativeButton={false}
+            >
+              <BookOpenIcon />
+              Menu
+            </Button>
+          ) : null}
           {canManageRestaurant ? (
             <Button
               variant="outline"
