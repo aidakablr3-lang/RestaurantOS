@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 
+import { PermissionRestricted } from "@/components/permission-restricted"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { useRestaurant, useUpdateRestaurant } from "@/hooks/use-restaurants"
 import { ApiError } from "@/lib/api-client"
 import { type RestaurantFormValues, restaurantSchema } from "@/lib/schemas/restaurant"
@@ -28,7 +30,10 @@ export default function EditRestaurantPage() {
   const router = useRouter()
   const restaurantId = params.restaurantId
 
-  const { data, isLoading } = useRestaurant(restaurantId)
+  const perms = usePermissionHelpers()
+  const canManage = perms.hasTenantWide("restaurant.manage")
+
+  const { data, isLoading, isError, error, refetch } = useRestaurant(restaurantId)
   const restaurant = data?.data
   const updateRestaurant = useUpdateRestaurant(restaurantId)
 
@@ -60,11 +65,38 @@ export default function EditRestaurantPage() {
     }
   }
 
-  if (isLoading) {
+  if (perms.isLoading || isLoading) {
     return (
       <div className="grid gap-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-64 w-full max-w-lg" />
+      </div>
+    )
+  }
+
+  if (!canManage) {
+    return (
+      <div className="grid gap-6">
+        <h1 className="text-xl font-semibold">Edit restaurant</h1>
+        <PermissionRestricted resource="restaurant editing" />
+      </div>
+    )
+  }
+
+  if (isError || !restaurant) {
+    return (
+      <div className="grid gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+        <p className="text-sm text-destructive">
+          {error instanceof ApiError ? error.message : "Failed to load this restaurant."}
+        </p>
+        <div className="mx-auto flex gap-2">
+          <Button variant="outline" onClick={() => refetch()}>
+            Retry
+          </Button>
+          <Button variant="ghost" onClick={() => router.push("/restaurants")}>
+            Back to restaurants
+          </Button>
+        </div>
       </div>
     )
   }
@@ -78,7 +110,7 @@ export default function EditRestaurantPage() {
           </Link>{" "}
           /{" "}
           <Link href={`/restaurants/${restaurantId}`} className="hover:underline">
-            {restaurant?.displayName ?? restaurantId}
+            {restaurant.displayName}
           </Link>{" "}
           / Edit
         </p>

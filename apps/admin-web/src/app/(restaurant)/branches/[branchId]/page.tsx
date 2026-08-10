@@ -7,6 +7,7 @@ import { ClockIcon, LockIcon, PencilIcon, UnlockIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { BranchStatusBadge } from "@/components/branch-status-badge"
+import { PermissionRestricted } from "@/components/permission-restricted"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useBranch, useCloseBranch, useReopenBranch, useReplaceOperatingHours } from "@/hooks/use-branches"
+import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { ApiError } from "@/lib/api-client"
 import { newIdempotencyKey } from "@/lib/idempotency"
 import { dayLabel } from "@/lib/schemas/branch"
@@ -181,7 +183,13 @@ export default function BranchDetailsPage() {
   const router = useRouter()
   const branchId = params.branchId
 
-  const { data, isLoading, isError, error, refetch } = useBranch(branchId)
+  const perms = usePermissionHelpers()
+  const canRead = perms.hasAtBranch(branchId, "branch.read")
+  const canManage = perms.hasAtBranch(branchId, "branch.manage")
+
+  const { data, isLoading, isError, error, refetch } = useBranch(branchId, {
+    enabled: !perms.isLoading && canRead,
+  })
   const branch = data?.data
 
   const closeBranch = useCloseBranch(branchId)
@@ -205,13 +213,17 @@ export default function BranchDetailsPage() {
     }
   }
 
-  if (isLoading) {
+  if (perms.isLoading || isLoading) {
     return (
       <div className="grid gap-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-64 w-full" />
       </div>
     )
+  }
+
+  if (!canRead) {
+    return <PermissionRestricted resource="this branch" />
   }
 
   if (isError || !branch) {
@@ -252,15 +264,17 @@ export default function BranchDetailsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            render={<Link href={`/branches/${branch.id}/edit`} />}
-            nativeButton={false}
-          >
-            <PencilIcon />
-            Edit
-          </Button>
-          {canClose ? (
+          {canManage ? (
+            <Button
+              variant="outline"
+              render={<Link href={`/branches/${branch.id}/edit`} />}
+              nativeButton={false}
+            >
+              <PencilIcon />
+              Edit
+            </Button>
+          ) : null}
+          {canManage && canClose ? (
             <AlertDialog>
               <AlertDialogTrigger
                 render={
@@ -278,13 +292,15 @@ export default function BranchDetailsPage() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleClose}>Close branch</AlertDialogAction>
+                  <AlertDialogCancel disabled={closeBranch.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClose} disabled={closeBranch.isPending}>
+                    {closeBranch.isPending ? "Closing…" : "Close branch"}
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           ) : null}
-          {canReopen ? (
+          {canManage && canReopen ? (
             <Button onClick={handleReopen} disabled={reopenBranch.isPending}>
               <UnlockIcon />
               {reopenBranch.isPending ? "Reopening…" : "Reopen branch"}
@@ -292,6 +308,14 @@ export default function BranchDetailsPage() {
           ) : null}
         </div>
       </div>
+
+      {branch.status === "temporarily_closed" || branch.status === "permanently_closed" ? (
+        <div className="rounded-xl border border-muted-foreground/20 bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          {branch.status === "temporarily_closed"
+            ? "This branch is temporarily closed. Reopen it when it's ready to accept guests again."
+            : "This branch is permanently closed."}
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -318,7 +342,9 @@ export default function BranchDetailsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Operating hours</CardTitle>
-            <OperatingHoursDialog branchId={branch.id} entries={branch.operatingHours} />
+            {canManage ? (
+              <OperatingHoursDialog branchId={branch.id} entries={branch.operatingHours} />
+            ) : null}
           </CardHeader>
           <CardContent>
             <Table>

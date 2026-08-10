@@ -9,6 +9,7 @@ import { PencilIcon, PlusIcon, StoreIcon, XCircleIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { BranchStatusBadge } from "@/components/branch-status-badge"
+import { PermissionRestricted } from "@/components/permission-restricted"
 import { RestaurantStatusBadge } from "@/components/restaurant-status-badge"
 import {
   AlertDialog,
@@ -51,6 +52,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useBranches } from "@/hooks/use-branches"
+import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { useCreateBranch, useDiscontinueRestaurant, useRestaurant } from "@/hooks/use-restaurants"
 import { ApiError } from "@/lib/api-client"
 import { newIdempotencyKey } from "@/lib/idempotency"
@@ -213,6 +215,10 @@ export default function RestaurantDetailsPage() {
   const router = useRouter()
   const restaurantId = params.restaurantId
 
+  const perms = usePermissionHelpers()
+  const canManageRestaurant = perms.hasTenantWide("restaurant.manage")
+  const canManageBranch = perms.hasTenantWide("branch.manage")
+
   const { data, isLoading, isError, error, refetch } = useRestaurant(restaurantId)
   const restaurant = data?.data
 
@@ -236,13 +242,17 @@ export default function RestaurantDetailsPage() {
     }
   }
 
-  if (isLoading) {
+  if (perms.isLoading || isLoading) {
     return (
       <div className="grid gap-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-64 w-full" />
       </div>
     )
+  }
+
+  if (!perms.hasTenantWide("restaurant.read")) {
+    return <PermissionRestricted resource="this restaurant" />
   }
 
   if (isError || !restaurant) {
@@ -279,15 +289,17 @@ export default function RestaurantDetailsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            render={<Link href={`/restaurants/${restaurant.id}/edit`} />}
-            nativeButton={false}
-          >
-            <PencilIcon />
-            Edit
-          </Button>
-          {restaurant.status === "active" ? (
+          {canManageRestaurant ? (
+            <Button
+              variant="outline"
+              render={<Link href={`/restaurants/${restaurant.id}/edit`} />}
+              nativeButton={false}
+            >
+              <PencilIcon />
+              Edit
+            </Button>
+          ) : null}
+          {canManageRestaurant && restaurant.status === "active" ? (
             <AlertDialog>
               <AlertDialogTrigger
                 render={
@@ -306,9 +318,14 @@ export default function RestaurantDetailsPage() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDiscontinue}>
-                    Discontinue restaurant
+                  <AlertDialogCancel disabled={discontinueRestaurant.isPending}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDiscontinue}
+                    disabled={discontinueRestaurant.isPending}
+                  >
+                    {discontinueRestaurant.isPending ? "Discontinuing…" : "Discontinue restaurant"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -316,6 +333,13 @@ export default function RestaurantDetailsPage() {
           ) : null}
         </div>
       </div>
+
+      {restaurant.status === "discontinued" ? (
+        <div className="rounded-xl border border-muted-foreground/20 bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          This restaurant is discontinued. It no longer accepts new branches, and existing
+          branches remain visible but should be wound down.
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -336,11 +360,27 @@ export default function RestaurantDetailsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Branches</CardTitle>
-          <AddBranchDialog restaurantId={restaurant.id} />
+          {canManageBranch ? <AddBranchDialog restaurantId={restaurant.id} /> : null}
         </CardHeader>
         <CardContent>
           {branchesQuery.isLoading ? (
             <Skeleton className="h-24 w-full" />
+          ) : branchesQuery.isError ? (
+            <div className="grid gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
+              <p className="text-sm text-destructive">
+                {branchesQuery.error instanceof ApiError
+                  ? branchesQuery.error.message
+                  : "Failed to load branches."}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mx-auto"
+                onClick={() => branchesQuery.refetch()}
+              >
+                Retry
+              </Button>
+            </div>
           ) : branches.length === 0 ? (
             <EmptyState
               icon={StoreIcon}

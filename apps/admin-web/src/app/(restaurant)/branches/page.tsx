@@ -5,6 +5,7 @@ import Link from "next/link"
 import { StoreIcon } from "lucide-react"
 
 import { BranchStatusBadge } from "@/components/branch-status-badge"
+import { PermissionRestricted } from "@/components/permission-restricted"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { PageHeader } from "@/components/ui/page-header"
@@ -19,18 +20,23 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useBranches } from "@/hooks/use-branches"
+import { usePermissionHelpers } from "@/hooks/use-permissions"
 
 const PAGE_SIZE = 20
 
 export default function BranchesPage() {
   const [offset, setOffset] = React.useState(0)
-  const { data, isLoading, isError, error, refetch } = useBranches({
-    offset,
-    limit: PAGE_SIZE,
-  })
+  const perms = usePermissionHelpers()
+  const canRead = perms.hasAnywhere("branch.read")
+
+  const { data, isLoading, isError, error, refetch } = useBranches(
+    { offset, limit: PAGE_SIZE },
+    { enabled: !perms.isLoading && canRead }
+  )
 
   const branches = data?.data ?? []
   const meta = data?.meta
+  const loading = perms.isLoading || isLoading
 
   return (
     <div className="grid gap-6">
@@ -39,7 +45,9 @@ export default function BranchesPage() {
         description="Every branch you have access to, across all restaurants."
       />
 
-      {isError ? (
+      {!perms.isLoading && !canRead ? (
+        <PermissionRestricted resource="branches" />
+      ) : isError ? (
         <div className="grid gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
           <p className="text-sm text-destructive">
             {error instanceof Error ? error.message : "Failed to load branches."}
@@ -48,7 +56,7 @@ export default function BranchesPage() {
             Retry
           </Button>
         </div>
-      ) : isLoading ? (
+      ) : loading ? (
         <div className="grid gap-2">
           {Array.from({ length: 5 }).map((_, index) => (
             <Skeleton key={index} className="h-10 w-full" />

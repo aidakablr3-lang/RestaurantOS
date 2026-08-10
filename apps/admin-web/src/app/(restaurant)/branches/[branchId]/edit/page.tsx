@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 
+import { PermissionRestricted } from "@/components/permission-restricted"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -20,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useBranch, useUpdateBranch } from "@/hooks/use-branches"
+import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { ApiError } from "@/lib/api-client"
 import { type BranchFormValues, branchSchema } from "@/lib/schemas/branch"
 
@@ -28,7 +30,10 @@ export default function EditBranchPage() {
   const router = useRouter()
   const branchId = params.branchId
 
-  const { data, isLoading } = useBranch(branchId)
+  const perms = usePermissionHelpers()
+  const canManage = perms.hasAtBranch(branchId, "branch.manage")
+
+  const { data, isLoading, isError, error, refetch } = useBranch(branchId)
   const branch = data?.data
   const updateBranch = useUpdateBranch(branchId)
 
@@ -71,11 +76,38 @@ export default function EditBranchPage() {
     }
   }
 
-  if (isLoading) {
+  if (perms.isLoading || isLoading) {
     return (
       <div className="grid gap-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-64 w-full max-w-lg" />
+      </div>
+    )
+  }
+
+  if (!canManage) {
+    return (
+      <div className="grid gap-6">
+        <h1 className="text-xl font-semibold">Edit branch</h1>
+        <PermissionRestricted resource="branch editing" />
+      </div>
+    )
+  }
+
+  if (isError || !branch) {
+    return (
+      <div className="grid gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+        <p className="text-sm text-destructive">
+          {error instanceof ApiError ? error.message : "Failed to load this branch."}
+        </p>
+        <div className="mx-auto flex gap-2">
+          <Button variant="outline" onClick={() => refetch()}>
+            Retry
+          </Button>
+          <Button variant="ghost" onClick={() => router.push("/branches")}>
+            Back to branches
+          </Button>
+        </div>
       </div>
     )
   }
@@ -89,7 +121,7 @@ export default function EditBranchPage() {
           </Link>{" "}
           /{" "}
           <Link href={`/branches/${branchId}`} className="hover:underline">
-            {branch?.name ?? branchId}
+            {branch.name}
           </Link>{" "}
           / Edit
         </p>
