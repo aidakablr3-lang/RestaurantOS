@@ -4,10 +4,10 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   CalendarClockIcon,
+  LayersIcon,
   LayoutDashboardIcon,
   MenuIcon,
   StoreIcon,
-  UtensilsCrossedIcon,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -50,7 +50,12 @@ const NAV_ITEMS: NavItem[] = [
     isVisible: (perms) => perms.hasAnywhere("branch.read"),
   },
   { label: "Reservations", href: "/reservations", icon: CalendarClockIcon, comingSoon: true },
-  { label: "Menu", href: "/menu", icon: UtensilsCrossedIcon, comingSoon: true },
+  {
+    label: "Modifiers",
+    href: "/modifier-groups",
+    icon: LayersIcon,
+    isVisible: (perms) => perms.hasTenantWide("menu.read"),
+  },
 ]
 
 function useVisibleNavItems() {
