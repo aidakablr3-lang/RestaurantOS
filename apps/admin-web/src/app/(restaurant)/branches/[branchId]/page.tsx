@@ -7,6 +7,7 @@ import { ClockIcon, LockIcon, PencilIcon, UnlockIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { BranchStatusBadge } from "@/components/branch-status-badge"
+import { BranchSubNav } from "@/components/branch-sub-nav"
 import { PermissionRestricted } from "@/components/permission-restricted"
 import {
   AlertDialog,
@@ -308,6 +309,8 @@ export default function BranchDetailsPage() {
           ) : null}
         </div>
       </div>
+
+      <BranchSubNav branchId={branch.id} />
 
       {branch.status === "temporarily_closed" || branch.status === "permanently_closed" ? (
         <div className="rounded-xl border border-muted-foreground/20 bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
