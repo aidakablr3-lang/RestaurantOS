@@ -47,6 +47,8 @@ export default function DashboardPage() {
   const canReadRestaurants = perms.hasTenantWide("restaurant.read")
   const canReadBranches = perms.hasAnywhere("branch.read")
   const canManageRestaurants = perms.hasTenantWide("restaurant.manage")
+  const canReadReservations = perms.hasAnywhere("reservation.read")
+  const canReadMenu = perms.hasTenantWide("menu.read")
 
   const restaurants = useRestaurants(
     { offset: 0, limit: 1 },
@@ -132,24 +134,40 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             ) : null}
-            <Card className="opacity-60">
-              <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                <CalendarClockIcon className="size-4 text-muted-foreground" />
-                <CardTitle className="text-sm font-medium">Reservations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Coming soon.</p>
-              </CardContent>
-            </Card>
-            <Card className="opacity-60">
-              <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                <UtensilsCrossedIcon className="size-4 text-muted-foreground" />
-                <CardTitle className="text-sm font-medium">Menu</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Coming soon.</p>
-              </CardContent>
-            </Card>
+            {canReadReservations ? (
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                  <CalendarClockIcon className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Reservations</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Reservations are managed per branch -- open a branch to view or update its
+                    list.
+                  </p>
+                  <Button size="sm" variant="outline" render={<Link href="/branches" />} nativeButton={false}>
+                    Go to branches
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+            {canReadMenu ? (
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                  <UtensilsCrossedIcon className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Menu</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Menu categories and items are managed per restaurant -- open a restaurant to
+                    view or edit its menu.
+                  </p>
+                  <Button size="sm" variant="outline" render={<Link href="/restaurants" />} nativeButton={false}>
+                    Go to restaurants
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
         </>
       )}
