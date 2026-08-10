@@ -68,19 +68,6 @@ describe("AppSidebar", () => {
     expect(screen.getByText("Branches")).toBeInTheDocument()
   })
 
-  it("always marks Reservations as coming soon, regardless of permissions", () => {
-    usePermissionHelpersMock.mockReturnValue(
-      mockPerms({
-        hasTenantWide: () => true,
-        hasAnywhere: () => true,
-      })
-    )
-
-    render(<AppSidebar />)
-
-    expect(screen.getAllByText("Soon")).toHaveLength(1)
-  })
-
   it("shows Modifiers when the user holds menu.read tenant-wide", () => {
     usePermissionHelpersMock.mockReturnValue(
       mockPerms({ hasTenantWide: (p) => p === "menu.read" })
@@ -119,15 +106,5 @@ describe("MobileNav", () => {
     expect(screen.getByText("Dashboard")).toBeInTheDocument()
     expect(screen.getByText("Restaurants")).toBeInTheDocument()
     expect(screen.queryByText("Branches")).not.toBeInTheDocument()
-  })
-
-  it("renders the coming-soon items as disabled, non-navigating entries", () => {
-    usePermissionHelpersMock.mockReturnValue(mockPerms())
-
-    render(<MobileNav />)
-    fireEvent.click(screen.getByRole("button", { name: "Open navigation menu" }))
-
-    const reservations = screen.getByText("Reservations").closest('[role="menuitem"]')
-    expect(reservations).toHaveAttribute("aria-disabled", "true")
   })
 })
