@@ -13,6 +13,14 @@ attacker enumerate valid tenant/account identifiers by status code alone.
 This mirrors InvalidCredentialsError's own documented rationale. Fully
 timing-safe enumeration resistance across every one of these paths is
 tracked as a follow-up hardening item, not claimed as complete here.
+
+Validation-error note: without an explicit ``RequestValidationError``
+handler here, FastAPI's own built-in one wins (it's registered before
+``create_app()`` ever runs) and returns its raw ``{"detail": [...]}``
+body -- the one response shape in this entire API that didn't match
+the shared ``{success, data|error}`` envelope every other route uses.
+Found during a pre-frontend release audit; closed below so a frontend
+client never needs a second error-parsing path for one status code.
 """
 
 from __future__ import annotations
@@ -21,6 +29,7 @@ import logging
 from typing import Any, Protocol
 
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from restaurant_os_api.core.response import ApiErrorDetail, ApiErrorResponse
@@ -101,6 +110,20 @@ _STATUS_BY_ERROR_CODE: dict[str, int] = {
 _DEFAULT_STATUS = status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
+def _format_validation_message(exc: RequestValidationError) -> str:
+    """Collapses Pydantic's own list-of-error-objects shape into one
+    human-readable string -- the envelope's ``message`` field is a
+    plain string everywhere else in this API, and inventing a second,
+    structured error shape just for this one status code would be a
+    bigger contract change than the actual problem (a raw, differently
+    shaped ``{"detail": [...]}`` body) calls for."""
+    parts = []
+    for error in exc.errors():
+        location = ".".join(str(segment) for segment in error["loc"])
+        parts.append(f"{location}: {error['msg']}")
+    return "; ".join(parts) if parts else "Request validation failed."
+
+
 def build_error_response(exc: _DomainErrorLike) -> tuple[int, dict[str, Any]]:
     """Shapes a known domain exception into ``(http_status,
     response_body)`` -- the exact pair ``IdempotencyGuard.run()``'s
@@ -133,6 +156,18 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def handle_idempotency_error(request: Request, exc: IdempotencyError) -> JSONResponse:
         http_status, body = build_error_response(exc)
         return JSONResponse(status_code=http_status, content=body)
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_request_validation_error(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        envelope = ApiErrorResponse(
+            error=ApiErrorDetail(code="VALIDATION_ERROR", message=_format_validation_message(exc))
+        )
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=envelope.model_dump(by_alias=True),
+        )
 
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
