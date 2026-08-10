@@ -34,6 +34,7 @@ from fastapi.responses import JSONResponse
 
 from restaurant_os_api.core.response import ApiErrorDetail, ApiErrorResponse
 from restaurant_os_api.modules.identity.domain.exceptions import IdentityDomainError
+from restaurant_os_api.modules.operations.domain.exceptions import OperationsDomainError
 from restaurant_os_api.modules.restaurant.domain.exceptions import RestaurantDomainError
 from restaurant_os_api.platform.idempotency.exceptions import IdempotencyError
 
@@ -105,6 +106,19 @@ _STATUS_BY_ERROR_CODE: dict[str, int] = {
     "EFFECTIVE_WINDOW_OVERLAP": status.HTTP_409_CONFLICT,
     # Reservation (Sprint 5, Step 4.11) additions:
     "RESERVATION_NOT_FOUND": status.HTTP_404_NOT_FOUND,
+    # Operations module, Order + Kitchen slice (Sprint 7, Step 3) additions:
+    "ORDER_NOT_FOUND": status.HTTP_404_NOT_FOUND,
+    "INVALID_ORDER_STATUS_TRANSITION": status.HTTP_409_CONFLICT,
+    "ORDER_HAS_NO_ITEMS": status.HTTP_409_CONFLICT,
+    "ORDER_ITEM_NOT_FOUND": status.HTTP_404_NOT_FOUND,
+    "INVALID_ORDER_ITEM_STATUS_TRANSITION": status.HTTP_409_CONFLICT,
+    "MENU_ITEM_NOT_AVAILABLE": status.HTTP_409_CONFLICT,
+    "TAB_NOT_FOUND": status.HTTP_404_NOT_FOUND,
+    "INVALID_TAB_STATUS_TRANSITION": status.HTTP_409_CONFLICT,
+    "KITCHEN_TICKET_NOT_FOUND": status.HTTP_404_NOT_FOUND,
+    "INVALID_KITCHEN_TICKET_STATUS_TRANSITION": status.HTTP_409_CONFLICT,
+    "KITCHEN_ITEM_NOT_FOUND": status.HTTP_404_NOT_FOUND,
+    "INVALID_KITCHEN_ITEM_STATUS_TRANSITION": status.HTTP_409_CONFLICT,
 }
 
 _DEFAULT_STATUS = status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -148,6 +162,13 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(RestaurantDomainError)
     async def handle_restaurant_domain_error(
         request: Request, exc: RestaurantDomainError
+    ) -> JSONResponse:
+        http_status, body = build_error_response(exc)
+        return JSONResponse(status_code=http_status, content=body)
+
+    @app.exception_handler(OperationsDomainError)
+    async def handle_operations_domain_error(
+        request: Request, exc: OperationsDomainError
     ) -> JSONResponse:
         http_status, body = build_error_response(exc)
         return JSONResponse(status_code=http_status, content=body)
