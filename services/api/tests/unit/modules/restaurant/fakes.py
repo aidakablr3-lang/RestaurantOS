@@ -22,6 +22,7 @@ from restaurant_os_api.modules.restaurant.domain.entities import (
     ModifierGroup,
     OperatingHours,
     QRCode,
+    Reservation,
     Restaurant,
     Table,
     TableZone,
@@ -491,6 +492,36 @@ class InMemoryQRCodeRepository:
         ]
         visible.sort(key=lambda c: c.created_at, reverse=True)
         return visible
+
+
+class InMemoryReservationRepository:
+    def __init__(self, reservations: dict[str, Reservation] | None = None) -> None:
+        self._reservations = reservations or {}
+
+    async def get_by_id(self, tenant_id: str, reservation_id: str) -> Reservation | None:
+        reservation = self._reservations.get(reservation_id)
+        if reservation is None or reservation.tenant_id != tenant_id:
+            return None
+        return reservation
+
+    async def create(self, reservation: Reservation) -> Reservation:
+        self._reservations[reservation.id] = reservation
+        return reservation
+
+    async def update(self, reservation: Reservation) -> Reservation:
+        self._reservations[reservation.id] = reservation
+        return reservation
+
+    async def list_for_branch(
+        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+    ) -> tuple[list[Reservation], int]:
+        visible = [
+            r
+            for r in self._reservations.values()
+            if r.tenant_id == tenant_id and r.branch_id == branch_id
+        ]
+        visible.sort(key=lambda r: r.requested_at)
+        return visible[offset : offset + limit], len(visible)
 
 
 @dataclass
