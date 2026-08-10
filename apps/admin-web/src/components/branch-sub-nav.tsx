@@ -23,6 +23,7 @@ export function BranchSubNav({ branchId }: BranchSubNavProps) {
     { label: "Overview", href: `/branches/${branchId}` },
     { label: "Dining areas", href: `/branches/${branchId}/dining-areas` },
     { label: "Tables", href: `/branches/${branchId}/tables` },
+    { label: "Reservations", href: `/branches/${branchId}/reservations` },
   ]
 
   return (

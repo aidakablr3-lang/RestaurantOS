@@ -2,13 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  CalendarClockIcon,
-  LayersIcon,
-  LayoutDashboardIcon,
-  MenuIcon,
-  StoreIcon,
-} from "lucide-react"
+import { LayersIcon, LayoutDashboardIcon, MenuIcon, StoreIcon } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -49,7 +43,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: StoreIcon,
     isVisible: (perms) => perms.hasAnywhere("branch.read"),
   },
-  { label: "Reservations", href: "/reservations", icon: CalendarClockIcon, comingSoon: true },
   {
     label: "Modifiers",
     href: "/modifier-groups",
