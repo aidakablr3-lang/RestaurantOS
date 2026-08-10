@@ -5,12 +5,22 @@ import { usePathname } from "next/navigation"
 import {
   CalendarClockIcon,
   LayoutDashboardIcon,
+  MenuIcon,
   StoreIcon,
   UtensilsCrossedIcon,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLinkItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { cn } from "@/lib/utils"
 
 interface NavItem {
@@ -18,18 +28,39 @@ interface NavItem {
   href: string
   icon: LucideIcon
   comingSoon?: boolean
+  // UI visibility only -- hides a link the caller has no permission to act
+  // on. The page itself (and, underneath that, the backend) is still the
+  // real gate; a direct URL visit is handled by each page's own
+  // usePermissionHelpers() check, not by this link being hidden.
+  isVisible?: (perms: ReturnType<typeof usePermissionHelpers>) => boolean
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
-  { label: "Restaurants", href: "/restaurants", icon: StoreIcon },
-  { label: "Branches", href: "/branches", icon: StoreIcon },
+  {
+    label: "Restaurants",
+    href: "/restaurants",
+    icon: StoreIcon,
+    isVisible: (perms) => perms.hasTenantWide("restaurant.read"),
+  },
+  {
+    label: "Branches",
+    href: "/branches",
+    icon: StoreIcon,
+    isVisible: (perms) => perms.hasAnywhere("branch.read"),
+  },
   { label: "Reservations", href: "/reservations", icon: CalendarClockIcon, comingSoon: true },
   { label: "Menu", href: "/menu", icon: UtensilsCrossedIcon, comingSoon: true },
 ]
 
+function useVisibleNavItems() {
+  const perms = usePermissionHelpers()
+  return NAV_ITEMS.filter((item) => perms.isLoading || !item.isVisible || item.isVisible(perms))
+}
+
 export function AppSidebar() {
   const pathname = usePathname()
+  const items = useVisibleNavItems()
 
   return (
     <aside className="hidden w-56 shrink-0 border-r bg-sidebar text-sidebar-foreground md:flex md:flex-col">
@@ -39,7 +70,7 @@ export function AppSidebar() {
         </Link>
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 p-2">
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
           const Icon = item.icon
 
@@ -75,5 +106,48 @@ export function AppSidebar() {
         })}
       </nav>
     </aside>
+  )
+}
+
+// The sidebar is hidden below the `md` breakpoint (`AppSidebar`'s own
+// `hidden md:flex`) -- without this, a phone-width user would have no way
+// to navigate between Dashboard/Restaurants/Branches at all once past the
+// first page. Reuses the same permission-filtered item list and the
+// existing DropdownMenu primitive rather than a new mobile-nav mechanism.
+export function MobileNav() {
+  const items = useVisibleNavItems()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon" aria-label="Open navigation menu" className="md:hidden">
+            <MenuIcon />
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="start">
+        {items.map((item) => {
+          const Icon = item.icon
+          if (item.comingSoon) {
+            return (
+              <DropdownMenuItem key={item.href} disabled>
+                <Icon />
+                {item.label}
+                <Badge variant="outline" className="ml-auto text-[10px] text-muted-foreground">
+                  Soon
+                </Badge>
+              </DropdownMenuItem>
+            )
+          }
+          return (
+            <DropdownMenuLinkItem key={item.href} render={<Link href={item.href} />}>
+              <Icon />
+              {item.label}
+            </DropdownMenuLinkItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

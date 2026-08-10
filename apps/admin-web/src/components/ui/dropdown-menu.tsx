@@ -62,6 +62,23 @@ function DropdownMenuItem({
   )
 }
 
+// Same visual treatment as DropdownMenuItem, but backed by Base UI's
+// dedicated LinkItem (renders an <a>, closeOnClick defaults false) --
+// pair with `render={<Link href="..." />}` for Next.js client routing,
+// the same pattern every Button-as-link in this app already uses.
+function DropdownMenuLinkItem({ className, ...props }: MenuPrimitive.LinkItem.Props) {
+  return (
+    <MenuPrimitive.LinkItem
+      data-slot="dropdown-menu-link-item"
+      className={cn(
+        "relative flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none select-none data-highlighted:bg-muted data-highlighted:text-foreground [&_svg]:size-4 [&_svg]:shrink-0",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
 function DropdownMenuCheckboxItem({
   className,
   children,
@@ -145,6 +162,7 @@ export {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuLinkItem,
   DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuSub,

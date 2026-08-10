@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { LogOutIcon } from "lucide-react"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppSidebar, MobileNav } from "@/components/app-sidebar"
 import { AuthGuard } from "@/components/auth-guard"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -56,7 +56,8 @@ export default function RestaurantAppLayout({
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-14 items-center justify-between border-b px-4 sm:px-6">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <MobileNav />
               {tenantId && (
                 <p className="truncate text-xs text-muted-foreground">
                   Tenant <span className="font-mono">{tenantId}</span>

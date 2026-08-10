@@ -23,10 +23,11 @@ export const restaurantKeys = {
   detail: (id: string) => [...restaurantKeys.details(), id] as const,
 }
 
-export function useRestaurants(params: ListRestaurantsParams) {
+export function useRestaurants(params: ListRestaurantsParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: restaurantKeys.list(params),
     queryFn: () => listRestaurants(params),
+    enabled: options?.enabled,
   })
 }
 

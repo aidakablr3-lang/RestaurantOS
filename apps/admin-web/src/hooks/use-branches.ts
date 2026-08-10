@@ -22,18 +22,19 @@ export const branchKeys = {
   detail: (id: string) => [...branchKeys.details(), id] as const,
 }
 
-export function useBranches(params: ListBranchesParams) {
+export function useBranches(params: ListBranchesParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: branchKeys.list(params),
     queryFn: () => listBranches(params),
+    enabled: options?.enabled,
   })
 }
 
-export function useBranch(branchId: string | undefined) {
+export function useBranch(branchId: string | undefined, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: branchKeys.detail(branchId ?? ""),
     queryFn: () => getBranch(branchId as string),
-    enabled: Boolean(branchId),
+    enabled: Boolean(branchId) && (options?.enabled ?? true),
   })
 }
 
