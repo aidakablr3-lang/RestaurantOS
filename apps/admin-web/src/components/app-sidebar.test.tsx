@@ -68,7 +68,7 @@ describe("AppSidebar", () => {
     expect(screen.getByText("Branches")).toBeInTheDocument()
   })
 
-  it("always marks Reservations and Menu as coming soon, regardless of permissions", () => {
+  it("always marks Reservations as coming soon, regardless of permissions", () => {
     usePermissionHelpersMock.mockReturnValue(
       mockPerms({
         hasTenantWide: () => true,
@@ -78,7 +78,25 @@ describe("AppSidebar", () => {
 
     render(<AppSidebar />)
 
-    expect(screen.getAllByText("Soon")).toHaveLength(2)
+    expect(screen.getAllByText("Soon")).toHaveLength(1)
+  })
+
+  it("shows Modifiers when the user holds menu.read tenant-wide", () => {
+    usePermissionHelpersMock.mockReturnValue(
+      mockPerms({ hasTenantWide: (p) => p === "menu.read" })
+    )
+
+    render(<AppSidebar />)
+
+    expect(screen.getByText("Modifiers")).toBeInTheDocument()
+  })
+
+  it("hides Modifiers when the user lacks menu.read", () => {
+    usePermissionHelpersMock.mockReturnValue(mockPerms())
+
+    render(<AppSidebar />)
+
+    expect(screen.queryByText("Modifiers")).not.toBeInTheDocument()
   })
 })
 
