@@ -103,6 +103,10 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "reservation.read",
                 "reservation.manage",
                 "roles.assign",
+                "order.read",
+                "order.manage",
+                "kitchen.read",
+                "kitchen.manage",
             }
         ),
     ),
@@ -126,12 +130,19 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "menu.manage",
                 "reservation.read",
                 "reservation.manage",
+                "order.read",
+                "order.manage",
+                "kitchen.read",
+                "kitchen.manage",
             }
         ),
     ),
     (
         "Branch Manager",
-        "Manages one branch's tables and reservations; reads (does not edit) the menu.",
+        (
+            "Manages one branch's tables, reservations, orders, and kitchen tickets; "
+            "reads (does not edit) the menu."
+        ),
         RoleScope.BRANCH,
         frozenset(
             {
@@ -141,26 +152,30 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "menu.read",
                 "reservation.read",
                 "reservation.manage",
+                "order.read",
+                "order.manage",
+                "kitchen.read",
+                "kitchen.manage",
             }
         ),
     ),
     (
         "Waiter",
-        "Reads tables and the menu; manages reservations.",
+        "Reads tables and the menu; manages reservations and orders.",
         RoleScope.BRANCH,
-        frozenset({"table.read", "menu.read", "reservation.manage"}),
+        frozenset({"table.read", "menu.read", "reservation.manage", "order.read", "order.manage"}),
     ),
     (
         "Cashier",
-        "Reads tables and the menu.",
+        "Reads tables and the menu; takes and manages orders.",
         RoleScope.BRANCH,
-        frozenset({"table.read", "menu.read"}),
+        frozenset({"table.read", "menu.read", "order.read", "order.manage"}),
     ),
     (
         "Kitchen Staff",
-        "Reads the menu (availability/86-status).",
+        "Reads the menu (availability/86-status); reads and updates kitchen tickets.",
         RoleScope.BRANCH,
-        frozenset({"menu.read"}),
+        frozenset({"menu.read", "kitchen.read", "kitchen.manage"}),
     ),
     (
         "Bartender",
