@@ -51,6 +51,12 @@ from restaurant_os_api.modules.restaurant.application.dto.qr_code_dto import QRC
 from restaurant_os_api.modules.restaurant.application.dto.qr_resolution_dto import (
     QRCodeResolutionDTO,
 )
+from restaurant_os_api.modules.restaurant.application.dto.reservation_dto import (
+    CreateReservationRequestDTO,
+    ReservationDTO,
+    ReservationListResultDTO,
+    UpdateReservationRequestDTO,
+)
 from restaurant_os_api.modules.restaurant.application.dto.restaurant_dto import (
     CreateRestaurantRequestDTO,
     RestaurantDTO,
@@ -85,6 +91,7 @@ __all__ = [
     "CreateMenuItemRequestDTO",
     "CreateModifierGroupRequestDTO",
     "CreateModifierRequestDTO",
+    "CreateReservationRequestDTO",
     "CreateRestaurantRequestDTO",
     "CreateTableRequestDTO",
     "CreateTableZoneRequestDTO",
@@ -104,6 +111,8 @@ __all__ = [
     "QRCodeResolutionDTO",
     "ReplaceMenuItemModifierGroupsRequestDTO",
     "ReplaceOperatingHoursRequestDTO",
+    "ReservationDTO",
+    "ReservationListResultDTO",
     "RestaurantDTO",
     "RestaurantListResultDTO",
     "TableDTO",
@@ -115,6 +124,7 @@ __all__ = [
     "UpdateMenuItemRequestDTO",
     "UpdateModifierGroupRequestDTO",
     "UpdateModifierRequestDTO",
+    "UpdateReservationRequestDTO",
     "UpdateRestaurantRequestDTO",
     "UpdateTableRequestDTO",
     "UpdateTableZoneRequestDTO",

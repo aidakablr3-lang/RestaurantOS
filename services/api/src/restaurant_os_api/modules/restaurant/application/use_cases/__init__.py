@@ -28,6 +28,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.create_modifier_
 from restaurant_os_api.modules.restaurant.application.use_cases.create_qr_code import (
     CreateQRCodeUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.create_reservation import (
+    CreateReservationUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.create_restaurant import (
     CreateRestaurantUseCase,
 )
@@ -54,6 +57,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.get_modifier imp
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.get_modifier_group import (
     GetModifierGroupUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.get_reservation import (
+    GetReservationUseCase,
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.get_restaurant import (
     GetRestaurantUseCase,
@@ -87,6 +93,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.list_modifiers i
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.list_qr_codes import (
     ListQRCodesUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.list_reservations import (
+    ListReservationsUseCase,
 )
 from restaurant_os_api.modules.restaurant.application.use_cases.list_restaurants import (
     ListRestaurantsUseCase,
@@ -124,6 +133,9 @@ from restaurant_os_api.modules.restaurant.application.use_cases.update_modifier 
 from restaurant_os_api.modules.restaurant.application.use_cases.update_modifier_group import (
     UpdateModifierGroupUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.update_reservation import (
+    UpdateReservationUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.update_restaurant import (
     UpdateRestaurantUseCase,
 )
@@ -145,6 +157,7 @@ __all__ = [
     "CreateModifierGroupUseCase",
     "CreateModifierUseCase",
     "CreateQRCodeUseCase",
+    "CreateReservationUseCase",
     "CreateRestaurantUseCase",
     "CreateTableUseCase",
     "CreateTableZoneUseCase",
@@ -154,6 +167,7 @@ __all__ = [
     "GetMenuItemUseCase",
     "GetModifierGroupUseCase",
     "GetModifierUseCase",
+    "GetReservationUseCase",
     "GetRestaurantUseCase",
     "GetTableUseCase",
     "GetTableZoneUseCase",
@@ -165,6 +179,7 @@ __all__ = [
     "ListModifierGroupsUseCase",
     "ListModifiersUseCase",
     "ListQRCodesUseCase",
+    "ListReservationsUseCase",
     "ListRestaurantsUseCase",
     "ListTableZonesUseCase",
     "ListTablesUseCase",
@@ -177,6 +192,7 @@ __all__ = [
     "UpdateMenuItemUseCase",
     "UpdateModifierGroupUseCase",
     "UpdateModifierUseCase",
+    "UpdateReservationUseCase",
     "UpdateRestaurantUseCase",
     "UpdateTableUseCase",
     "UpdateTableZoneUseCase",

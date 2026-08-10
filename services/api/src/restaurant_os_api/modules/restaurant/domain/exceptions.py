@@ -137,6 +137,14 @@ class TableNotFoundError(RestaurantDomainError):
         self.table_id = table_id
 
 
+class ReservationNotFoundError(RestaurantDomainError):
+    error_code = "RESERVATION_NOT_FOUND"
+
+    def __init__(self, reservation_id: str) -> None:
+        super().__init__(f"Reservation '{reservation_id}' does not exist.")
+        self.reservation_id = reservation_id
+
+
 class TableNumberConflictError(RestaurantDomainError):
     """Mirrors the DB's own ``UNIQUE (branch_id, table_number)`` constraint
     (Restaurant Platform Architecture SS3.1's ``Table`` entry), checked
