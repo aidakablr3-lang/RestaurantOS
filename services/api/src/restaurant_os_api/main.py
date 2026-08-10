@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 
 from restaurant_os_api.core.config import get_settings
 from restaurant_os_api.core.exceptions import register_exception_handlers
@@ -57,9 +58,46 @@ from restaurant_os_api.modules.restaurant.presentation.api.v1.table_zone_router 
     router as table_zone_router,
 )
 
+# Every route in this API is Bearer-token-gated except these four --
+# the three auth routes (which hand out or invalidate the token itself,
+# so requiring one to call them would be circular) and the one
+# deliberately unauthenticated QR guest-resolution route (ADR 0001).
+# Auth is a raw ``Authorization`` header dependency (``require_authenticated_user``),
+# not ``fastapi.security``'s ``HTTPBearer``, so FastAPI never auto-populates
+# ``security`` in the OpenAPI schema on its own -- without this, the schema
+# didn't document which routes need a token at all (found in a pre-frontend
+# release audit). This only edits the generated schema, never runtime
+# request handling, so it carries zero behavior-change risk.
+_UNAUTHENTICATED_OPERATIONS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("/api/v1/auth/login", "post"),
+        ("/api/v1/auth/refresh", "post"),
+        ("/api/v1/auth/logout", "post"),
+        ("/api/v1/qr/{token}", "get"),
+    }
+)
+
 
 def create_app() -> FastAPI:
     app = FastAPI(title="RestaurantOS API", version="0.1.0")
+
+    def custom_openapi() -> dict[str, object]:
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+        schema.setdefault("components", {})["securitySchemes"] = {
+            "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+        }
+        for path, operations in schema.get("paths", {}).items():
+            for method, operation in operations.items():
+                if method not in ("get", "post", "put", "patch", "delete"):
+                    continue
+                is_public = (path, method) in _UNAUTHENTICATED_OPERATIONS
+                operation["security"] = [] if is_public else [{"BearerAuth": []}]
+        app.openapi_schema = schema
+        return app.openapi_schema
+
+    app.openapi = custom_openapi  # type: ignore[method-assign]
 
     # Every client (admin-web, customer-ordering, kitchen-display) is a
     # browser app calling this API cross-origin. Auth is Bearer-token-based
