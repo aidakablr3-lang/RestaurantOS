@@ -162,7 +162,8 @@ class TestPermissionRepository:
         codes = {p.code for p in permissions}
         assert SEEDED_PERMISSION_CODE in codes
         assert "roles.assign" in codes
-        assert len(permissions) == 11
+        # 11 from 0003 + 12 from 0007 (Sprint 7 Step 2, Operations module).
+        assert len(permissions) == 23
 
     async def test_get_by_code_returns_none_for_unknown_code(self, session_factory) -> None:
         async with UnitOfWork(session_factory) as uow:

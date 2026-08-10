@@ -131,4 +131,6 @@ class TestOpenApiSecurityScheme:
                         f"{method.upper()} {path} has unexpected security: "
                         f"{operation.get('security')!r}"
                     )
-        assert checked == 73
+        # Sprint 7 Step 3 (Order + Kitchen) added 12 operations: 7 on
+        # order_router, 2 on tab_router, 3 on kitchen_router.
+        assert checked == 85
