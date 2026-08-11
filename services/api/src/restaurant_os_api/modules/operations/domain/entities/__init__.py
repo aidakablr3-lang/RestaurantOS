@@ -8,6 +8,10 @@ from restaurant_os_api.modules.operations.domain.entities.cash_drawer import (
     CashDrawerStatus,
 )
 from restaurant_os_api.modules.operations.domain.entities.discount import Discount, DiscountType
+from restaurant_os_api.modules.operations.domain.entities.inventory_category import (
+    InventoryCategory,
+)
+from restaurant_os_api.modules.operations.domain.entities.inventory_item import InventoryItem
 from restaurant_os_api.modules.operations.domain.entities.kitchen_item import (
     KitchenItem,
     KitchenItemStatus,
@@ -36,7 +40,16 @@ from restaurant_os_api.modules.operations.domain.entities.payment import (
     PaymentStatus,
     TenderType,
 )
+from restaurant_os_api.modules.operations.domain.entities.recipe import Recipe
+from restaurant_os_api.modules.operations.domain.entities.recipe_ingredient import (
+    RecipeIngredient,
+)
 from restaurant_os_api.modules.operations.domain.entities.refund import Refund, RefundStatus
+from restaurant_os_api.modules.operations.domain.entities.stock_adjustment import StockAdjustment
+from restaurant_os_api.modules.operations.domain.entities.stock_movement import (
+    StockMovement,
+    StockMovementType,
+)
 from restaurant_os_api.modules.operations.domain.entities.tab import Tab, TabStatus
 from restaurant_os_api.modules.operations.domain.entities.tax import Tax
 
@@ -50,6 +63,8 @@ __all__ = [
     "CashDrawerStatus",
     "Discount",
     "DiscountType",
+    "InventoryCategory",
+    "InventoryItem",
     "KitchenItem",
     "KitchenItemStatus",
     "KitchenTicket",
@@ -64,8 +79,13 @@ __all__ = [
     "OrderTaxLine",
     "Payment",
     "PaymentStatus",
+    "Recipe",
+    "RecipeIngredient",
     "Refund",
     "RefundStatus",
+    "StockAdjustment",
+    "StockMovement",
+    "StockMovementType",
     "Tab",
     "TabStatus",
     "Tax",

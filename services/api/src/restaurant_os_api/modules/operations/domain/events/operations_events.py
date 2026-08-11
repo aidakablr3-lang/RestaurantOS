@@ -131,6 +131,38 @@ class PaymentSettled:
 
 
 @dataclass(frozen=True, slots=True)
+class LowStockDetected:
+    """Architecture doc SS11: published when a ``StockMovement`` insert
+    crosses ``InventoryItem.reorder_point`` going downward -- the event
+    a future menu-availability/86-list cache-invalidation consumer
+    subscribes to. Only fires on the crossing itself (previous quantity
+    above the point, resulting quantity at or below it), not on every
+    movement that merely leaves the item already-low."""
+
+    inventory_item_id: str
+    branch_id: str
+    quantity_on_hand: str
+    reorder_point: str
+    occurred_at: datetime
+
+    event_type: ClassVar[str] = "LowStockDetected"
+    aggregate_type: ClassVar[str] = "inventory_item"
+
+    @property
+    def aggregate_id(self) -> str:
+        return self.inventory_item_id
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "inventoryItemId": self.inventory_item_id,
+            "branchId": self.branch_id,
+            "quantityOnHand": self.quantity_on_hand,
+            "reorderPoint": self.reorder_point,
+            "occurredAt": self.occurred_at.isoformat(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class RefundProcessed:
     refund_id: str
     payment_id: str

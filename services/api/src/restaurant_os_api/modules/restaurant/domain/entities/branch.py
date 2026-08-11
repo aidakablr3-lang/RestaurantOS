@@ -34,6 +34,10 @@ class Branch:
     status: BranchStatus
     created_at: datetime
     address_id: str | None = None
+    # Added by migration 0007 (Sprint 7 Step 2) for the operations
+    # module's negative-inventory trigger. No route in this module sets
+    # it yet -- read-only from the restaurant module's own perspective.
+    allow_negative_stock: bool = False
 
     def activate(self) -> None:
         """Initial activation, following the branch's own setup flow --

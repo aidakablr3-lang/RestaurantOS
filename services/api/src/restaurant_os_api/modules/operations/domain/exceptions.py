@@ -300,3 +300,87 @@ class CashDrawerAlreadyOpenError(OperationsDomainError):
     def __init__(self, branch_id: str) -> None:
         super().__init__(f"Branch '{branch_id}' already has an open cash drawer.")
         self.branch_id = branch_id
+
+
+# --- Inventory + Recipe (Sprint 7 Step 5) ---------------------------------
+
+
+class RecipeNotFoundError(OperationsDomainError):
+    error_code = "RECIPE_NOT_FOUND"
+
+    def __init__(self, recipe_id: str) -> None:
+        super().__init__(f"Recipe '{recipe_id}' does not exist.")
+        self.recipe_id = recipe_id
+
+
+class InventoryCategoryNotFoundError(OperationsDomainError):
+    error_code = "INVENTORY_CATEGORY_NOT_FOUND"
+
+    def __init__(self, inventory_category_id: str) -> None:
+        super().__init__(f"InventoryCategory '{inventory_category_id}' does not exist.")
+        self.inventory_category_id = inventory_category_id
+
+
+class InventoryCategoryNameConflictError(OperationsDomainError):
+    """Mirrors the DB's own ``UNIQUE (tenant_id, name)`` constraint,
+    checked proactively the same way ``MenuCategoryNameConflictError``
+    checks its own uniqueness constraint."""
+
+    error_code = "INVENTORY_CATEGORY_NAME_CONFLICT"
+
+    def __init__(self, name: str) -> None:
+        super().__init__(f"An InventoryCategory named '{name}' already exists.")
+        self.name = name
+
+
+class InventoryItemNotFoundError(OperationsDomainError):
+    error_code = "INVENTORY_ITEM_NOT_FOUND"
+
+    def __init__(self, inventory_item_id: str) -> None:
+        super().__init__(f"InventoryItem '{inventory_item_id}' does not exist.")
+        self.inventory_item_id = inventory_item_id
+
+
+class InventoryItemNameConflictError(OperationsDomainError):
+    """Mirrors the DB's own ``UNIQUE (branch_id, name)`` constraint."""
+
+    error_code = "INVENTORY_ITEM_NAME_CONFLICT"
+
+    def __init__(self, branch_id: str, name: str) -> None:
+        super().__init__(f"Branch '{branch_id}' already has an InventoryItem named '{name}'.")
+        self.branch_id = branch_id
+        self.name = name
+
+
+class InsufficientStockError(OperationsDomainError):
+    """Application-layer replica of the ``stock_movements`` trigger's own
+    check (Data Architecture v2.0 Group D) -- ``RecordStockMovementUseCase``
+    evaluates the same ``COALESCE(item_override, branch_allows_negative,
+    false)`` precedence *before* inserting, purely to raise a clean,
+    typed domain error instead of a raw database exception. The trigger
+    itself remains the actual source of truth and still re-checks at
+    insert time (defense in depth), matching this codebase's existing
+    "pre-check for a clean error, DB constraint is still the real
+    enforcement" shape (e.g. ``BillAlreadyExistsError`` vs. the bill
+    XOR constraint)."""
+
+    error_code = "INSUFFICIENT_STOCK"
+
+    def __init__(self, inventory_item_id: str, current_quantity: str, attempted_delta: str) -> None:
+        super().__init__(
+            f"InventoryItem '{inventory_item_id}' has {current_quantity} on hand; "
+            f"a delta of {attempted_delta} would take it negative."
+        )
+        self.inventory_item_id = inventory_item_id
+
+
+class StockAdjustmentRequiresReasonError(OperationsDomainError):
+    """``movement_type='adjustment'`` always creates a linked
+    ``StockAdjustment`` row (Architecture doc SS3.6) -- a reason and an
+    approver are required for that specific movement type, matching
+    ``Refund``'s own "requires an approver" precedent."""
+
+    error_code = "STOCK_ADJUSTMENT_REQUIRES_REASON"
+
+    def __init__(self) -> None:
+        super().__init__("An 'adjustment' stock movement requires a reason and an approving user.")
