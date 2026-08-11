@@ -136,4 +136,6 @@ class TestOpenApiSecurityScheme:
         # Sprint 7 Step 4 (Billing + Payments + Ledger) added 11 more: 4 on
         # bill_router, 2 on discount_router, 3 on payment_router, 2 on
         # cash_drawer_router.
-        assert checked == 96
+        # Sprint 7 Step 5 (Inventory + Recipe) added 10 more: 8 on
+        # inventory_router, 2 on recipe_router.
+        assert checked == 106
