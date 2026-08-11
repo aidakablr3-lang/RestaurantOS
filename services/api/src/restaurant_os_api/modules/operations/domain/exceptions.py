@@ -151,3 +151,152 @@ class InvalidKitchenItemStatusTransitionError(OperationsDomainError):
         self.kitchen_item_id = kitchen_item_id
         self.from_status = from_status
         self.to_status = to_status
+
+
+# --- Billing + Payments + Ledger (Sprint 7 Step 4) -----------------------
+
+
+class BillNotFoundError(OperationsDomainError):
+    error_code = "BILL_NOT_FOUND"
+
+    def __init__(self, bill_id: str) -> None:
+        super().__init__(f"Bill '{bill_id}' does not exist.")
+        self.bill_id = bill_id
+
+
+class BillAlreadyClosedError(OperationsDomainError):
+    error_code = "BILL_ALREADY_CLOSED"
+
+    def __init__(self, bill_id: str) -> None:
+        super().__init__(f"Bill '{bill_id}' is already closed.")
+        self.bill_id = bill_id
+
+
+class BillAlreadyExistsError(OperationsDomainError):
+    """One Order/Tab gets at most one Bill -- generating a second one
+    for the same Order/Tab is rejected rather than silently creating a
+    duplicate."""
+
+    error_code = "BILL_ALREADY_EXISTS"
+
+    def __init__(self, order_id: str | None, tab_id: str | None) -> None:
+        target = order_id or tab_id
+        super().__init__(f"A bill already exists for '{target}'.")
+        self.order_id = order_id
+        self.tab_id = tab_id
+
+
+class DiscountNotFoundError(OperationsDomainError):
+    error_code = "DISCOUNT_NOT_FOUND"
+
+    def __init__(self, discount_id: str) -> None:
+        super().__init__(f"Discount '{discount_id}' does not exist.")
+        self.discount_id = discount_id
+
+
+class AdjustmentApprovalRequiredError(OperationsDomainError):
+    """Mirrors ``Discount.requires_approval`` -- applying a discount
+    flagged this way without an ``approved_by_user_id`` is rejected."""
+
+    error_code = "ADJUSTMENT_APPROVAL_REQUIRED"
+
+    def __init__(self, discount_id: str) -> None:
+        super().__init__(f"Discount '{discount_id}' requires an approver.")
+        self.discount_id = discount_id
+
+
+class PaymentNotFoundError(OperationsDomainError):
+    error_code = "PAYMENT_NOT_FOUND"
+
+    def __init__(self, payment_id: str) -> None:
+        super().__init__(f"Payment '{payment_id}' does not exist.")
+        self.payment_id = payment_id
+
+
+class InvalidPaymentStatusTransitionError(OperationsDomainError):
+    error_code = "INVALID_PAYMENT_STATUS_TRANSITION"
+
+    def __init__(self, payment_id: str, from_status: str, to_status: str) -> None:
+        super().__init__(
+            f"Payment '{payment_id}' cannot transition from '{from_status}' to '{to_status}'."
+        )
+        self.payment_id = payment_id
+        self.from_status = from_status
+        self.to_status = to_status
+
+
+class OverpaymentError(OperationsDomainError):
+    """A payment that would take the bill's total paid amount above its
+    amount due -- rejected rather than silently accepted as a credit
+    balance (no credit/store-value concept exists in this scope)."""
+
+    error_code = "OVERPAYMENT"
+
+    def __init__(self, bill_id: str, amount_due: str, attempted_total: str) -> None:
+        super().__init__(
+            f"Bill '{bill_id}' amount due is {amount_due}; payments would total {attempted_total}."
+        )
+        self.bill_id = bill_id
+
+
+class RefundNotFoundError(OperationsDomainError):
+    error_code = "REFUND_NOT_FOUND"
+
+    def __init__(self, refund_id: str) -> None:
+        super().__init__(f"Refund '{refund_id}' does not exist.")
+        self.refund_id = refund_id
+
+
+class InvalidRefundStatusTransitionError(OperationsDomainError):
+    error_code = "INVALID_REFUND_STATUS_TRANSITION"
+
+    def __init__(self, refund_id: str, from_status: str, to_status: str) -> None:
+        super().__init__(
+            f"Refund '{refund_id}' cannot transition from '{from_status}' to '{to_status}'."
+        )
+        self.refund_id = refund_id
+        self.from_status = from_status
+        self.to_status = to_status
+
+
+class RefundExceedsPaymentError(OperationsDomainError):
+    error_code = "REFUND_EXCEEDS_PAYMENT"
+
+    def __init__(self, payment_id: str) -> None:
+        super().__init__(
+            f"Refund amount exceeds the remaining refundable balance of payment '{payment_id}'."
+        )
+        self.payment_id = payment_id
+
+
+class CashDrawerNotFoundError(OperationsDomainError):
+    error_code = "CASH_DRAWER_NOT_FOUND"
+
+    def __init__(self, cash_drawer_id: str) -> None:
+        super().__init__(f"CashDrawer '{cash_drawer_id}' does not exist.")
+        self.cash_drawer_id = cash_drawer_id
+
+
+class InvalidCashDrawerStatusTransitionError(OperationsDomainError):
+    error_code = "INVALID_CASH_DRAWER_STATUS_TRANSITION"
+
+    def __init__(self, cash_drawer_id: str, from_status: str, to_status: str) -> None:
+        super().__init__(
+            f"CashDrawer '{cash_drawer_id}' cannot transition from '{from_status}' to '{to_status}'."
+        )
+        self.cash_drawer_id = cash_drawer_id
+        self.from_status = from_status
+        self.to_status = to_status
+
+
+class CashDrawerAlreadyOpenError(OperationsDomainError):
+    """At most one open CashDrawer per branch (+ optional terminal) at a
+    time -- opening a second one is rejected rather than silently
+    allowed, which would make "which drawer is this cash payment
+    against" ambiguous."""
+
+    error_code = "CASH_DRAWER_ALREADY_OPEN"
+
+    def __init__(self, branch_id: str) -> None:
+        super().__init__(f"Branch '{branch_id}' already has an open cash drawer.")
+        self.branch_id = branch_id

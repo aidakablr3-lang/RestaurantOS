@@ -3,6 +3,8 @@ from restaurant_os_api.modules.operations.domain.events.operations_events import
     OrderFired,
     OrderPlaced,
     OrderVoided,
+    PaymentSettled,
+    RefundProcessed,
     TicketReady,
 )
 
@@ -11,5 +13,7 @@ __all__ = [
     "OrderFired",
     "OrderPlaced",
     "OrderVoided",
+    "PaymentSettled",
+    "RefundProcessed",
     "TicketReady",
 ]

@@ -105,3 +105,49 @@ class TicketReady:
             "orderId": self.order_id,
             "occurredAt": self.occurred_at.isoformat(),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentSettled:
+    payment_id: str
+    bill_id: str
+    amount: str
+    occurred_at: datetime
+
+    event_type: ClassVar[str] = "PaymentSettled"
+    aggregate_type: ClassVar[str] = "payment"
+
+    @property
+    def aggregate_id(self) -> str:
+        return self.payment_id
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "paymentId": self.payment_id,
+            "billId": self.bill_id,
+            "amount": self.amount,
+            "occurredAt": self.occurred_at.isoformat(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RefundProcessed:
+    refund_id: str
+    payment_id: str
+    amount: str
+    occurred_at: datetime
+
+    event_type: ClassVar[str] = "RefundProcessed"
+    aggregate_type: ClassVar[str] = "refund"
+
+    @property
+    def aggregate_id(self) -> str:
+        return self.refund_id
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "refundId": self.refund_id,
+            "paymentId": self.payment_id,
+            "amount": self.amount,
+            "occurredAt": self.occurred_at.isoformat(),
+        }

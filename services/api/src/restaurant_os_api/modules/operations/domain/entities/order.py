@@ -1,17 +1,15 @@
 """Order entity -- aggregate root over its own ``OrderItem`` children.
 
 Architecture doc SS3.1's graph: ``open -> fired -> served -> billed ->
-closed``; ``open``/``fired -> voided``. This step implements
-``fire()``, ``close()``, and ``void()`` -- the three flat routes
-Architecture doc SS6 actually specifies for Order. ``served``/``billed``
-stay reachable *enum values* (the DB CHECK constraint already allows
-them, and Step 4's Billing work will need to reach ``billed``) but no
-domain method transitions into them from this step alone; wiring
-"kitchen finishes -> order marked served" and "bill closes -> order
-marked billed" as automatic cross-aggregate triggers is real, separate
-scope this step deliberately doesn't take on, the same "don't invent a
-business rule beyond what's specified" discipline ``Table.status``
-followed in Sprint 5.
+closed``; ``open``/``fired -> voided``. Step 3 implemented ``fire()``,
+``close()``, and ``void()``. Step 4 (Billing) adds ``mark_billed()`` --
+called by ``GenerateBillUseCase`` once a Bill is created for the order.
+``served`` stays a reachable *enum value* (the DB CHECK constraint
+already allows it) with no domain method transitioning into it yet --
+"kitchen finishes -> order marked served" as an automatic
+cross-aggregate trigger is real, separate scope still not taken on, the
+same "don't invent a business rule beyond what's specified" discipline
+``Table.status`` followed in Sprint 5.
 
 ``close()`` deliberately accepts ``fired``, ``served``, *and* ``billed``
 as valid predecessor states -- not just ``billed`` as a strict reading
@@ -73,6 +71,14 @@ class Order:
 
     def fire(self) -> None:
         self._transition_to(OrderStatus.FIRED, allowed_from=(OrderStatus.OPEN,))
+
+    def mark_billed(self) -> None:
+        """The transition Step 4's ``GenerateBillUseCase`` reaches --
+        this step's own contribution to the graph this entity's
+        docstring already disclosed as unimplemented from Step 3 alone."""
+        self._transition_to(
+            OrderStatus.BILLED, allowed_from=(OrderStatus.FIRED, OrderStatus.SERVED)
+        )
 
     def close(self, *, closed_at: datetime) -> None:
         self._transition_to(
