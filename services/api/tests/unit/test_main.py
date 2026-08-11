@@ -138,4 +138,6 @@ class TestOpenApiSecurityScheme:
         # cash_drawer_router.
         # Sprint 7 Step 5 (Inventory + Recipe) added 10 more: 8 on
         # inventory_router, 2 on recipe_router.
-        assert checked == 106
+        # Sprint 7 Step 6 (Purchasing) added 10 more: 3 on the supplier
+        # routes, 7 on the purchase-order/receipt routes.
+        assert checked == 116
