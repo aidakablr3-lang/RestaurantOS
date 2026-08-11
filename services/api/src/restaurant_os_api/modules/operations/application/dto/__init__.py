@@ -15,6 +15,18 @@ from restaurant_os_api.modules.operations.application.dto.discount_dto import (
     DiscountDTO,
     DiscountListResultDTO,
 )
+from restaurant_os_api.modules.operations.application.dto.inventory_dto import (
+    CreateInventoryCategoryRequestDTO,
+    CreateInventoryItemRequestDTO,
+    InventoryCategoryDTO,
+    InventoryCategoryListResultDTO,
+    InventoryItemDTO,
+    InventoryItemListResultDTO,
+    RecordStockMovementRequestDTO,
+    StockMovementDTO,
+    StockMovementListResultDTO,
+    UpdateInventoryItemRequestDTO,
+)
 from restaurant_os_api.modules.operations.application.dto.kitchen_dto import (
     ChangeKitchenItemStatusRequestDTO,
     ChangeKitchenTicketStatusRequestDTO,
@@ -35,6 +47,12 @@ from restaurant_os_api.modules.operations.application.dto.payment_dto import (
     RefundDTO,
     RequestRefundRequestDTO,
 )
+from restaurant_os_api.modules.operations.application.dto.recipe_dto import (
+    RecipeDTO,
+    RecipeIngredientDTO,
+    ReviseRecipeIngredientRequestDTO,
+    ReviseRecipeRequestDTO,
+)
 from restaurant_os_api.modules.operations.application.dto.tab_dto import (
     CreateTabRequestDTO,
     TabDTO,
@@ -50,11 +68,17 @@ __all__ = [
     "ChangeKitchenTicketStatusRequestDTO",
     "CloseCashDrawerRequestDTO",
     "CreateDiscountRequestDTO",
+    "CreateInventoryCategoryRequestDTO",
+    "CreateInventoryItemRequestDTO",
     "CreateOrderRequestDTO",
     "CreateTabRequestDTO",
     "DiscountDTO",
     "DiscountListResultDTO",
     "GenerateBillRequestDTO",
+    "InventoryCategoryDTO",
+    "InventoryCategoryListResultDTO",
+    "InventoryItemDTO",
+    "InventoryItemListResultDTO",
     "KitchenItemDTO",
     "KitchenTicketDTO",
     "KitchenTicketListResultDTO",
@@ -64,8 +88,16 @@ __all__ = [
     "OrderListResultDTO",
     "OrderTaxLineDTO",
     "PaymentDTO",
+    "RecipeDTO",
+    "RecipeIngredientDTO",
     "RecordPaymentRequestDTO",
+    "RecordStockMovementRequestDTO",
     "RefundDTO",
     "RequestRefundRequestDTO",
+    "ReviseRecipeIngredientRequestDTO",
+    "ReviseRecipeRequestDTO",
+    "StockMovementDTO",
+    "StockMovementListResultDTO",
     "TabDTO",
+    "UpdateInventoryItemRequestDTO",
 ]

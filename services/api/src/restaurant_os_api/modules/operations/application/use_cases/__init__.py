@@ -14,6 +14,12 @@ from restaurant_os_api.modules.operations.application.use_cases.close_tab import
 from restaurant_os_api.modules.operations.application.use_cases.create_discount import (
     CreateDiscountUseCase,
 )
+from restaurant_os_api.modules.operations.application.use_cases.create_inventory_category import (
+    CreateInventoryCategoryUseCase,
+)
+from restaurant_os_api.modules.operations.application.use_cases.create_inventory_item import (
+    CreateInventoryItemUseCase,
+)
 from restaurant_os_api.modules.operations.application.use_cases.create_order import (
     CreateOrderUseCase,
 )
@@ -24,9 +30,21 @@ from restaurant_os_api.modules.operations.application.use_cases.generate_bill im
     GenerateBillUseCase,
 )
 from restaurant_os_api.modules.operations.application.use_cases.get_bill import GetBillUseCase
+from restaurant_os_api.modules.operations.application.use_cases.get_inventory_item import (
+    GetInventoryItemUseCase,
+)
+from restaurant_os_api.modules.operations.application.use_cases.get_menu_item_recipe import (
+    GetMenuItemRecipeUseCase,
+)
 from restaurant_os_api.modules.operations.application.use_cases.get_order import GetOrderUseCase
 from restaurant_os_api.modules.operations.application.use_cases.list_discounts import (
     ListDiscountsUseCase,
+)
+from restaurant_os_api.modules.operations.application.use_cases.list_inventory_categories import (
+    ListInventoryCategoriesUseCase,
+)
+from restaurant_os_api.modules.operations.application.use_cases.list_inventory_items import (
+    ListInventoryItemsUseCase,
 )
 from restaurant_os_api.modules.operations.application.use_cases.list_kitchen_tickets import (
     ListKitchenTicketsUseCase,
@@ -37,14 +55,26 @@ from restaurant_os_api.modules.operations.application.use_cases.list_orders impo
 from restaurant_os_api.modules.operations.application.use_cases.list_payments import (
     ListPaymentsUseCase,
 )
+from restaurant_os_api.modules.operations.application.use_cases.list_stock_movements import (
+    ListStockMovementsUseCase,
+)
 from restaurant_os_api.modules.operations.application.use_cases.open_cash_drawer import (
     OpenCashDrawerUseCase,
 )
 from restaurant_os_api.modules.operations.application.use_cases.record_payment import (
     RecordPaymentUseCase,
 )
+from restaurant_os_api.modules.operations.application.use_cases.record_stock_movement import (
+    RecordStockMovementUseCase,
+)
 from restaurant_os_api.modules.operations.application.use_cases.request_refund import (
     RequestRefundUseCase,
+)
+from restaurant_os_api.modules.operations.application.use_cases.revise_recipe import (
+    ReviseRecipeUseCase,
+)
+from restaurant_os_api.modules.operations.application.use_cases.update_inventory_item import (
+    UpdateInventoryItemUseCase,
 )
 from restaurant_os_api.modules.operations.application.use_cases.update_kitchen_item_status import (
     UpdateKitchenItemStatusUseCase,
@@ -61,20 +91,30 @@ __all__ = [
     "CloseOrderUseCase",
     "CloseTabUseCase",
     "CreateDiscountUseCase",
+    "CreateInventoryCategoryUseCase",
+    "CreateInventoryItemUseCase",
     "CreateOrderUseCase",
     "CreateTabUseCase",
     "CreateTaxUseCase",
     "FireOrderUseCase",
     "GenerateBillUseCase",
     "GetBillUseCase",
+    "GetInventoryItemUseCase",
+    "GetMenuItemRecipeUseCase",
     "GetOrderUseCase",
     "ListDiscountsUseCase",
+    "ListInventoryCategoriesUseCase",
+    "ListInventoryItemsUseCase",
     "ListKitchenTicketsUseCase",
     "ListOrdersUseCase",
     "ListPaymentsUseCase",
+    "ListStockMovementsUseCase",
     "OpenCashDrawerUseCase",
     "RecordPaymentUseCase",
+    "RecordStockMovementUseCase",
     "RequestRefundUseCase",
+    "ReviseRecipeUseCase",
+    "UpdateInventoryItemUseCase",
     "UpdateKitchenItemStatusUseCase",
     "UpdateKitchenTicketStatusUseCase",
     "VoidOrderUseCase",
