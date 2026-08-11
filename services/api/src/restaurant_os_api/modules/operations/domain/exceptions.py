@@ -384,3 +384,78 @@ class StockAdjustmentRequiresReasonError(OperationsDomainError):
 
     def __init__(self) -> None:
         super().__init__("An 'adjustment' stock movement requires a reason and an approving user.")
+
+
+# --- Purchasing (Sprint 7 Step 6) -----------------------------------------
+
+
+class SupplierNotFoundError(OperationsDomainError):
+    error_code = "SUPPLIER_NOT_FOUND"
+
+    def __init__(self, supplier_id: str) -> None:
+        super().__init__(f"Supplier '{supplier_id}' does not exist.")
+        self.supplier_id = supplier_id
+
+
+class SupplierNameConflictError(OperationsDomainError):
+    """Mirrors the DB's own ``UNIQUE (tenant_id, name)`` constraint."""
+
+    error_code = "SUPPLIER_NAME_CONFLICT"
+
+    def __init__(self, name: str) -> None:
+        super().__init__(f"A Supplier named '{name}' already exists.")
+        self.name = name
+
+
+class PurchaseOrderNotFoundError(OperationsDomainError):
+    error_code = "PURCHASE_ORDER_NOT_FOUND"
+
+    def __init__(self, purchase_order_id: str) -> None:
+        super().__init__(f"PurchaseOrder '{purchase_order_id}' does not exist.")
+        self.purchase_order_id = purchase_order_id
+
+
+class InvalidPurchaseOrderStatusTransitionError(OperationsDomainError):
+    error_code = "INVALID_PURCHASE_ORDER_STATUS_TRANSITION"
+
+    def __init__(self, purchase_order_id: str, from_status: str, to_status: str) -> None:
+        super().__init__(
+            f"PurchaseOrder '{purchase_order_id}' cannot transition from "
+            f"'{from_status}' to '{to_status}'."
+        )
+        self.purchase_order_id = purchase_order_id
+        self.from_status = from_status
+        self.to_status = to_status
+
+
+class PurchaseOrderHasNoItemsError(OperationsDomainError):
+    """Sending a PO with zero line items would create a meaningless
+    order to the supplier -- rejected proactively, mirroring
+    ``OrderHasNoItemsError``'s own precedent for firing an empty order."""
+
+    error_code = "PURCHASE_ORDER_HAS_NO_ITEMS"
+
+    def __init__(self, purchase_order_id: str) -> None:
+        super().__init__(f"PurchaseOrder '{purchase_order_id}' has no items to send.")
+        self.purchase_order_id = purchase_order_id
+
+
+class PurchaseOrderItemNotFoundError(OperationsDomainError):
+    error_code = "PURCHASE_ORDER_ITEM_NOT_FOUND"
+
+    def __init__(self, purchase_order_item_id: str) -> None:
+        super().__init__(f"PurchaseOrderItem '{purchase_order_item_id}' does not exist.")
+        self.purchase_order_item_id = purchase_order_item_id
+
+
+class InvalidGoodsReceiptStatusTransitionError(OperationsDomainError):
+    error_code = "INVALID_GOODS_RECEIPT_STATUS_TRANSITION"
+
+    def __init__(self, goods_receipt_id: str, from_status: str, to_status: str) -> None:
+        super().__init__(
+            f"GoodsReceipt '{goods_receipt_id}' cannot transition from "
+            f"'{from_status}' to '{to_status}'."
+        )
+        self.goods_receipt_id = goods_receipt_id
+        self.from_status = from_status
+        self.to_status = to_status

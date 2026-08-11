@@ -8,6 +8,10 @@ from restaurant_os_api.modules.operations.domain.entities.cash_drawer import (
     CashDrawerStatus,
 )
 from restaurant_os_api.modules.operations.domain.entities.discount import Discount, DiscountType
+from restaurant_os_api.modules.operations.domain.entities.goods_receipt import (
+    GoodsReceipt,
+    GoodsReceiptStatus,
+)
 from restaurant_os_api.modules.operations.domain.entities.inventory_category import (
     InventoryCategory,
 )
@@ -40,6 +44,13 @@ from restaurant_os_api.modules.operations.domain.entities.payment import (
     PaymentStatus,
     TenderType,
 )
+from restaurant_os_api.modules.operations.domain.entities.purchase_order import (
+    PurchaseOrder,
+    PurchaseOrderStatus,
+)
+from restaurant_os_api.modules.operations.domain.entities.purchase_order_item import (
+    PurchaseOrderItem,
+)
 from restaurant_os_api.modules.operations.domain.entities.recipe import Recipe
 from restaurant_os_api.modules.operations.domain.entities.recipe_ingredient import (
     RecipeIngredient,
@@ -50,6 +61,7 @@ from restaurant_os_api.modules.operations.domain.entities.stock_movement import 
     StockMovement,
     StockMovementType,
 )
+from restaurant_os_api.modules.operations.domain.entities.supplier import Supplier, SupplierStatus
 from restaurant_os_api.modules.operations.domain.entities.tab import Tab, TabStatus
 from restaurant_os_api.modules.operations.domain.entities.tax import Tax
 
@@ -63,6 +75,8 @@ __all__ = [
     "CashDrawerStatus",
     "Discount",
     "DiscountType",
+    "GoodsReceipt",
+    "GoodsReceiptStatus",
     "InventoryCategory",
     "InventoryItem",
     "KitchenItem",
@@ -79,6 +93,9 @@ __all__ = [
     "OrderTaxLine",
     "Payment",
     "PaymentStatus",
+    "PurchaseOrder",
+    "PurchaseOrderItem",
+    "PurchaseOrderStatus",
     "Recipe",
     "RecipeIngredient",
     "Refund",
@@ -86,6 +103,8 @@ __all__ = [
     "StockAdjustment",
     "StockMovement",
     "StockMovementType",
+    "Supplier",
+    "SupplierStatus",
     "Tab",
     "TabStatus",
     "Tax",

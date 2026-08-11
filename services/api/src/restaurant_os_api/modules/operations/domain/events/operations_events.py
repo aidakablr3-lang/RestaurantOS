@@ -183,3 +183,28 @@ class RefundProcessed:
             "amount": self.amount,
             "occurredAt": self.occurred_at.isoformat(),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class PurchaseOrderReceived:
+    """Architecture doc SS11: emitted by ``ConfirmGoodsReceiptUseCase``."""
+
+    purchase_order_id: str
+    goods_receipt_id: str
+    has_discrepancy: bool
+    occurred_at: datetime
+
+    event_type: ClassVar[str] = "PurchaseOrderReceived"
+    aggregate_type: ClassVar[str] = "purchase_order"
+
+    @property
+    def aggregate_id(self) -> str:
+        return self.purchase_order_id
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "purchaseOrderId": self.purchase_order_id,
+            "goodsReceiptId": self.goods_receipt_id,
+            "hasDiscrepancy": self.has_discrepancy,
+            "occurredAt": self.occurred_at.isoformat(),
+        }
