@@ -45,6 +45,9 @@ from restaurant_os_api.modules.operations.presentation.api.v1.order_router impor
 from restaurant_os_api.modules.operations.presentation.api.v1.payment_router import (
     router as payment_router,
 )
+from restaurant_os_api.modules.operations.presentation.api.v1.purchasing_router import (
+    router as purchasing_router,
+)
 from restaurant_os_api.modules.operations.presentation.api.v1.recipe_router import (
     router as recipe_router,
 )
@@ -165,6 +168,7 @@ def create_app() -> FastAPI:
     app.include_router(cash_drawer_router)
     app.include_router(inventory_router)
     app.include_router(recipe_router)
+    app.include_router(purchasing_router)
 
     @app.get("/health/live", include_in_schema=False)
     async def health_live() -> dict[str, str]:

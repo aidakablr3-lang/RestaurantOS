@@ -35,14 +35,19 @@ from restaurant_os_api.modules.identity.presentation.dependencies import (
 )
 from restaurant_os_api.modules.operations.application.use_cases import (
     AddOrderItemUseCase,
+    AddPurchaseOrderItemUseCase,
     ApplyBillAdjustmentUseCase,
+    CancelPurchaseOrderUseCase,
     CloseCashDrawerUseCase,
     CloseOrderUseCase,
     CloseTabUseCase,
+    ConfirmGoodsReceiptUseCase,
     CreateDiscountUseCase,
     CreateInventoryCategoryUseCase,
     CreateInventoryItemUseCase,
     CreateOrderUseCase,
+    CreatePurchaseOrderUseCase,
+    CreateSupplierUseCase,
     CreateTabUseCase,
     CreateTaxUseCase,
     FireOrderUseCase,
@@ -51,39 +56,48 @@ from restaurant_os_api.modules.operations.application.use_cases import (
     GetInventoryItemUseCase,
     GetMenuItemRecipeUseCase,
     GetOrderUseCase,
+    GetPurchaseOrderUseCase,
     ListDiscountsUseCase,
     ListInventoryCategoriesUseCase,
     ListInventoryItemsUseCase,
     ListKitchenTicketsUseCase,
     ListOrdersUseCase,
     ListPaymentsUseCase,
+    ListPurchaseOrdersUseCase,
     ListStockMovementsUseCase,
+    ListSuppliersUseCase,
     OpenCashDrawerUseCase,
     RecordPaymentUseCase,
     RecordStockMovementUseCase,
     RequestRefundUseCase,
     ReviseRecipeUseCase,
+    SendPurchaseOrderUseCase,
     UpdateInventoryItemUseCase,
     UpdateKitchenItemStatusUseCase,
     UpdateKitchenTicketStatusUseCase,
+    UpdateSupplierUseCase,
     VoidOrderUseCase,
 )
 from restaurant_os_api.modules.operations.infrastructure.database.repositories import (
     SQLAlchemyBillRepository,
     SQLAlchemyCashDrawerRepository,
     SQLAlchemyDiscountRepository,
+    SQLAlchemyGoodsReceiptRepository,
     SQLAlchemyInventoryCategoryRepository,
     SQLAlchemyInventoryItemRepository,
     SQLAlchemyKitchenTicketRepository,
     SQLAlchemyLedgerRepository,
     SQLAlchemyOrderRepository,
     SQLAlchemyPaymentRepository,
+    SQLAlchemyPurchaseOrderRepository,
     SQLAlchemyRecipeRepository,
     SQLAlchemyStockMovementRepository,
+    SQLAlchemySupplierRepository,
     SQLAlchemyTabRepository,
     SQLAlchemyTaxRepository,
 )
 from restaurant_os_api.modules.restaurant.infrastructure.database.repositories import (
+    SQLAlchemyAddressRepository,
     SQLAlchemyBranchRepository,
     SQLAlchemyMenuCategoryRepository,
     SQLAlchemyMenuItemRepository,
@@ -95,14 +109,19 @@ from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchem
 
 __all__ = [
     "AddOrderItemUseCaseDep",
+    "AddPurchaseOrderItemUseCaseDep",
     "ApplyBillAdjustmentUseCaseDep",
+    "CancelPurchaseOrderUseCaseDep",
     "CloseCashDrawerUseCaseDep",
     "CloseOrderUseCaseDep",
     "CloseTabUseCaseDep",
+    "ConfirmGoodsReceiptUseCaseDep",
     "CreateDiscountUseCaseDep",
     "CreateInventoryCategoryUseCaseDep",
     "CreateInventoryItemUseCaseDep",
     "CreateOrderUseCaseDep",
+    "CreatePurchaseOrderUseCaseDep",
+    "CreateSupplierUseCaseDep",
     "CreateTabUseCaseDep",
     "CreateTaxUseCaseDep",
     "FireOrderUseCaseDep",
@@ -111,6 +130,7 @@ __all__ = [
     "GetInventoryItemUseCaseDep",
     "GetMenuItemRecipeUseCaseDep",
     "GetOrderUseCaseDep",
+    "GetPurchaseOrderUseCaseDep",
     "IdempotencyGuardDep",
     "ListDiscountsUseCaseDep",
     "ListInventoryCategoriesUseCaseDep",
@@ -118,7 +138,9 @@ __all__ = [
     "ListKitchenTicketsUseCaseDep",
     "ListOrdersUseCaseDep",
     "ListPaymentsUseCaseDep",
+    "ListPurchaseOrdersUseCaseDep",
     "ListStockMovementsUseCaseDep",
+    "ListSuppliersUseCaseDep",
     "OpenCashDrawerUseCaseDep",
     "RecordPaymentUseCaseDep",
     "RecordStockMovementUseCaseDep",
@@ -139,10 +161,17 @@ __all__ = [
     "RequireOrderManageAtAnyScopeDep",
     "RequireOrderManageDep",
     "RequireOrderReadDep",
+    "RequirePurchasingManageAtAnyScopeDep",
+    "RequirePurchasingManageDep",
+    "RequirePurchasingManageTenantWideDep",
+    "RequirePurchasingReadDep",
+    "RequirePurchasingReadTenantWideDep",
     "ReviseRecipeUseCaseDep",
+    "SendPurchaseOrderUseCaseDep",
     "UpdateInventoryItemUseCaseDep",
     "UpdateKitchenItemStatusUseCaseDep",
     "UpdateKitchenTicketStatusUseCaseDep",
+    "UpdateSupplierUseCaseDep",
     "VoidOrderUseCaseDep",
 ]
 
@@ -208,6 +237,25 @@ RequireInventoryManageTenantWideDep = Annotated[
 ]
 RequireInventoryReadTenantWideDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission("inventory.read"))
+]
+
+# --- Purchasing (Sprint 7 Step 6) ------------------------------------------
+RequirePurchasingManageDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("purchasing.manage"))
+]
+RequirePurchasingReadDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("purchasing.read"))
+]
+RequirePurchasingManageAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("purchasing.manage"))
+]
+# Suppliers are tenant-level (Architecture doc SS10: "mirroring how
+# Restaurant's own permissions are tenant-wide").
+RequirePurchasingManageTenantWideDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission("purchasing.manage"))
+]
+RequirePurchasingReadTenantWideDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission("purchasing.read"))
 ]
 
 
@@ -703,4 +751,157 @@ def get_get_menu_item_recipe_use_case(
 
 GetMenuItemRecipeUseCaseDep = Annotated[
     GetMenuItemRecipeUseCase, Depends(get_get_menu_item_recipe_use_case)
+]
+
+
+# --- Purchasing (Sprint 7 Step 6) ------------------------------------------
+
+
+def get_create_supplier_use_case(session_factory: SessionFactoryDep) -> CreateSupplierUseCase:
+    return CreateSupplierUseCase(
+        session_factory=session_factory,
+        supplier_repository_factory=SQLAlchemySupplierRepository,
+        address_repository_factory=SQLAlchemyAddressRepository,
+    )
+
+
+CreateSupplierUseCaseDep = Annotated[CreateSupplierUseCase, Depends(get_create_supplier_use_case)]
+
+
+def get_list_suppliers_use_case(session_factory: SessionFactoryDep) -> ListSuppliersUseCase:
+    return ListSuppliersUseCase(
+        session_factory=session_factory,
+        supplier_repository_factory=SQLAlchemySupplierRepository,
+        address_repository_factory=SQLAlchemyAddressRepository,
+    )
+
+
+ListSuppliersUseCaseDep = Annotated[ListSuppliersUseCase, Depends(get_list_suppliers_use_case)]
+
+
+def get_update_supplier_use_case(session_factory: SessionFactoryDep) -> UpdateSupplierUseCase:
+    return UpdateSupplierUseCase(
+        session_factory=session_factory,
+        supplier_repository_factory=SQLAlchemySupplierRepository,
+        address_repository_factory=SQLAlchemyAddressRepository,
+    )
+
+
+UpdateSupplierUseCaseDep = Annotated[UpdateSupplierUseCase, Depends(get_update_supplier_use_case)]
+
+
+def get_create_purchase_order_use_case(
+    session_factory: SessionFactoryDep,
+) -> CreatePurchaseOrderUseCase:
+    return CreatePurchaseOrderUseCase(
+        session_factory=session_factory,
+        purchase_order_repository_factory=SQLAlchemyPurchaseOrderRepository,
+        supplier_repository_factory=SQLAlchemySupplierRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+    )
+
+
+CreatePurchaseOrderUseCaseDep = Annotated[
+    CreatePurchaseOrderUseCase, Depends(get_create_purchase_order_use_case)
+]
+
+
+def get_get_purchase_order_use_case(
+    session_factory: SessionFactoryDep,
+) -> GetPurchaseOrderUseCase:
+    return GetPurchaseOrderUseCase(
+        session_factory=session_factory,
+        purchase_order_repository_factory=SQLAlchemyPurchaseOrderRepository,
+    )
+
+
+GetPurchaseOrderUseCaseDep = Annotated[
+    GetPurchaseOrderUseCase, Depends(get_get_purchase_order_use_case)
+]
+
+
+def get_list_purchase_orders_use_case(
+    session_factory: SessionFactoryDep,
+) -> ListPurchaseOrdersUseCase:
+    return ListPurchaseOrdersUseCase(
+        session_factory=session_factory,
+        purchase_order_repository_factory=SQLAlchemyPurchaseOrderRepository,
+    )
+
+
+ListPurchaseOrdersUseCaseDep = Annotated[
+    ListPurchaseOrdersUseCase, Depends(get_list_purchase_orders_use_case)
+]
+
+
+def get_add_purchase_order_item_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> AddPurchaseOrderItemUseCase:
+    return AddPurchaseOrderItemUseCase(
+        session_factory=session_factory,
+        purchase_order_repository_factory=SQLAlchemyPurchaseOrderRepository,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+AddPurchaseOrderItemUseCaseDep = Annotated[
+    AddPurchaseOrderItemUseCase, Depends(get_add_purchase_order_item_use_case)
+]
+
+
+def get_send_purchase_order_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> SendPurchaseOrderUseCase:
+    return SendPurchaseOrderUseCase(
+        session_factory=session_factory,
+        purchase_order_repository_factory=SQLAlchemyPurchaseOrderRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+SendPurchaseOrderUseCaseDep = Annotated[
+    SendPurchaseOrderUseCase, Depends(get_send_purchase_order_use_case)
+]
+
+
+def get_cancel_purchase_order_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> CancelPurchaseOrderUseCase:
+    return CancelPurchaseOrderUseCase(
+        session_factory=session_factory,
+        purchase_order_repository_factory=SQLAlchemyPurchaseOrderRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+CancelPurchaseOrderUseCaseDep = Annotated[
+    CancelPurchaseOrderUseCase, Depends(get_cancel_purchase_order_use_case)
+]
+
+
+def get_confirm_goods_receipt_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ConfirmGoodsReceiptUseCase:
+    return ConfirmGoodsReceiptUseCase(
+        session_factory=session_factory,
+        purchase_order_repository_factory=SQLAlchemyPurchaseOrderRepository,
+        goods_receipt_repository_factory=SQLAlchemyGoodsReceiptRepository,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        stock_movement_repository_factory=SQLAlchemyStockMovementRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+ConfirmGoodsReceiptUseCaseDep = Annotated[
+    ConfirmGoodsReceiptUseCase, Depends(get_confirm_goods_receipt_use_case)
 ]

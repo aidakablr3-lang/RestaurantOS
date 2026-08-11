@@ -22,6 +22,8 @@ from restaurant_os_api.modules.operations.domain.entities import (
     CashDrawerStatus,
     Discount,
     DiscountType,
+    GoodsReceipt,
+    GoodsReceiptStatus,
     InventoryCategory,
     InventoryItem,
     KitchenItem,
@@ -38,6 +40,9 @@ from restaurant_os_api.modules.operations.domain.entities import (
     OrderTaxLine,
     Payment,
     PaymentStatus,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchaseOrderStatus,
     Recipe,
     RecipeIngredient,
     Refund,
@@ -45,6 +50,8 @@ from restaurant_os_api.modules.operations.domain.entities import (
     StockAdjustment,
     StockMovement,
     StockMovementType,
+    Supplier,
+    SupplierStatus,
     Tab,
     TabStatus,
     Tax,
@@ -55,6 +62,7 @@ from restaurant_os_api.modules.operations.infrastructure.database.models import 
     BillModel,
     CashDrawerModel,
     DiscountModel,
+    GoodsReceiptModel,
     InventoryCategoryModel,
     InventoryItemModel,
     KitchenItemModel,
@@ -64,11 +72,14 @@ from restaurant_os_api.modules.operations.infrastructure.database.models import 
     OrderModel,
     OrderTaxLineModel,
     PaymentModel,
+    PurchaseOrderItemModel,
+    PurchaseOrderModel,
     RecipeIngredientModel,
     RecipeModel,
     RefundModel,
     StockAdjustmentModel,
     StockMovementModel,
+    SupplierModel,
     TabModel,
     TaxModel,
 )
@@ -1199,3 +1210,262 @@ class SQLAlchemyStockMovementRepository:
         self._session.add(model)
         await self._session.flush()
         return _stock_adjustment_from_model(model)
+
+
+# --- Purchasing (Sprint 7 Step 6) ------------------------------------------
+
+
+def _supplier_from_model(model: SupplierModel) -> Supplier:
+    return Supplier(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        name=model.name,
+        status=SupplierStatus(model.status),
+        created_at=model.created_at,
+        address_id=model.address_id,
+    )
+
+
+def _purchase_order_from_model(model: PurchaseOrderModel) -> PurchaseOrder:
+    return PurchaseOrder(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        branch_id=model.branch_id,
+        supplier_id=model.supplier_id,
+        status=PurchaseOrderStatus(model.status),
+        created_at=model.created_at,
+    )
+
+
+def _purchase_order_item_from_model(model: PurchaseOrderItemModel) -> PurchaseOrderItem:
+    return PurchaseOrderItem(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        purchase_order_id=model.purchase_order_id,
+        inventory_item_id=model.inventory_item_id,
+        quantity_ordered=model.quantity_ordered,
+        quantity_received=model.quantity_received,
+        created_at=model.created_at,
+    )
+
+
+def _goods_receipt_from_model(model: GoodsReceiptModel) -> GoodsReceipt:
+    return GoodsReceipt(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        purchase_order_id=model.purchase_order_id,
+        status=GoodsReceiptStatus(model.status),
+        received_at=model.received_at,
+        created_at=model.created_at,
+        has_discrepancy=model.has_discrepancy,
+    )
+
+
+class SQLAlchemySupplierRepository:
+    """Implements ``SupplierRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, supplier_id: str) -> Supplier | None:
+        stmt = select(SupplierModel).where(
+            SupplierModel.id == supplier_id,
+            SupplierModel.tenant_id == tenant_id,
+            SupplierModel.deleted_at.is_(None),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _supplier_from_model(model) if model is not None else None
+
+    async def get_by_tenant_id_and_name(self, tenant_id: str, name: str) -> Supplier | None:
+        stmt = select(SupplierModel).where(
+            SupplierModel.tenant_id == tenant_id,
+            SupplierModel.name == name,
+            SupplierModel.deleted_at.is_(None),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _supplier_from_model(model) if model is not None else None
+
+    async def create(self, supplier: Supplier) -> Supplier:
+        model = SupplierModel(
+            id=supplier.id,
+            tenant_id=supplier.tenant_id,
+            name=supplier.name,
+            address_id=supplier.address_id,
+            status=supplier.status.value,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _supplier_from_model(model)
+
+    async def update(self, supplier: Supplier) -> Supplier:
+        stmt = (
+            update(SupplierModel)
+            .where(SupplierModel.id == supplier.id, SupplierModel.tenant_id == supplier.tenant_id)
+            .values(
+                name=supplier.name,
+                address_id=supplier.address_id,
+                status=supplier.status.value,
+            )
+        )
+        await self._session.execute(stmt)
+        return supplier
+
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[Supplier], int]:
+        filters = (SupplierModel.tenant_id == tenant_id, SupplierModel.deleted_at.is_(None))
+        count_stmt = select(func.count()).select_from(SupplierModel).where(*filters)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        page_stmt = (
+            select(SupplierModel)
+            .where(*filters)
+            .order_by(SupplierModel.name)
+            .offset(offset)
+            .limit(limit)
+        )
+        models = (await self._session.execute(page_stmt)).scalars().all()
+        return [_supplier_from_model(m) for m in models], total
+
+
+class SQLAlchemyPurchaseOrderRepository:
+    """Implements ``PurchaseOrderRepository`` -- bundles PurchaseOrder
+    and its PurchaseOrderItem children, mirroring
+    ``SQLAlchemyOrderRepository``'s own Order+OrderItem bundling."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, purchase_order_id: str) -> PurchaseOrder | None:
+        stmt = select(PurchaseOrderModel).where(
+            PurchaseOrderModel.id == purchase_order_id,
+            PurchaseOrderModel.tenant_id == tenant_id,
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _purchase_order_from_model(model) if model is not None else None
+
+    async def create(self, purchase_order: PurchaseOrder) -> PurchaseOrder:
+        model = PurchaseOrderModel(
+            id=purchase_order.id,
+            tenant_id=purchase_order.tenant_id,
+            branch_id=purchase_order.branch_id,
+            supplier_id=purchase_order.supplier_id,
+            status=purchase_order.status.value,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _purchase_order_from_model(model)
+
+    async def update(self, purchase_order: PurchaseOrder) -> PurchaseOrder:
+        stmt = (
+            update(PurchaseOrderModel)
+            .where(
+                PurchaseOrderModel.id == purchase_order.id,
+                PurchaseOrderModel.tenant_id == purchase_order.tenant_id,
+            )
+            .values(status=purchase_order.status.value)
+        )
+        await self._session.execute(stmt)
+        return purchase_order
+
+    async def list_for_branch(
+        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+    ) -> tuple[list[PurchaseOrder], int]:
+        filters = (
+            PurchaseOrderModel.tenant_id == tenant_id,
+            PurchaseOrderModel.branch_id == branch_id,
+        )
+        count_stmt = select(func.count()).select_from(PurchaseOrderModel).where(*filters)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        page_stmt = (
+            select(PurchaseOrderModel)
+            .where(*filters)
+            .order_by(PurchaseOrderModel.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        models = (await self._session.execute(page_stmt)).scalars().all()
+        return [_purchase_order_from_model(m) for m in models], total
+
+    async def get_items(self, tenant_id: str, purchase_order_id: str) -> list[PurchaseOrderItem]:
+        stmt = (
+            select(PurchaseOrderItemModel)
+            .where(
+                PurchaseOrderItemModel.tenant_id == tenant_id,
+                PurchaseOrderItemModel.purchase_order_id == purchase_order_id,
+            )
+            .order_by(PurchaseOrderItemModel.created_at)
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_purchase_order_item_from_model(m) for m in models]
+
+    async def get_item_by_id(
+        self, tenant_id: str, purchase_order_item_id: str
+    ) -> PurchaseOrderItem | None:
+        stmt = select(PurchaseOrderItemModel).where(
+            PurchaseOrderItemModel.id == purchase_order_item_id,
+            PurchaseOrderItemModel.tenant_id == tenant_id,
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _purchase_order_item_from_model(model) if model is not None else None
+
+    async def add_item(self, item: PurchaseOrderItem) -> PurchaseOrderItem:
+        model = PurchaseOrderItemModel(
+            id=item.id,
+            tenant_id=item.tenant_id,
+            purchase_order_id=item.purchase_order_id,
+            inventory_item_id=item.inventory_item_id,
+            quantity_ordered=item.quantity_ordered,
+            quantity_received=item.quantity_received,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _purchase_order_item_from_model(model)
+
+    async def update_item(self, item: PurchaseOrderItem) -> PurchaseOrderItem:
+        stmt = (
+            update(PurchaseOrderItemModel)
+            .where(
+                PurchaseOrderItemModel.id == item.id,
+                PurchaseOrderItemModel.tenant_id == item.tenant_id,
+            )
+            .values(quantity_received=item.quantity_received)
+        )
+        await self._session.execute(stmt)
+        return item
+
+
+class SQLAlchemyGoodsReceiptRepository:
+    """Implements ``GoodsReceiptRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(self, goods_receipt: GoodsReceipt) -> GoodsReceipt:
+        model = GoodsReceiptModel(
+            id=goods_receipt.id,
+            tenant_id=goods_receipt.tenant_id,
+            purchase_order_id=goods_receipt.purchase_order_id,
+            status=goods_receipt.status.value,
+            received_at=goods_receipt.received_at,
+            has_discrepancy=goods_receipt.has_discrepancy,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _goods_receipt_from_model(model)
+
+    async def update(self, goods_receipt: GoodsReceipt) -> GoodsReceipt:
+        stmt = (
+            update(GoodsReceiptModel)
+            .where(
+                GoodsReceiptModel.id == goods_receipt.id,
+                GoodsReceiptModel.tenant_id == goods_receipt.tenant_id,
+            )
+            .values(
+                status=goods_receipt.status.value,
+                has_discrepancy=goods_receipt.has_discrepancy,
+            )
+        )
+        await self._session.execute(stmt)
+        return goods_receipt
