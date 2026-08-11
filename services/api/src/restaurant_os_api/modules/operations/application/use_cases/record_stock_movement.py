@@ -51,6 +51,9 @@ from restaurant_os_api.modules.operations.application.dto import (
 from restaurant_os_api.modules.operations.application.use_cases._inventory_mapper import (
     stock_movement_to_dto,
 )
+from restaurant_os_api.modules.operations.application.use_cases._stock_guard import (
+    ensure_not_negative,
+)
 from restaurant_os_api.modules.operations.domain.entities import (
     StockAdjustment,
     StockMovement,
@@ -58,7 +61,6 @@ from restaurant_os_api.modules.operations.domain.entities import (
 )
 from restaurant_os_api.modules.operations.domain.events import LowStockDetected
 from restaurant_os_api.modules.operations.domain.exceptions import (
-    InsufficientStockError,
     InventoryItemNotFoundError,
     StockAdjustmentRequiresReasonError,
 )
@@ -129,17 +131,9 @@ class RecordStockMovementUseCase:
                 raise StockAdjustmentRequiresReasonError()
 
             previous_quantity = item.quantity_on_hand
-            resulting_quantity = previous_quantity + quantity_delta
-            if resulting_quantity < 0:
-                allowed = (
-                    item.allow_negative_stock_override
-                    if item.allow_negative_stock_override is not None
-                    else branch.allow_negative_stock
-                )
-                if not allowed:
-                    raise InsufficientStockError(
-                        item.id, str(previous_quantity), str(quantity_delta)
-                    )
+            ensure_not_negative(
+                item, branch, previous_quantity=previous_quantity, quantity_delta=quantity_delta
+            )
 
             movement = await movement_repo.create_movement(
                 StockMovement(
