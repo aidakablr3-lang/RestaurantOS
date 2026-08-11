@@ -113,6 +113,8 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "ledger.read",
                 "inventory.read",
                 "inventory.manage",
+                "purchasing.read",
+                "purchasing.manage",
             }
         ),
     ),
@@ -146,6 +148,8 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "ledger.read",
                 "inventory.read",
                 "inventory.manage",
+                "purchasing.read",
+                "purchasing.manage",
             }
         ),
     ),
@@ -173,6 +177,8 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "billing.refund",
                 "inventory.read",
                 "inventory.manage",
+                "purchasing.read",
+                "purchasing.manage",
             }
         ),
     ),
@@ -215,11 +221,33 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
     (
         "Inventory Manager",
         (
-            "Manages stock levels and recipes; no POS or payroll access "
-            "(architecture doc SS10's own role table)."
+            "Manages stock levels, recipes, and purchasing; no POS or payroll "
+            "access (architecture doc SS10's own role table). Sprint 7 Step 5 "
+            "deferred purchasing.* here since Purchasing wasn't built yet -- "
+            "Step 6 completes it."
         ),
         RoleScope.BRANCH,
-        frozenset({"inventory.read", "inventory.manage", "menu.read", "menu.manage"}),
+        frozenset(
+            {
+                "inventory.read",
+                "inventory.manage",
+                "menu.read",
+                "menu.manage",
+                "purchasing.read",
+                "purchasing.manage",
+            }
+        ),
+    ),
+    (
+        "Accountant",
+        (
+            "Full financial reporting access (ledger, billing, purchasing); "
+            "no operational (POS/KDS) actions -- architecture doc SS10's own "
+            "role table. Disclosed as deferred in Sprint 7 Step 5 (purchasing "
+            "wasn't built yet); added now that Step 6 completes it."
+        ),
+        RoleScope.BRANCH,
+        frozenset({"ledger.read", "billing.read", "purchasing.read"}),
     ),
 )
 
