@@ -30,26 +30,44 @@ from restaurant_os_api.modules.identity.presentation.dependencies import (
     ResolveUserPermissionsUseCaseDep,
     SessionFactoryDep,
     require_branch_permission,
+    require_permission,
     require_permission_at_any_scope,
 )
 from restaurant_os_api.modules.operations.application.use_cases import (
     AddOrderItemUseCase,
+    ApplyBillAdjustmentUseCase,
+    CloseCashDrawerUseCase,
     CloseOrderUseCase,
     CloseTabUseCase,
+    CreateDiscountUseCase,
     CreateOrderUseCase,
     CreateTabUseCase,
+    CreateTaxUseCase,
     FireOrderUseCase,
+    GenerateBillUseCase,
+    GetBillUseCase,
     GetOrderUseCase,
+    ListDiscountsUseCase,
     ListKitchenTicketsUseCase,
     ListOrdersUseCase,
+    ListPaymentsUseCase,
+    OpenCashDrawerUseCase,
+    RecordPaymentUseCase,
+    RequestRefundUseCase,
     UpdateKitchenItemStatusUseCase,
     UpdateKitchenTicketStatusUseCase,
     VoidOrderUseCase,
 )
 from restaurant_os_api.modules.operations.infrastructure.database.repositories import (
+    SQLAlchemyBillRepository,
+    SQLAlchemyCashDrawerRepository,
+    SQLAlchemyDiscountRepository,
     SQLAlchemyKitchenTicketRepository,
+    SQLAlchemyLedgerRepository,
     SQLAlchemyOrderRepository,
+    SQLAlchemyPaymentRepository,
     SQLAlchemyTabRepository,
+    SQLAlchemyTaxRepository,
 )
 from restaurant_os_api.modules.restaurant.infrastructure.database.repositories import (
     SQLAlchemyBranchRepository,
@@ -63,15 +81,31 @@ from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchem
 
 __all__ = [
     "AddOrderItemUseCaseDep",
+    "ApplyBillAdjustmentUseCaseDep",
+    "CloseCashDrawerUseCaseDep",
     "CloseOrderUseCaseDep",
     "CloseTabUseCaseDep",
+    "CreateDiscountUseCaseDep",
     "CreateOrderUseCaseDep",
     "CreateTabUseCaseDep",
+    "CreateTaxUseCaseDep",
     "FireOrderUseCaseDep",
+    "GenerateBillUseCaseDep",
+    "GetBillUseCaseDep",
     "GetOrderUseCaseDep",
     "IdempotencyGuardDep",
+    "ListDiscountsUseCaseDep",
     "ListKitchenTicketsUseCaseDep",
     "ListOrdersUseCaseDep",
+    "ListPaymentsUseCaseDep",
+    "OpenCashDrawerUseCaseDep",
+    "RecordPaymentUseCaseDep",
+    "RequestRefundUseCaseDep",
+    "RequireBillingManageAtAnyScopeDep",
+    "RequireBillingManageDep",
+    "RequireBillingManageTenantWideDep",
+    "RequireBillingReadAtAnyScopeDep",
+    "RequireBillingRefundAtAnyScopeDep",
     "RequireKitchenManageAtAnyScopeDep",
     "RequireKitchenReadDep",
     "RequireOrderManageAtAnyScopeDep",
@@ -103,6 +137,25 @@ RequireKitchenReadDep = Annotated[
 ]
 RequireKitchenManageAtAnyScopeDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("kitchen.manage"))
+]
+
+# --- Billing + Payments + Ledger (Sprint 7 Step 4) ------------------------
+RequireBillingManageDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("billing.manage"))
+]
+RequireBillingManageAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("billing.manage"))
+]
+RequireBillingReadAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("billing.read"))
+]
+RequireBillingRefundAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("billing.refund"))
+]
+# Taxes/Discounts are tenant-wide reference data (no branch dimension),
+# mirroring ModifierGroupRouter's own tenant-wide gate shape.
+RequireBillingManageTenantWideDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission("billing.manage"))
 ]
 
 
@@ -280,4 +333,170 @@ def get_update_kitchen_item_status_use_case(
 
 UpdateKitchenItemStatusUseCaseDep = Annotated[
     UpdateKitchenItemStatusUseCase, Depends(get_update_kitchen_item_status_use_case)
+]
+
+
+# --- Billing + Payments + Ledger (Sprint 7 Step 4) ------------------------
+
+
+def get_create_tax_use_case(session_factory: SessionFactoryDep) -> CreateTaxUseCase:
+    return CreateTaxUseCase(
+        session_factory=session_factory, tax_repository_factory=SQLAlchemyTaxRepository
+    )
+
+
+CreateTaxUseCaseDep = Annotated[CreateTaxUseCase, Depends(get_create_tax_use_case)]
+
+
+def get_create_discount_use_case(session_factory: SessionFactoryDep) -> CreateDiscountUseCase:
+    return CreateDiscountUseCase(
+        session_factory=session_factory, discount_repository_factory=SQLAlchemyDiscountRepository
+    )
+
+
+CreateDiscountUseCaseDep = Annotated[CreateDiscountUseCase, Depends(get_create_discount_use_case)]
+
+
+def get_list_discounts_use_case(session_factory: SessionFactoryDep) -> ListDiscountsUseCase:
+    return ListDiscountsUseCase(
+        session_factory=session_factory, discount_repository_factory=SQLAlchemyDiscountRepository
+    )
+
+
+ListDiscountsUseCaseDep = Annotated[ListDiscountsUseCase, Depends(get_list_discounts_use_case)]
+
+
+def get_generate_bill_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> GenerateBillUseCase:
+    return GenerateBillUseCase(
+        session_factory=session_factory,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        bill_repository_factory=SQLAlchemyBillRepository,
+        tax_repository_factory=SQLAlchemyTaxRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+GenerateBillUseCaseDep = Annotated[GenerateBillUseCase, Depends(get_generate_bill_use_case)]
+
+
+def get_get_bill_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> GetBillUseCase:
+    return GetBillUseCase(
+        session_factory=session_factory,
+        bill_repository_factory=SQLAlchemyBillRepository,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        payment_repository_factory=SQLAlchemyPaymentRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+GetBillUseCaseDep = Annotated[GetBillUseCase, Depends(get_get_bill_use_case)]
+
+
+def get_apply_bill_adjustment_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ApplyBillAdjustmentUseCase:
+    return ApplyBillAdjustmentUseCase(
+        session_factory=session_factory,
+        bill_repository_factory=SQLAlchemyBillRepository,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        discount_repository_factory=SQLAlchemyDiscountRepository,
+        payment_repository_factory=SQLAlchemyPaymentRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+ApplyBillAdjustmentUseCaseDep = Annotated[
+    ApplyBillAdjustmentUseCase, Depends(get_apply_bill_adjustment_use_case)
+]
+
+
+def get_record_payment_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> RecordPaymentUseCase:
+    return RecordPaymentUseCase(
+        session_factory=session_factory,
+        bill_repository_factory=SQLAlchemyBillRepository,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        payment_repository_factory=SQLAlchemyPaymentRepository,
+        ledger_repository_factory=SQLAlchemyLedgerRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+RecordPaymentUseCaseDep = Annotated[RecordPaymentUseCase, Depends(get_record_payment_use_case)]
+
+
+def get_list_payments_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ListPaymentsUseCase:
+    return ListPaymentsUseCase(
+        session_factory=session_factory,
+        bill_repository_factory=SQLAlchemyBillRepository,
+        payment_repository_factory=SQLAlchemyPaymentRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+ListPaymentsUseCaseDep = Annotated[ListPaymentsUseCase, Depends(get_list_payments_use_case)]
+
+
+def get_request_refund_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> RequestRefundUseCase:
+    return RequestRefundUseCase(
+        session_factory=session_factory,
+        payment_repository_factory=SQLAlchemyPaymentRepository,
+        bill_repository_factory=SQLAlchemyBillRepository,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        ledger_repository_factory=SQLAlchemyLedgerRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+RequestRefundUseCaseDep = Annotated[RequestRefundUseCase, Depends(get_request_refund_use_case)]
+
+
+def get_open_cash_drawer_use_case(session_factory: SessionFactoryDep) -> OpenCashDrawerUseCase:
+    return OpenCashDrawerUseCase(
+        session_factory=session_factory,
+        cash_drawer_repository_factory=SQLAlchemyCashDrawerRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+    )
+
+
+OpenCashDrawerUseCaseDep = Annotated[OpenCashDrawerUseCase, Depends(get_open_cash_drawer_use_case)]
+
+
+def get_close_cash_drawer_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> CloseCashDrawerUseCase:
+    return CloseCashDrawerUseCase(
+        session_factory=session_factory,
+        cash_drawer_repository_factory=SQLAlchemyCashDrawerRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+CloseCashDrawerUseCaseDep = Annotated[
+    CloseCashDrawerUseCase, Depends(get_close_cash_drawer_use_case)
 ]

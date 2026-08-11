@@ -1,33 +1,63 @@
-"""SQLAlchemy repository implementations for the operations module,
-Order + Kitchen slice (Sprint 7 Step 3). Mirrors
+"""SQLAlchemy repository implementations for the operations module --
+Order + Kitchen (Sprint 7 Step 3) and Billing + Payments + Ledger
+(Sprint 7 Step 4). Mirrors
 ``modules.restaurant.infrastructure.database.repositories``'s exact
 conventions.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal
+
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from restaurant_os_api.modules.operations.domain.entities import (
+    Bill,
+    BillAdjustment,
+    BillAdjustmentType,
+    BillStatus,
+    CashDrawer,
+    CashDrawerStatus,
+    Discount,
+    DiscountType,
     KitchenItem,
     KitchenItemStatus,
     KitchenTicket,
     KitchenTicketStatus,
+    LedgerEntry,
+    LedgerEntryType,
     Order,
     OrderItem,
     OrderItemLineStatus,
     OrderSource,
     OrderStatus,
+    OrderTaxLine,
+    Payment,
+    PaymentStatus,
+    Refund,
+    RefundStatus,
     Tab,
     TabStatus,
+    Tax,
+    TenderType,
 )
 from restaurant_os_api.modules.operations.infrastructure.database.models import (
+    BillAdjustmentModel,
+    BillModel,
+    CashDrawerModel,
+    DiscountModel,
     KitchenItemModel,
     KitchenTicketModel,
+    LedgerEntryModel,
     OrderItemModel,
     OrderModel,
+    OrderTaxLineModel,
+    PaymentModel,
+    RefundModel,
     TabModel,
+    TaxModel,
 )
 
 
@@ -351,3 +381,492 @@ class SQLAlchemyKitchenTicketRepository:
         )
         await self._session.execute(stmt)
         return item
+
+
+# --- Billing + Payments + Ledger mappers (Sprint 7 Step 4) ----------------
+
+
+def _tax_from_model(model: TaxModel) -> Tax:
+    return Tax(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        name=model.name,
+        rate=model.rate,
+        is_active=model.is_active,
+        created_at=model.created_at,
+    )
+
+
+def _discount_from_model(model: DiscountModel) -> Discount:
+    return Discount(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        name=model.name,
+        discount_type=DiscountType(model.discount_type),
+        value=model.value,
+        requires_approval=model.requires_approval,
+        created_at=model.created_at,
+        max_value=model.max_value,
+        active_from=model.active_from,
+        active_to=model.active_to,
+    )
+
+
+def _bill_from_model(model: BillModel) -> Bill:
+    return Bill(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        branch_id=model.branch_id,
+        status=BillStatus(model.status),
+        created_at=model.created_at,
+        order_id=model.order_id,
+        tab_id=model.tab_id,
+    )
+
+
+def _bill_adjustment_from_model(model: BillAdjustmentModel) -> BillAdjustment:
+    return BillAdjustment(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        bill_id=model.bill_id,
+        adjustment_type=BillAdjustmentType(model.adjustment_type),
+        amount=model.amount,
+        created_at=model.created_at,
+        reference_type=model.reference_type,
+        reference_id=model.reference_id,
+        reason=model.reason,
+        approved_by_user_id=model.approved_by_user_id,
+    )
+
+
+def _order_tax_line_from_model(model: OrderTaxLineModel) -> OrderTaxLine:
+    return OrderTaxLine(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        order_id=model.order_id,
+        tax_id=model.tax_id,
+        taxable_amount=model.taxable_amount,
+        tax_rate_snapshot=model.tax_rate_snapshot,
+        tax_amount=model.tax_amount,
+        created_at=model.created_at,
+    )
+
+
+def _payment_from_model(model: PaymentModel) -> Payment:
+    return Payment(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        branch_id=model.branch_id,
+        bill_id=model.bill_id,
+        tender_type=TenderType(model.tender_type),
+        amount=model.amount,
+        currency_code=model.currency_code,
+        tip_amount=model.tip_amount,
+        status=PaymentStatus(model.status),
+        created_at=model.created_at,
+        gateway_token_ref=model.gateway_token_ref,
+        gateway_last4=model.gateway_last4,
+    )
+
+
+def _refund_from_model(model: RefundModel) -> Refund:
+    return Refund(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        branch_id=model.branch_id,
+        payment_id=model.payment_id,
+        order_id=model.order_id,
+        approved_by_user_id=model.approved_by_user_id,
+        amount=model.amount,
+        status=RefundStatus(model.status),
+        created_at=model.created_at,
+    )
+
+
+def _cash_drawer_from_model(model: CashDrawerModel) -> CashDrawer:
+    return CashDrawer(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        branch_id=model.branch_id,
+        status=CashDrawerStatus(model.status),
+        opening_float_amount=model.opening_float_amount,
+        opened_at=model.opened_at,
+        created_at=model.created_at,
+        terminal_id=model.terminal_id,
+        closing_counted_amount=model.closing_counted_amount,
+        closed_at=model.closed_at,
+    )
+
+
+class SQLAlchemyTaxRepository:
+    """Implements ``TaxRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, tax_id: str) -> Tax | None:
+        stmt = select(TaxModel).where(TaxModel.id == tax_id, TaxModel.tenant_id == tenant_id)
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _tax_from_model(model) if model is not None else None
+
+    async def create(self, tax: Tax) -> Tax:
+        model = TaxModel(
+            id=tax.id,
+            tenant_id=tax.tenant_id,
+            name=tax.name,
+            rate=tax.rate,
+            is_active=tax.is_active,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _tax_from_model(model)
+
+    async def list_active_for_tenant(self, tenant_id: str) -> list[Tax]:
+        stmt = select(TaxModel).where(
+            TaxModel.tenant_id == tenant_id,
+            TaxModel.is_active.is_(True),
+            TaxModel.deleted_at.is_(None),
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_tax_from_model(m) for m in models]
+
+
+class SQLAlchemyDiscountRepository:
+    """Implements ``DiscountRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, discount_id: str) -> Discount | None:
+        stmt = select(DiscountModel).where(
+            DiscountModel.id == discount_id,
+            DiscountModel.tenant_id == tenant_id,
+            DiscountModel.deleted_at.is_(None),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _discount_from_model(model) if model is not None else None
+
+    async def create(self, discount: Discount) -> Discount:
+        model = DiscountModel(
+            id=discount.id,
+            tenant_id=discount.tenant_id,
+            name=discount.name,
+            discount_type=discount.discount_type.value,
+            value=discount.value,
+            requires_approval=discount.requires_approval,
+            max_value=discount.max_value,
+            active_from=discount.active_from,
+            active_to=discount.active_to,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _discount_from_model(model)
+
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[Discount], int]:
+        filters = (DiscountModel.tenant_id == tenant_id, DiscountModel.deleted_at.is_(None))
+        count_stmt = select(func.count()).select_from(DiscountModel).where(*filters)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        page_stmt = (
+            select(DiscountModel)
+            .where(*filters)
+            .order_by(DiscountModel.name)
+            .offset(offset)
+            .limit(limit)
+        )
+        models = (await self._session.execute(page_stmt)).scalars().all()
+        return [_discount_from_model(m) for m in models], total
+
+
+class SQLAlchemyBillRepository:
+    """Implements ``BillRepository`` -- Bill + BillAdjustment + OrderTaxLine."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, bill_id: str) -> Bill | None:
+        stmt = select(BillModel).where(BillModel.id == bill_id, BillModel.tenant_id == tenant_id)
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _bill_from_model(model) if model is not None else None
+
+    async def get_by_order_id(self, tenant_id: str, order_id: str) -> Bill | None:
+        stmt = select(BillModel).where(
+            BillModel.order_id == order_id, BillModel.tenant_id == tenant_id
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _bill_from_model(model) if model is not None else None
+
+    async def create(self, bill: Bill) -> Bill:
+        model = BillModel(
+            id=bill.id,
+            tenant_id=bill.tenant_id,
+            branch_id=bill.branch_id,
+            order_id=bill.order_id,
+            tab_id=bill.tab_id,
+            status=bill.status.value,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _bill_from_model(model)
+
+    async def update(self, bill: Bill) -> Bill:
+        stmt = (
+            update(BillModel)
+            .where(BillModel.id == bill.id, BillModel.tenant_id == bill.tenant_id)
+            .values(status=bill.status.value)
+        )
+        await self._session.execute(stmt)
+        return bill
+
+    async def add_tax_line(self, tax_line: OrderTaxLine) -> OrderTaxLine:
+        model = OrderTaxLineModel(
+            id=tax_line.id,
+            tenant_id=tax_line.tenant_id,
+            order_id=tax_line.order_id,
+            tax_id=tax_line.tax_id,
+            taxable_amount=tax_line.taxable_amount,
+            tax_rate_snapshot=tax_line.tax_rate_snapshot,
+            tax_amount=tax_line.tax_amount,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _order_tax_line_from_model(model)
+
+    async def get_tax_lines_for_order(self, tenant_id: str, order_id: str) -> list[OrderTaxLine]:
+        stmt = select(OrderTaxLineModel).where(
+            OrderTaxLineModel.tenant_id == tenant_id, OrderTaxLineModel.order_id == order_id
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_order_tax_line_from_model(m) for m in models]
+
+    async def add_adjustment(self, adjustment: BillAdjustment) -> BillAdjustment:
+        model = BillAdjustmentModel(
+            id=adjustment.id,
+            tenant_id=adjustment.tenant_id,
+            bill_id=adjustment.bill_id,
+            adjustment_type=adjustment.adjustment_type.value,
+            reference_type=adjustment.reference_type,
+            reference_id=adjustment.reference_id,
+            amount=adjustment.amount,
+            reason=adjustment.reason,
+            approved_by_user_id=adjustment.approved_by_user_id,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _bill_adjustment_from_model(model)
+
+    async def get_adjustments(self, tenant_id: str, bill_id: str) -> list[BillAdjustment]:
+        stmt = select(BillAdjustmentModel).where(
+            BillAdjustmentModel.tenant_id == tenant_id, BillAdjustmentModel.bill_id == bill_id
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_bill_adjustment_from_model(m) for m in models]
+
+
+class SQLAlchemyPaymentRepository:
+    """Implements ``PaymentRepository`` -- Payment + Refund."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, payment_id: str) -> Payment | None:
+        stmt = select(PaymentModel).where(
+            PaymentModel.id == payment_id, PaymentModel.tenant_id == tenant_id
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _payment_from_model(model) if model is not None else None
+
+    async def create(self, payment: Payment) -> Payment:
+        model = PaymentModel(
+            id=payment.id,
+            tenant_id=payment.tenant_id,
+            branch_id=payment.branch_id,
+            bill_id=payment.bill_id,
+            tender_type=payment.tender_type.value,
+            amount=payment.amount,
+            currency_code=payment.currency_code,
+            tip_amount=payment.tip_amount,
+            gateway_token_ref=payment.gateway_token_ref,
+            gateway_last4=payment.gateway_last4,
+            status=payment.status.value,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _payment_from_model(model)
+
+    async def update(self, payment: Payment) -> Payment:
+        stmt = (
+            update(PaymentModel)
+            .where(PaymentModel.id == payment.id, PaymentModel.tenant_id == payment.tenant_id)
+            .values(status=payment.status.value)
+        )
+        await self._session.execute(stmt)
+        return payment
+
+    async def list_for_bill(self, tenant_id: str, bill_id: str) -> list[Payment]:
+        stmt = select(PaymentModel).where(
+            PaymentModel.tenant_id == tenant_id, PaymentModel.bill_id == bill_id
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_payment_from_model(m) for m in models]
+
+    async def get_refund_by_id(self, tenant_id: str, refund_id: str) -> Refund | None:
+        stmt = select(RefundModel).where(
+            RefundModel.id == refund_id, RefundModel.tenant_id == tenant_id
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _refund_from_model(model) if model is not None else None
+
+    async def create_refund(self, refund: Refund) -> Refund:
+        model = RefundModel(
+            id=refund.id,
+            tenant_id=refund.tenant_id,
+            branch_id=refund.branch_id,
+            payment_id=refund.payment_id,
+            order_id=refund.order_id,
+            approved_by_user_id=refund.approved_by_user_id,
+            amount=refund.amount,
+            status=refund.status.value,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _refund_from_model(model)
+
+    async def update_refund(self, refund: Refund) -> Refund:
+        stmt = (
+            update(RefundModel)
+            .where(RefundModel.id == refund.id, RefundModel.tenant_id == refund.tenant_id)
+            .values(status=refund.status.value)
+        )
+        await self._session.execute(stmt)
+        return refund
+
+    async def list_refunds_for_payment(self, tenant_id: str, payment_id: str) -> list[Refund]:
+        stmt = select(RefundModel).where(
+            RefundModel.tenant_id == tenant_id, RefundModel.payment_id == payment_id
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_refund_from_model(m) for m in models]
+
+
+class SQLAlchemyCashDrawerRepository:
+    """Implements ``CashDrawerRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, cash_drawer_id: str) -> CashDrawer | None:
+        stmt = select(CashDrawerModel).where(
+            CashDrawerModel.id == cash_drawer_id, CashDrawerModel.tenant_id == tenant_id
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _cash_drawer_from_model(model) if model is not None else None
+
+    async def get_open_for_branch(self, tenant_id: str, branch_id: str) -> CashDrawer | None:
+        stmt = select(CashDrawerModel).where(
+            CashDrawerModel.tenant_id == tenant_id,
+            CashDrawerModel.branch_id == branch_id,
+            CashDrawerModel.status == "open",
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _cash_drawer_from_model(model) if model is not None else None
+
+    async def create(self, cash_drawer: CashDrawer) -> CashDrawer:
+        model = CashDrawerModel(
+            id=cash_drawer.id,
+            tenant_id=cash_drawer.tenant_id,
+            branch_id=cash_drawer.branch_id,
+            terminal_id=cash_drawer.terminal_id,
+            status=cash_drawer.status.value,
+            opening_float_amount=cash_drawer.opening_float_amount,
+            opened_at=cash_drawer.opened_at,
+            closing_counted_amount=cash_drawer.closing_counted_amount,
+            closed_at=cash_drawer.closed_at,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _cash_drawer_from_model(model)
+
+    async def update(self, cash_drawer: CashDrawer) -> CashDrawer:
+        stmt = (
+            update(CashDrawerModel)
+            .where(
+                CashDrawerModel.id == cash_drawer.id,
+                CashDrawerModel.tenant_id == cash_drawer.tenant_id,
+            )
+            .values(
+                status=cash_drawer.status.value,
+                closing_counted_amount=cash_drawer.closing_counted_amount,
+                closed_at=cash_drawer.closed_at,
+            )
+        )
+        await self._session.execute(stmt)
+        return cash_drawer
+
+    async def sum_settled_cash_payments(
+        self, tenant_id: str, branch_id: str, *, since: datetime
+    ) -> Decimal:
+        stmt = select(func.coalesce(func.sum(PaymentModel.amount), 0)).where(
+            PaymentModel.tenant_id == tenant_id,
+            PaymentModel.branch_id == branch_id,
+            PaymentModel.tender_type == "cash",
+            PaymentModel.status == "settled",
+            PaymentModel.created_at >= since,
+        )
+        total = (await self._session.execute(stmt)).scalar_one()
+        return Decimal(total)
+
+
+class SQLAlchemyLedgerRepository:
+    """Implements ``LedgerRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, entry: LedgerEntry) -> LedgerEntry:
+        model = LedgerEntryModel(
+            id=entry.id,
+            tenant_id=entry.tenant_id,
+            entry_type=entry.entry_type.value,
+            account_code=entry.account_code,
+            amount=entry.amount,
+            currency_code=entry.currency_code,
+            reference_type=entry.reference_type,
+            reference_id=entry.reference_id,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return entry
+
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[LedgerEntry], int]:
+        filters = (LedgerEntryModel.tenant_id == tenant_id,)
+        count_stmt = select(func.count()).select_from(LedgerEntryModel).where(*filters)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        page_stmt = (
+            select(LedgerEntryModel)
+            .where(*filters)
+            .order_by(LedgerEntryModel.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        models = (await self._session.execute(page_stmt)).scalars().all()
+        entries = [
+            LedgerEntry(
+                id=m.id,
+                tenant_id=m.tenant_id,
+                entry_type=LedgerEntryType(m.entry_type),
+                account_code=m.account_code,
+                amount=m.amount,
+                currency_code=m.currency_code,
+                created_at=m.created_at,
+                reference_type=m.reference_type,
+                reference_id=m.reference_id,
+            )
+            for m in models
+        ]
+        return entries, total

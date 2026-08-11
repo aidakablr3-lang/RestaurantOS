@@ -24,11 +24,23 @@ from restaurant_os_api.modules.identity.presentation.api.v1.rbac_router import (
 from restaurant_os_api.modules.identity.presentation.api.v1.self_service_tenant_router import (
     router as self_service_tenant_router,
 )
+from restaurant_os_api.modules.operations.presentation.api.v1.bill_router import (
+    router as bill_router,
+)
+from restaurant_os_api.modules.operations.presentation.api.v1.cash_drawer_router import (
+    router as cash_drawer_router,
+)
+from restaurant_os_api.modules.operations.presentation.api.v1.discount_router import (
+    router as discount_router,
+)
 from restaurant_os_api.modules.operations.presentation.api.v1.kitchen_router import (
     router as kitchen_router,
 )
 from restaurant_os_api.modules.operations.presentation.api.v1.order_router import (
     router as order_router,
+)
+from restaurant_os_api.modules.operations.presentation.api.v1.payment_router import (
+    router as payment_router,
 )
 from restaurant_os_api.modules.operations.presentation.api.v1.tab_router import (
     router as tab_router,
@@ -141,6 +153,10 @@ def create_app() -> FastAPI:
     app.include_router(order_router)
     app.include_router(tab_router)
     app.include_router(kitchen_router)
+    app.include_router(bill_router)
+    app.include_router(discount_router)
+    app.include_router(payment_router)
+    app.include_router(cash_drawer_router)
 
     @app.get("/health/live", include_in_schema=False)
     async def health_live() -> dict[str, str]:
