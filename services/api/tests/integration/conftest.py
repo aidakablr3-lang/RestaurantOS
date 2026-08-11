@@ -203,6 +203,9 @@ async def _clean_tables(engine: AsyncEngine) -> AsyncGenerator[None]:
     truncating here for the same reason every other table does --
     otherwise one test's rate-limit counters would carry into the
     next test reusing the same IP/token strings.
+
+    Sprint 7 (Day-to-Day Operations, migration 0007) added 26 more
+    tables, listed here in the same "extend, don't rebuild" spirit.
     """
     yield
     async with engine.begin() as conn:
@@ -214,11 +217,19 @@ async def _clean_tables(engine: AsyncEngine) -> AsyncGenerator[None]:
             "menu_items, menu_categories, qr_codes, tables, table_zones, operating_hours, "
             "branches, addresses, restaurants, user_roles, role_permissions, roles, "
             "tenant_directory_entries, feature_flags, system_settings, subscriptions, "
-            "sessions, users, tenants RESTART IDENTITY CASCADE"
+            "sessions, users, tenants, "
+            "goods_receipts, purchase_order_items, purchase_orders, suppliers, "
+            "stock_adjustments, stock_movements, inventory_items, inventory_categories, "
+            "recipe_ingredients, recipes, ledger_entries, refunds, payments, "
+            "cash_drawers, bill_adjustments, order_tax_lines, bills, promo_codes, "
+            "discounts, taxes, kitchen_items, kitchen_tickets, order_items, orders, tabs "
+            "RESTART IDENTITY CASCADE"
         )
-        # `permissions` is deliberately excluded: it's fixed platform
-        # reference data seeded once by the 0003 migration (RBAC
-        # Foundation Architecture SS4.2, "same as currencies"), not
-        # per-test data -- truncating it would break every RBAC test
-        # after the first, since role_permissions.permission_code is an
-        # ON DELETE RESTRICT foreign key into it.
+        # `permissions` and `chart_of_accounts` are deliberately
+        # excluded: both are fixed platform reference data seeded once
+        # by their own migrations (0003 and 0007 respectively, "same as
+        # currencies" -- see 0007's own docstring), not per-test data.
+        # Truncating `permissions` would break every RBAC test after
+        # the first (`role_permissions.permission_code` is an
+        # ON DELETE RESTRICT foreign key into it); `chart_of_accounts`
+        # has no tenant_id and no per-tenant rows to begin with.
