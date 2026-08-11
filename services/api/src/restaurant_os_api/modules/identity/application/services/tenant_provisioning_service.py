@@ -111,6 +111,8 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "billing.manage",
                 "billing.refund",
                 "ledger.read",
+                "inventory.read",
+                "inventory.manage",
             }
         ),
     ),
@@ -142,6 +144,8 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "billing.manage",
                 "billing.refund",
                 "ledger.read",
+                "inventory.read",
+                "inventory.manage",
             }
         ),
     ),
@@ -167,6 +171,8 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "billing.read",
                 "billing.manage",
                 "billing.refund",
+                "inventory.read",
+                "inventory.manage",
             }
         ),
     ),
@@ -205,6 +211,15 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
         "Reads the menu (drink-menu subset).",
         RoleScope.BRANCH,
         frozenset({"menu.read"}),
+    ),
+    (
+        "Inventory Manager",
+        (
+            "Manages stock levels and recipes; no POS or payroll access "
+            "(architecture doc SS10's own role table)."
+        ),
+        RoleScope.BRANCH,
+        frozenset({"inventory.read", "inventory.manage", "menu.read", "menu.manage"}),
     ),
 )
 
