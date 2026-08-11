@@ -133,4 +133,7 @@ class TestOpenApiSecurityScheme:
                     )
         # Sprint 7 Step 3 (Order + Kitchen) added 12 operations: 7 on
         # order_router, 2 on tab_router, 3 on kitchen_router.
-        assert checked == 85
+        # Sprint 7 Step 4 (Billing + Payments + Ledger) added 11 more: 4 on
+        # bill_router, 2 on discount_router, 3 on payment_router, 2 on
+        # cash_drawer_router.
+        assert checked == 96
