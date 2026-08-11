@@ -107,6 +107,10 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "order.manage",
                 "kitchen.read",
                 "kitchen.manage",
+                "billing.read",
+                "billing.manage",
+                "billing.refund",
+                "ledger.read",
             }
         ),
     ),
@@ -134,6 +138,10 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "order.manage",
                 "kitchen.read",
                 "kitchen.manage",
+                "billing.read",
+                "billing.manage",
+                "billing.refund",
+                "ledger.read",
             }
         ),
     ),
@@ -156,6 +164,9 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "order.manage",
                 "kitchen.read",
                 "kitchen.manage",
+                "billing.read",
+                "billing.manage",
+                "billing.refund",
             }
         ),
     ),
@@ -167,9 +178,21 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
     ),
     (
         "Cashier",
-        "Reads tables and the menu; takes and manages orders.",
+        (
+            "Reads tables and the menu; takes and manages orders; bills and takes "
+            "payment (cannot issue refunds)."
+        ),
         RoleScope.BRANCH,
-        frozenset({"table.read", "menu.read", "order.read", "order.manage"}),
+        frozenset(
+            {
+                "table.read",
+                "menu.read",
+                "order.read",
+                "order.manage",
+                "billing.read",
+                "billing.manage",
+            }
+        ),
     ),
     (
         "Kitchen Staff",
