@@ -87,6 +87,7 @@ def _branch_from_model(model: BranchModel) -> Branch:
         status=BranchStatus(model.status),
         created_at=model.created_at,
         address_id=model.address_id,
+        allow_negative_stock=model.allow_negative_stock,
     )
 
 

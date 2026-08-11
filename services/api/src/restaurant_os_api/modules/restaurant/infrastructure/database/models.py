@@ -89,6 +89,12 @@ class BranchModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, 
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    # Added by migration 0007 (Sprint 7 Step 2) for the operations
+    # module's negative-inventory trigger; read (not written) by
+    # anything in the restaurant module itself.
+    allow_negative_stock: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
 
 
 class OperatingHoursModel(
@@ -198,9 +204,10 @@ class MenuItemModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin
     currency_code: Mapped[str] = mapped_column(Text, nullable=False)
     is_available: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     display_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    # Inventory Platform's future FK target -- reserved, unpopulated,
-    # no FK yet (Recipe doesn't exist).
-    recipe_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # FK added in migration 0008 (Sprint 7 Step 5), once Recipe existed.
+    recipe_id: Mapped[str | None] = mapped_column(
+        Text, ForeignKey("recipes.id", ondelete="RESTRICT"), nullable=True
+    )
 
 
 class ModifierGroupModel(

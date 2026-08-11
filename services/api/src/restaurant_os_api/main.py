@@ -33,6 +33,9 @@ from restaurant_os_api.modules.operations.presentation.api.v1.cash_drawer_router
 from restaurant_os_api.modules.operations.presentation.api.v1.discount_router import (
     router as discount_router,
 )
+from restaurant_os_api.modules.operations.presentation.api.v1.inventory_router import (
+    router as inventory_router,
+)
 from restaurant_os_api.modules.operations.presentation.api.v1.kitchen_router import (
     router as kitchen_router,
 )
@@ -41,6 +44,9 @@ from restaurant_os_api.modules.operations.presentation.api.v1.order_router impor
 )
 from restaurant_os_api.modules.operations.presentation.api.v1.payment_router import (
     router as payment_router,
+)
+from restaurant_os_api.modules.operations.presentation.api.v1.recipe_router import (
+    router as recipe_router,
 )
 from restaurant_os_api.modules.operations.presentation.api.v1.tab_router import (
     router as tab_router,
@@ -157,6 +163,8 @@ def create_app() -> FastAPI:
     app.include_router(discount_router)
     app.include_router(payment_router)
     app.include_router(cash_drawer_router)
+    app.include_router(inventory_router)
+    app.include_router(recipe_router)
 
     @app.get("/health/live", include_in_schema=False)
     async def health_live() -> dict[str, str]:

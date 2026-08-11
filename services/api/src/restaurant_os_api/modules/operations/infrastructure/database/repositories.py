@@ -22,6 +22,8 @@ from restaurant_os_api.modules.operations.domain.entities import (
     CashDrawerStatus,
     Discount,
     DiscountType,
+    InventoryCategory,
+    InventoryItem,
     KitchenItem,
     KitchenItemStatus,
     KitchenTicket,
@@ -36,8 +38,13 @@ from restaurant_os_api.modules.operations.domain.entities import (
     OrderTaxLine,
     Payment,
     PaymentStatus,
+    Recipe,
+    RecipeIngredient,
     Refund,
     RefundStatus,
+    StockAdjustment,
+    StockMovement,
+    StockMovementType,
     Tab,
     TabStatus,
     Tax,
@@ -48,6 +55,8 @@ from restaurant_os_api.modules.operations.infrastructure.database.models import 
     BillModel,
     CashDrawerModel,
     DiscountModel,
+    InventoryCategoryModel,
+    InventoryItemModel,
     KitchenItemModel,
     KitchenTicketModel,
     LedgerEntryModel,
@@ -55,7 +64,11 @@ from restaurant_os_api.modules.operations.infrastructure.database.models import 
     OrderModel,
     OrderTaxLineModel,
     PaymentModel,
+    RecipeIngredientModel,
+    RecipeModel,
     RefundModel,
+    StockAdjustmentModel,
+    StockMovementModel,
     TabModel,
     TaxModel,
 )
@@ -870,3 +883,319 @@ class SQLAlchemyLedgerRepository:
             for m in models
         ]
         return entries, total
+
+
+# --- Inventory + Recipe (Sprint 7 Step 5) ----------------------------------
+
+
+def _inventory_category_from_model(model: InventoryCategoryModel) -> InventoryCategory:
+    return InventoryCategory(
+        id=model.id, tenant_id=model.tenant_id, name=model.name, created_at=model.created_at
+    )
+
+
+def _inventory_item_from_model(model: InventoryItemModel) -> InventoryItem:
+    return InventoryItem(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        branch_id=model.branch_id,
+        inventory_category_id=model.inventory_category_id,
+        name=model.name,
+        unit=model.unit,
+        quantity_on_hand=model.quantity_on_hand,
+        created_at=model.created_at,
+        reorder_point=model.reorder_point,
+        allow_negative_stock_override=model.allow_negative_stock_override,
+    )
+
+
+def _recipe_from_model(model: RecipeModel) -> Recipe:
+    return Recipe(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        name=model.name,
+        version=model.version,
+        created_at=model.created_at,
+        superseded_by_id=model.superseded_by_id,
+    )
+
+
+def _recipe_ingredient_from_model(model: RecipeIngredientModel) -> RecipeIngredient:
+    return RecipeIngredient(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        recipe_id=model.recipe_id,
+        inventory_item_id=model.inventory_item_id,
+        quantity=model.quantity,
+        unit=model.unit,
+        created_at=model.created_at,
+    )
+
+
+def _stock_movement_from_model(model: StockMovementModel) -> StockMovement:
+    return StockMovement(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        branch_id=model.branch_id,
+        inventory_item_id=model.inventory_item_id,
+        movement_type=StockMovementType(model.movement_type),
+        quantity_delta=model.quantity_delta,
+        occurred_at=model.occurred_at,
+        created_at=model.created_at,
+        reference_type=model.reference_type,
+        reference_id=model.reference_id,
+        idempotency_key=model.idempotency_key,
+    )
+
+
+def _stock_adjustment_from_model(model: StockAdjustmentModel) -> StockAdjustment:
+    return StockAdjustment(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        branch_id=model.branch_id,
+        inventory_item_id=model.inventory_item_id,
+        reason=model.reason,
+        approved_by_user_id=model.approved_by_user_id,
+        created_at=model.created_at,
+        stock_movement_id=model.stock_movement_id,
+    )
+
+
+class SQLAlchemyInventoryCategoryRepository:
+    """Implements ``InventoryCategoryRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(
+        self, tenant_id: str, inventory_category_id: str
+    ) -> InventoryCategory | None:
+        stmt = select(InventoryCategoryModel).where(
+            InventoryCategoryModel.id == inventory_category_id,
+            InventoryCategoryModel.tenant_id == tenant_id,
+            InventoryCategoryModel.deleted_at.is_(None),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _inventory_category_from_model(model) if model is not None else None
+
+    async def get_by_tenant_id_and_name(
+        self, tenant_id: str, name: str
+    ) -> InventoryCategory | None:
+        stmt = select(InventoryCategoryModel).where(
+            InventoryCategoryModel.tenant_id == tenant_id,
+            InventoryCategoryModel.name == name,
+            InventoryCategoryModel.deleted_at.is_(None),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _inventory_category_from_model(model) if model is not None else None
+
+    async def create(self, category: InventoryCategory) -> InventoryCategory:
+        model = InventoryCategoryModel(
+            id=category.id, tenant_id=category.tenant_id, name=category.name
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _inventory_category_from_model(model)
+
+    async def list_for_tenant(self, tenant_id: str) -> list[InventoryCategory]:
+        stmt = select(InventoryCategoryModel).where(
+            InventoryCategoryModel.tenant_id == tenant_id,
+            InventoryCategoryModel.deleted_at.is_(None),
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_inventory_category_from_model(m) for m in models]
+
+
+class SQLAlchemyInventoryItemRepository:
+    """Implements ``InventoryItemRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, inventory_item_id: str) -> InventoryItem | None:
+        stmt = select(InventoryItemModel).where(
+            InventoryItemModel.id == inventory_item_id,
+            InventoryItemModel.tenant_id == tenant_id,
+            InventoryItemModel.deleted_at.is_(None),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _inventory_item_from_model(model) if model is not None else None
+
+    async def get_by_branch_id_and_name(
+        self, tenant_id: str, branch_id: str, name: str
+    ) -> InventoryItem | None:
+        stmt = select(InventoryItemModel).where(
+            InventoryItemModel.tenant_id == tenant_id,
+            InventoryItemModel.branch_id == branch_id,
+            InventoryItemModel.name == name,
+            InventoryItemModel.deleted_at.is_(None),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _inventory_item_from_model(model) if model is not None else None
+
+    async def create(self, item: InventoryItem) -> InventoryItem:
+        model = InventoryItemModel(
+            id=item.id,
+            tenant_id=item.tenant_id,
+            branch_id=item.branch_id,
+            inventory_category_id=item.inventory_category_id,
+            name=item.name,
+            unit=item.unit,
+            quantity_on_hand=item.quantity_on_hand,
+            reorder_point=item.reorder_point,
+            allow_negative_stock_override=item.allow_negative_stock_override,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _inventory_item_from_model(model)
+
+    async def update(self, item: InventoryItem) -> InventoryItem:
+        stmt = (
+            update(InventoryItemModel)
+            .where(InventoryItemModel.id == item.id, InventoryItemModel.tenant_id == item.tenant_id)
+            .values(
+                inventory_category_id=item.inventory_category_id,
+                name=item.name,
+                reorder_point=item.reorder_point,
+                allow_negative_stock_override=item.allow_negative_stock_override,
+            )
+        )
+        await self._session.execute(stmt)
+        return item
+
+    async def list_for_branch(
+        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+    ) -> tuple[list[InventoryItem], int]:
+        filters = (
+            InventoryItemModel.tenant_id == tenant_id,
+            InventoryItemModel.branch_id == branch_id,
+            InventoryItemModel.deleted_at.is_(None),
+        )
+        count_stmt = select(func.count()).select_from(InventoryItemModel).where(*filters)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        page_stmt = (
+            select(InventoryItemModel)
+            .where(*filters)
+            .order_by(InventoryItemModel.name)
+            .offset(offset)
+            .limit(limit)
+        )
+        models = (await self._session.execute(page_stmt)).scalars().all()
+        return [_inventory_item_from_model(m) for m in models], total
+
+
+class SQLAlchemyRecipeRepository:
+    """Implements ``RecipeRepository``."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_id(self, tenant_id: str, recipe_id: str) -> Recipe | None:
+        stmt = select(RecipeModel).where(
+            RecipeModel.id == recipe_id,
+            RecipeModel.tenant_id == tenant_id,
+            RecipeModel.deleted_at.is_(None),
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _recipe_from_model(model) if model is not None else None
+
+    async def create(self, recipe: Recipe) -> Recipe:
+        model = RecipeModel(
+            id=recipe.id, tenant_id=recipe.tenant_id, name=recipe.name, version=recipe.version
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _recipe_from_model(model)
+
+    async def update(self, recipe: Recipe) -> Recipe:
+        stmt = (
+            update(RecipeModel)
+            .where(RecipeModel.id == recipe.id, RecipeModel.tenant_id == recipe.tenant_id)
+            .values(superseded_by_id=recipe.superseded_by_id)
+        )
+        await self._session.execute(stmt)
+        return recipe
+
+    async def add_ingredient(self, ingredient: RecipeIngredient) -> RecipeIngredient:
+        model = RecipeIngredientModel(
+            id=ingredient.id,
+            tenant_id=ingredient.tenant_id,
+            recipe_id=ingredient.recipe_id,
+            inventory_item_id=ingredient.inventory_item_id,
+            quantity=ingredient.quantity,
+            unit=ingredient.unit,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _recipe_ingredient_from_model(model)
+
+    async def list_ingredients_for_recipe(
+        self, tenant_id: str, recipe_id: str
+    ) -> list[RecipeIngredient]:
+        stmt = select(RecipeIngredientModel).where(
+            RecipeIngredientModel.tenant_id == tenant_id,
+            RecipeIngredientModel.recipe_id == recipe_id,
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_recipe_ingredient_from_model(m) for m in models]
+
+
+class SQLAlchemyStockMovementRepository:
+    """Implements ``StockMovementRepository`` -- bundles StockMovement
+    and StockAdjustment, mirroring ``SQLAlchemyPaymentRepository``'s own
+    Payment+Refund bundling."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create_movement(self, movement: StockMovement) -> StockMovement:
+        model = StockMovementModel(
+            id=movement.id,
+            tenant_id=movement.tenant_id,
+            branch_id=movement.branch_id,
+            inventory_item_id=movement.inventory_item_id,
+            movement_type=movement.movement_type.value,
+            quantity_delta=movement.quantity_delta,
+            occurred_at=movement.occurred_at,
+            reference_type=movement.reference_type,
+            reference_id=movement.reference_id,
+            idempotency_key=movement.idempotency_key,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _stock_movement_from_model(model)
+
+    async def list_for_item(
+        self, tenant_id: str, inventory_item_id: str, *, offset: int, limit: int
+    ) -> tuple[list[StockMovement], int]:
+        filters = (
+            StockMovementModel.tenant_id == tenant_id,
+            StockMovementModel.inventory_item_id == inventory_item_id,
+        )
+        count_stmt = select(func.count()).select_from(StockMovementModel).where(*filters)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        page_stmt = (
+            select(StockMovementModel)
+            .where(*filters)
+            .order_by(StockMovementModel.occurred_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        models = (await self._session.execute(page_stmt)).scalars().all()
+        return [_stock_movement_from_model(m) for m in models], total
+
+    async def create_adjustment(self, adjustment: StockAdjustment) -> StockAdjustment:
+        model = StockAdjustmentModel(
+            id=adjustment.id,
+            tenant_id=adjustment.tenant_id,
+            branch_id=adjustment.branch_id,
+            inventory_item_id=adjustment.inventory_item_id,
+            stock_movement_id=adjustment.stock_movement_id,
+            reason=adjustment.reason,
+            approved_by_user_id=adjustment.approved_by_user_id,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _stock_adjustment_from_model(model)

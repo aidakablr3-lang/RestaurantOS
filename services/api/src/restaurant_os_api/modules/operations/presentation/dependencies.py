@@ -40,20 +40,30 @@ from restaurant_os_api.modules.operations.application.use_cases import (
     CloseOrderUseCase,
     CloseTabUseCase,
     CreateDiscountUseCase,
+    CreateInventoryCategoryUseCase,
+    CreateInventoryItemUseCase,
     CreateOrderUseCase,
     CreateTabUseCase,
     CreateTaxUseCase,
     FireOrderUseCase,
     GenerateBillUseCase,
     GetBillUseCase,
+    GetInventoryItemUseCase,
+    GetMenuItemRecipeUseCase,
     GetOrderUseCase,
     ListDiscountsUseCase,
+    ListInventoryCategoriesUseCase,
+    ListInventoryItemsUseCase,
     ListKitchenTicketsUseCase,
     ListOrdersUseCase,
     ListPaymentsUseCase,
+    ListStockMovementsUseCase,
     OpenCashDrawerUseCase,
     RecordPaymentUseCase,
+    RecordStockMovementUseCase,
     RequestRefundUseCase,
+    ReviseRecipeUseCase,
+    UpdateInventoryItemUseCase,
     UpdateKitchenItemStatusUseCase,
     UpdateKitchenTicketStatusUseCase,
     VoidOrderUseCase,
@@ -62,10 +72,14 @@ from restaurant_os_api.modules.operations.infrastructure.database.repositories i
     SQLAlchemyBillRepository,
     SQLAlchemyCashDrawerRepository,
     SQLAlchemyDiscountRepository,
+    SQLAlchemyInventoryCategoryRepository,
+    SQLAlchemyInventoryItemRepository,
     SQLAlchemyKitchenTicketRepository,
     SQLAlchemyLedgerRepository,
     SQLAlchemyOrderRepository,
     SQLAlchemyPaymentRepository,
+    SQLAlchemyRecipeRepository,
+    SQLAlchemyStockMovementRepository,
     SQLAlchemyTabRepository,
     SQLAlchemyTaxRepository,
 )
@@ -86,31 +100,47 @@ __all__ = [
     "CloseOrderUseCaseDep",
     "CloseTabUseCaseDep",
     "CreateDiscountUseCaseDep",
+    "CreateInventoryCategoryUseCaseDep",
+    "CreateInventoryItemUseCaseDep",
     "CreateOrderUseCaseDep",
     "CreateTabUseCaseDep",
     "CreateTaxUseCaseDep",
     "FireOrderUseCaseDep",
     "GenerateBillUseCaseDep",
     "GetBillUseCaseDep",
+    "GetInventoryItemUseCaseDep",
+    "GetMenuItemRecipeUseCaseDep",
     "GetOrderUseCaseDep",
     "IdempotencyGuardDep",
     "ListDiscountsUseCaseDep",
+    "ListInventoryCategoriesUseCaseDep",
+    "ListInventoryItemsUseCaseDep",
     "ListKitchenTicketsUseCaseDep",
     "ListOrdersUseCaseDep",
     "ListPaymentsUseCaseDep",
+    "ListStockMovementsUseCaseDep",
     "OpenCashDrawerUseCaseDep",
     "RecordPaymentUseCaseDep",
+    "RecordStockMovementUseCaseDep",
     "RequestRefundUseCaseDep",
     "RequireBillingManageAtAnyScopeDep",
     "RequireBillingManageDep",
     "RequireBillingManageTenantWideDep",
     "RequireBillingReadAtAnyScopeDep",
     "RequireBillingRefundAtAnyScopeDep",
+    "RequireInventoryManageAtAnyScopeDep",
+    "RequireInventoryManageDep",
+    "RequireInventoryManageTenantWideDep",
+    "RequireInventoryReadAtAnyScopeDep",
+    "RequireInventoryReadDep",
+    "RequireInventoryReadTenantWideDep",
     "RequireKitchenManageAtAnyScopeDep",
     "RequireKitchenReadDep",
     "RequireOrderManageAtAnyScopeDep",
     "RequireOrderManageDep",
     "RequireOrderReadDep",
+    "ReviseRecipeUseCaseDep",
+    "UpdateInventoryItemUseCaseDep",
     "UpdateKitchenItemStatusUseCaseDep",
     "UpdateKitchenTicketStatusUseCaseDep",
     "VoidOrderUseCaseDep",
@@ -156,6 +186,28 @@ RequireBillingRefundAtAnyScopeDep = Annotated[
 # mirroring ModifierGroupRouter's own tenant-wide gate shape.
 RequireBillingManageTenantWideDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission("billing.manage"))
+]
+
+# --- Inventory + Recipe (Sprint 7 Step 5) ---------------------------------
+RequireInventoryManageDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("inventory.manage"))
+]
+RequireInventoryReadDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("inventory.read"))
+]
+RequireInventoryManageAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("inventory.manage"))
+]
+RequireInventoryReadAtAnyScopeDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("inventory.read"))
+]
+# InventoryCategory is tenant-level grouping (no branch dimension),
+# mirroring Tax/Discount's own tenant-wide gate shape.
+RequireInventoryManageTenantWideDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission("inventory.manage"))
+]
+RequireInventoryReadTenantWideDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission("inventory.read"))
 ]
 
 
@@ -499,4 +551,156 @@ def get_close_cash_drawer_use_case(
 
 CloseCashDrawerUseCaseDep = Annotated[
     CloseCashDrawerUseCase, Depends(get_close_cash_drawer_use_case)
+]
+
+
+# --- Inventory + Recipe (Sprint 7 Step 5) ---------------------------------
+
+
+def get_create_inventory_category_use_case(
+    session_factory: SessionFactoryDep,
+) -> CreateInventoryCategoryUseCase:
+    return CreateInventoryCategoryUseCase(
+        session_factory=session_factory,
+        inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
+    )
+
+
+CreateInventoryCategoryUseCaseDep = Annotated[
+    CreateInventoryCategoryUseCase, Depends(get_create_inventory_category_use_case)
+]
+
+
+def get_list_inventory_categories_use_case(
+    session_factory: SessionFactoryDep,
+) -> ListInventoryCategoriesUseCase:
+    return ListInventoryCategoriesUseCase(
+        session_factory=session_factory,
+        inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
+    )
+
+
+ListInventoryCategoriesUseCaseDep = Annotated[
+    ListInventoryCategoriesUseCase, Depends(get_list_inventory_categories_use_case)
+]
+
+
+def get_create_inventory_item_use_case(
+    session_factory: SessionFactoryDep,
+) -> CreateInventoryItemUseCase:
+    return CreateInventoryItemUseCase(
+        session_factory=session_factory,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+    )
+
+
+CreateInventoryItemUseCaseDep = Annotated[
+    CreateInventoryItemUseCase, Depends(get_create_inventory_item_use_case)
+]
+
+
+def get_get_inventory_item_use_case(session_factory: SessionFactoryDep) -> GetInventoryItemUseCase:
+    return GetInventoryItemUseCase(
+        session_factory=session_factory,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+    )
+
+
+GetInventoryItemUseCaseDep = Annotated[
+    GetInventoryItemUseCase, Depends(get_get_inventory_item_use_case)
+]
+
+
+def get_list_inventory_items_use_case(
+    session_factory: SessionFactoryDep,
+) -> ListInventoryItemsUseCase:
+    return ListInventoryItemsUseCase(
+        session_factory=session_factory,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+    )
+
+
+ListInventoryItemsUseCaseDep = Annotated[
+    ListInventoryItemsUseCase, Depends(get_list_inventory_items_use_case)
+]
+
+
+def get_update_inventory_item_use_case(
+    session_factory: SessionFactoryDep,
+) -> UpdateInventoryItemUseCase:
+    return UpdateInventoryItemUseCase(
+        session_factory=session_factory,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
+    )
+
+
+UpdateInventoryItemUseCaseDep = Annotated[
+    UpdateInventoryItemUseCase, Depends(get_update_inventory_item_use_case)
+]
+
+
+def get_record_stock_movement_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> RecordStockMovementUseCase:
+    return RecordStockMovementUseCase(
+        session_factory=session_factory,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        stock_movement_repository_factory=SQLAlchemyStockMovementRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+RecordStockMovementUseCaseDep = Annotated[
+    RecordStockMovementUseCase, Depends(get_record_stock_movement_use_case)
+]
+
+
+def get_list_stock_movements_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ListStockMovementsUseCase:
+    return ListStockMovementsUseCase(
+        session_factory=session_factory,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        stock_movement_repository_factory=SQLAlchemyStockMovementRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+ListStockMovementsUseCaseDep = Annotated[
+    ListStockMovementsUseCase, Depends(get_list_stock_movements_use_case)
+]
+
+
+def get_revise_recipe_use_case(session_factory: SessionFactoryDep) -> ReviseRecipeUseCase:
+    return ReviseRecipeUseCase(
+        session_factory=session_factory,
+        recipe_repository_factory=SQLAlchemyRecipeRepository,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+    )
+
+
+ReviseRecipeUseCaseDep = Annotated[ReviseRecipeUseCase, Depends(get_revise_recipe_use_case)]
+
+
+def get_get_menu_item_recipe_use_case(
+    session_factory: SessionFactoryDep,
+) -> GetMenuItemRecipeUseCase:
+    return GetMenuItemRecipeUseCase(
+        session_factory=session_factory,
+        recipe_repository_factory=SQLAlchemyRecipeRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+    )
+
+
+GetMenuItemRecipeUseCaseDep = Annotated[
+    GetMenuItemRecipeUseCase, Depends(get_get_menu_item_recipe_use_case)
 ]
