@@ -261,6 +261,10 @@ class TestGetBillUseCase:
         assert result.amount_paid == Decimal(50)
         assert result.subtotal_amount == Decimal(100)
         assert result.tax_amount == Decimal(10)
+        # amount_due must reflect the remaining balance, not the bill's
+        # original total -- regression lock for the bug where a partial
+        # payment never reduced amount_due (110 total - 50 paid = 60).
+        assert result.amount_due == Decimal(60)
 
     async def test_raises_not_found_for_an_unknown_bill(self) -> None:
         use_case = self._use_case(

@@ -50,7 +50,7 @@ def bill_to_dto(
     amount_paid: Decimal,
 ) -> BillDTO:
     adjustments_total = sum((a.amount for a in adjustments), Decimal(0))
-    amount_due = subtotal_amount + tax_amount + adjustments_total
+    amount_due = subtotal_amount + tax_amount + adjustments_total - amount_paid
     return BillDTO(
         id=bill.id,
         tenant_id=bill.tenant_id,
