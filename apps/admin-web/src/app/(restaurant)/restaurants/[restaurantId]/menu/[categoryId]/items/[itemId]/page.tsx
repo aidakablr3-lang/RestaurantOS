@@ -553,18 +553,23 @@ export default function MenuItemDetailPage() {
             / {item.name}
           </p>
         </div>
-        {canManage ? (
-          <MenuItemFormDialog
-            menuCategoryId={categoryId}
-            menuItem={item}
-            trigger={
-              <Button variant="outline">
-                <PencilIcon />
-                Edit
-              </Button>
-            }
-          />
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="outline" render={<Link href={`/menu-items/${itemId}/recipe`} />} nativeButton={false}>
+            Recipe
+          </Button>
+          {canManage ? (
+            <MenuItemFormDialog
+              menuCategoryId={categoryId}
+              menuItem={item}
+              trigger={
+                <Button variant="outline">
+                  <PencilIcon />
+                  Edit
+                </Button>
+              }
+            />
+          ) : null}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
