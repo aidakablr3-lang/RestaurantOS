@@ -35,7 +35,12 @@ from restaurant_os_api.modules.operations.domain.exceptions import (
     PaymentNotFoundError,
     RefundExceedsPaymentError,
 )
-from restaurant_os_api.modules.restaurant.domain.entities import Branch, BranchStatus
+from restaurant_os_api.modules.restaurant.domain.entities import (
+    Branch,
+    BranchStatus,
+    Table,
+    TableStatus,
+)
 from tests.unit.modules.operations.fakes import (
     FakeAsyncSession,
     FakeOutboxWriter,
@@ -46,13 +51,14 @@ from tests.unit.modules.operations.fakes import (
     InMemoryPaymentRepository,
     fake_session_factory_returning,
 )
-from tests.unit.modules.restaurant.fakes import InMemoryBranchRepository
+from tests.unit.modules.restaurant.fakes import InMemoryBranchRepository, InMemoryTableRepository
 
 TENANT_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 BRANCH_ID = "01ARZ3NDEKTSV4RRFFQ6BRNCH1"
 ORDER_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR01"
 BILL_ID = "01ARZ3NDEKTSV4RRFFQ6BILL01"
 PAYMENT_ID = "01ARZ3NDEKTSV4RRFFQ6PAY001"
+TABLE_ID = "01ARZ3NDEKTSV4RRFFQ6TABL01"
 
 
 def _session_factory():
@@ -102,6 +108,22 @@ def _bill(**overrides) -> Bill:
     return Bill(**defaults)
 
 
+def _table(**overrides) -> Table:
+    defaults = {
+        "id": TABLE_ID,
+        "tenant_id": TENANT_ID,
+        "branch_id": BRANCH_ID,
+        "table_zone_id": "01ARZ3NDEKTSV4RRFFQ6ZONE01",
+        "table_number": "5",
+        "capacity": 4,
+        "status": TableStatus.OCCUPIED,
+        "sync_version": 1,
+        "created_at": datetime.now(UTC),
+    }
+    defaults.update(overrides)
+    return Table(**defaults)
+
+
 def _payment(**overrides) -> Payment:
     defaults = {
         "id": PAYMENT_ID,
@@ -121,7 +143,15 @@ def _payment(**overrides) -> Payment:
 
 class TestRecordPaymentUseCase:
     def _use_case(
-        self, bill_repo, order_repo, payment_repo, ledger_repo, branch_repo, resolved, outbox
+        self,
+        bill_repo,
+        order_repo,
+        payment_repo,
+        ledger_repo,
+        branch_repo,
+        resolved,
+        outbox,
+        table_repo=None,
     ) -> RecordPaymentUseCase:
         return RecordPaymentUseCase(
             session_factory=_session_factory(),
@@ -130,6 +160,7 @@ class TestRecordPaymentUseCase:
             payment_repository_factory=lambda _s: payment_repo,
             ledger_repository_factory=lambda _s: ledger_repo,
             branch_repository_factory=lambda _s: branch_repo,
+            table_repository_factory=lambda _s: table_repo or InMemoryTableRepository(),
             resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved),
             outbox_writer_factory=lambda _s: outbox,
         )
@@ -158,6 +189,7 @@ class TestRecordPaymentUseCase:
         )
 
         assert result.status == "settled"
+        assert result.tip_amount == Decimal(0)
         updated_bill = await bill_repo.get_by_id(TENANT_ID, BILL_ID)
         assert updated_bill is not None
         assert updated_bill.status == BillStatus.CLOSED
@@ -195,6 +227,54 @@ class TestRecordPaymentUseCase:
         updated_order = await order_repo.get_by_id(TENANT_ID, ORDER_ID)
         assert updated_order is not None
         assert updated_order.status == OrderStatus.BILLED
+
+    async def test_full_payment_releases_an_occupied_table(self) -> None:
+        bill_repo = InMemoryBillRepository({BILL_ID: _bill()})
+        order_repo = InMemoryOrderRepository({ORDER_ID: _order(table_id=TABLE_ID)})
+        table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
+        use_case = self._use_case(
+            bill_repo,
+            order_repo,
+            InMemoryPaymentRepository(),
+            InMemoryLedgerRepository(),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+            FakeOutboxWriter(),
+            table_repo=table_repo,
+        )
+
+        await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            RecordPaymentRequestDTO(bill_id=BILL_ID, tender_type="cash", amount=Decimal(110)),
+        )
+
+        table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
+        assert table is not None
+        assert table.status == TableStatus.AVAILABLE
+
+    async def test_partial_payment_leaves_the_table_occupied(self) -> None:
+        table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
+        use_case = self._use_case(
+            InMemoryBillRepository({BILL_ID: _bill()}),
+            InMemoryOrderRepository({ORDER_ID: _order(table_id=TABLE_ID)}),
+            InMemoryPaymentRepository(),
+            InMemoryLedgerRepository(),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+            FakeOutboxWriter(),
+            table_repo=table_repo,
+        )
+
+        await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            RecordPaymentRequestDTO(bill_id=BILL_ID, tender_type="cash", amount=Decimal(50)),
+        )
+
+        table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
+        assert table is not None
+        assert table.status == TableStatus.OCCUPIED
 
     async def test_raises_overpayment_when_amount_exceeds_amount_due(self) -> None:
         use_case = self._use_case(

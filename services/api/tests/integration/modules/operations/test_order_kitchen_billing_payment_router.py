@@ -229,15 +229,21 @@ class TestOrderKitchenBillingPaymentLifecycle:
         headers = _auth_headers(owner["token"])
         branch_id = owner["branch_id"]
 
+        table_id = owner["table_id"]
         create_resp = client.post(
             f"/api/v1/branches/{branch_id}/orders",
             headers=headers,
-            json={"orderSource": "pos"},
+            json={"orderSource": "pos", "tableId": table_id},
         )
         assert create_resp.status_code == 201, create_resp.text
         order = create_resp.json()["data"]
         assert order["status"] == "open"
         order_id = order["id"]
+
+        table_after_create = client.get(f"/api/v1/branches/{branch_id}/tables", headers=headers)
+        assert table_after_create.status_code == 200
+        seated_table = next(t for t in table_after_create.json()["data"] if t["id"] == table_id)
+        assert seated_table["status"] == "occupied"
 
         item_resp = client.post(
             f"/api/v1/orders/{order_id}/items",
@@ -265,6 +271,9 @@ class TestOrderKitchenBillingPaymentLifecycle:
             json={"status": "in_progress"},
         )
         assert start_resp.status_code == 200, start_resp.text
+        # The ticket-level bump cascades down to its own items -- nobody
+        # bumped this item individually, so it started out "queued".
+        assert all(item["status"] == "in_progress" for item in start_resp.json()["data"]["items"])
 
         ready_resp = client.post(
             f"/api/v1/kitchen-tickets/{ticket_id}/status",
@@ -273,6 +282,24 @@ class TestOrderKitchenBillingPaymentLifecycle:
         )
         assert ready_resp.status_code == 200, ready_resp.text
         assert ready_resp.json()["data"]["status"] == "ready"
+        assert all(item["status"] == "ready" for item in ready_resp.json()["data"]["items"])
+
+        served_resp = client.post(
+            f"/api/v1/kitchen-tickets/{ticket_id}/status",
+            headers=headers,
+            json={"status": "served"},
+        )
+        assert served_resp.status_code == 200, served_resp.text
+        # This ticket carries the order's only item, so serving it also
+        # cascades the underlying OrderItem to "served" and, since that
+        # was the order's last outstanding item, the Order itself.
+        order_after_serve = client.get(
+            f"/api/v1/branches/{branch_id}/orders/{order_id}", headers=headers
+        )
+        assert order_after_serve.status_code == 200
+        served_order = order_after_serve.json()["data"]
+        assert served_order["status"] == "served"
+        assert all(item["lineStatus"] == "served" for item in served_order["items"])
 
         tax_resp = client.post(
             "/api/v1/taxes", headers=headers, json={"name": "VAT", "rate": "0.10"}
@@ -298,22 +325,25 @@ class TestOrderKitchenBillingPaymentLifecycle:
         amount_due = Decimal(adjusted_bill["amountDue"])
         assert amount_due == Decimal("20.00")  # 20 subtotal + 2 tax - 2 discount
 
-        tip_amount = Decimal("3.00")
+        # No tip anywhere: the customer pays exactly amount_due (P0
+        # correction, 2026-08-12 -- tip is not part of the restaurant bill).
         payment_resp = client.post(
             f"/api/v1/bills/{bill_id}/payments",
             headers=headers,
-            json={
-                "tenderType": "cash",
-                # RecordPaymentUseCase applies (amount - tipAmount) to amount_due,
-                # so the bill's own share must be topped up by the tip to fully pay.
-                "amount": str(amount_due + tip_amount),
-                "tipAmount": str(tip_amount),
-            },
+            json={"tenderType": "cash", "amount": str(amount_due)},
         )
         assert payment_resp.status_code == 201, payment_resp.text
         payment = payment_resp.json()["data"]
         assert payment["status"] == "settled"
+        assert Decimal(payment["tipAmount"]) == Decimal(0)
         payment_id = payment["id"]
+
+        bill_after_payment = client.get(f"/api/v1/bills/{bill_id}", headers=headers)
+        assert bill_after_payment.status_code == 200
+        settled_bill = bill_after_payment.json()["data"]
+        assert settled_bill["status"] == "closed"
+        assert Decimal(settled_bill["amountDue"]) == Decimal(0)
+        assert Decimal(settled_bill["amountPaid"]) == amount_due
 
         order_after_payment = client.get(
             f"/api/v1/branches/{branch_id}/orders/{order_id}", headers=headers
@@ -321,17 +351,120 @@ class TestOrderKitchenBillingPaymentLifecycle:
         assert order_after_payment.status_code == 200
         assert order_after_payment.json()["data"]["status"] == "closed"
 
+        # The other half of the P0 correction: the table is released
+        # automatically in the same transaction as the closing payment --
+        # no separate manual step required.
+        table_after_payment = client.get(f"/api/v1/branches/{branch_id}/tables", headers=headers)
+        assert table_after_payment.status_code == 200
+        released_table = next(t for t in table_after_payment.json()["data"] if t["id"] == table_id)
+        assert released_table["status"] == "available"
+
         list_payments_resp = client.get(f"/api/v1/bills/{bill_id}/payments", headers=headers)
         assert list_payments_resp.status_code == 200
         assert len(list_payments_resp.json()["data"]) == 1
 
+        # Refund is retired from the active product surface -- the route
+        # no longer exists at all.
         refund_resp = client.post(
             f"/api/v1/payments/{payment_id}/refund",
             headers=headers,
             json={"approvedByUserId": owner["user_id"], "amount": "5.00"},
         )
-        assert refund_resp.status_code == 201, refund_resp.text
-        assert refund_resp.json()["data"]["status"] == "processed"
+        assert refund_resp.status_code == 404, refund_resp.text
+
+    def test_overpayment_is_rejected(self, client: TestClient, owner: dict) -> None:
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+
+        create_resp = client.post(
+            f"/api/v1/branches/{branch_id}/orders", headers=headers, json={"orderSource": "pos"}
+        )
+        order_id = create_resp.json()["data"]["id"]
+        client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        )
+        client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        bill_resp = client.post(f"/api/v1/orders/{order_id}/bill", headers=headers)
+        bill_id = bill_resp.json()["data"]["id"]
+        amount_due = Decimal(bill_resp.json()["data"]["amountDue"])
+
+        over_resp = client.post(
+            f"/api/v1/bills/{bill_id}/payments",
+            headers=headers,
+            json={"tenderType": "cash", "amount": str(amount_due + Decimal("1.00"))},
+        )
+        assert over_resp.status_code == 409, over_resp.text
+
+        exact_resp = client.post(
+            f"/api/v1/bills/{bill_id}/payments",
+            headers=headers,
+            json={"tenderType": "cash", "amount": str(amount_due)},
+        )
+        assert exact_resp.status_code == 201, exact_resp.text
+        assert exact_resp.json()["data"]["status"] == "settled"
+
+    def test_partial_then_full_payment_releases_the_table_only_once_settled(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+        table_id = owner["table_id"]
+
+        create_resp = client.post(
+            f"/api/v1/branches/{branch_id}/orders",
+            headers=headers,
+            json={"orderSource": "pos", "tableId": table_id},
+        )
+        order_id = create_resp.json()["data"]["id"]
+        client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 2},
+        )
+        client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        bill_resp = client.post(f"/api/v1/orders/{order_id}/bill", headers=headers)
+        bill_id = bill_resp.json()["data"]["id"]
+        amount_due = Decimal(bill_resp.json()["data"]["amountDue"])
+        half = (amount_due / 2).quantize(Decimal("0.01"))
+
+        partial_resp = client.post(
+            f"/api/v1/bills/{bill_id}/payments",
+            headers=headers,
+            json={"tenderType": "cash", "amount": str(half)},
+        )
+        assert partial_resp.status_code == 201, partial_resp.text
+
+        bill_after_partial = client.get(f"/api/v1/bills/{bill_id}", headers=headers).json()["data"]
+        assert bill_after_partial["status"] == "partially_paid"
+        assert Decimal(bill_after_partial["amountDue"]) == amount_due - half
+
+        table_after_partial = client.get(
+            f"/api/v1/branches/{branch_id}/tables", headers=headers
+        ).json()["data"]
+        assert next(t for t in table_after_partial if t["id"] == table_id)["status"] == "occupied"
+
+        final_resp = client.post(
+            f"/api/v1/bills/{bill_id}/payments",
+            headers=headers,
+            json={"tenderType": "cash", "amount": str(amount_due - half)},
+        )
+        assert final_resp.status_code == 201, final_resp.text
+
+        bill_after_final = client.get(f"/api/v1/bills/{bill_id}", headers=headers).json()["data"]
+        assert bill_after_final["status"] == "closed"
+        assert Decimal(bill_after_final["amountDue"]) == Decimal(0)
+
+        order_after_final = client.get(
+            f"/api/v1/branches/{branch_id}/orders/{order_id}", headers=headers
+        ).json()["data"]
+        assert order_after_final["status"] == "closed"
+
+        table_after_final = client.get(
+            f"/api/v1/branches/{branch_id}/tables", headers=headers
+        ).json()["data"]
+        assert next(t for t in table_after_final if t["id"] == table_id)["status"] == "available"
 
     def test_requires_authentication(self, client: TestClient, owner: dict) -> None:
         response = client.post(
