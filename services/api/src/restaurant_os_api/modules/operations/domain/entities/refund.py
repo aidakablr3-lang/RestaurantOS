@@ -1,8 +1,19 @@
-"""Refund entity -- the only mechanism for correcting a closed
-Order/Bill/Payment. ``approved_by_user_id`` is required at construction
-(unlike ``BillAdjustment``'s optional one) -- Architecture doc SS3.4:
-every refund needs a named approver. No separate async approval queue
-exists in this step (disclosed in ``request_refund.py``): a refund is
+"""Refund entity.
+
+**Retired from the active product surface (P0 correction,
+2026-08-12).** RestaurantOS v1 does not provide a customer refund
+workflow -- a failed/reversed/disputed transaction is handled entirely
+through the relevant payment provider/bank, outside RestaurantOS. This
+entity, ``RequestRefundUseCase``, its repository methods, and the
+reversing ledger logic are all still present and unit-tested,
+preserving the abstraction for a possible future real payment-gateway
+integration, but no REST route constructs one anymore (see
+``payment_router.py``'s own docstring).
+
+``approved_by_user_id`` is required at construction (unlike
+``BillAdjustment``'s optional one) -- Architecture doc SS3.4: every
+refund needs a named approver. No separate async approval queue exists
+in this step (disclosed in ``request_refund.py``): a refund is
 requested, approved, and processed synchronously in one call, so
 ``approve()``/``process()`` are both invoked by that one use case
 rather than by two separate future routes -- kept as distinct methods,

@@ -140,4 +140,7 @@ class TestOpenApiSecurityScheme:
         # inventory_router, 2 on recipe_router.
         # Sprint 7 Step 6 (Purchasing) added 10 more: 3 on the supplier
         # routes, 7 on the purchase-order/receipt routes.
-        assert checked == 116
+        # The payment/table-lifecycle P0 correction (2026-08-12) removed
+        # 1: POST /payments/{id}/refund -- RestaurantOS v1 has no refund
+        # workflow (see docs/AI_HANDOFF.md).
+        assert checked == 115

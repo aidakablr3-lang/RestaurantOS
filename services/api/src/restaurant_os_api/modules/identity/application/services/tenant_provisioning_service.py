@@ -85,6 +85,15 @@ _DEFAULT_CONNECTION_REF = "primary"
 # modules do not automatically flow into these role definitions. Each
 # future module's migration must explicitly re-grant its permissions to
 # the roles below (a `RolePermission` insert against the existing row).
+#
+# `billing.refund` is deliberately NOT granted to any role below (P0
+# correction, 2026-08-12): RestaurantOS v1 retired its customer refund
+# workflow -- there is no route left that checks this permission (see
+# `payment_router.py`'s own docstring), so granting it would only imply
+# a capability that doesn't exist. The permission code itself is left
+# in the catalogue undeleted (no migration/data change), and any tenant
+# provisioned before this change keeps whatever grant it already has --
+# harmless, since the route it once authorized no longer exists either.
 _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] = (
     (
         "Tenant Owner",
@@ -109,7 +118,6 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "kitchen.manage",
                 "billing.read",
                 "billing.manage",
-                "billing.refund",
                 "ledger.read",
                 "inventory.read",
                 "inventory.manage",
@@ -144,7 +152,6 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "kitchen.manage",
                 "billing.read",
                 "billing.manage",
-                "billing.refund",
                 "ledger.read",
                 "inventory.read",
                 "inventory.manage",
@@ -174,7 +181,6 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "kitchen.manage",
                 "billing.read",
                 "billing.manage",
-                "billing.refund",
                 "inventory.read",
                 "inventory.manage",
                 "purchasing.read",
