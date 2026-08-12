@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useApplyBillAdjustment, useBill } from "@/hooks/use-bills"
-import { usePayments, useRecordPayment, useRequestRefund } from "@/hooks/use-payments"
+import { usePayments, useRecordPayment } from "@/hooks/use-payments"
 import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { ApiError } from "@/lib/api-client"
 import {
@@ -35,16 +35,15 @@ import {
   applyBillAdjustmentSchema,
   type RecordPaymentFormValues,
   recordPaymentSchema,
-  type RequestRefundFormValues,
-  requestRefundSchema,
 } from "@/lib/schemas/bill"
 import { useCurrentUserId } from "@/lib/current-user"
-import type { Payment } from "@/types/payment"
 
+// "tip" is deliberately excluded -- a tip is not part of the
+// restaurant bill (P0 correction, 2026-08-12); the backend rejects any
+// attempt to apply one as a bill adjustment.
 const ADJUSTMENT_TYPE_LABEL: Record<string, string> = {
   discount: "Discount",
   service_charge: "Service charge",
-  tip: "Tip",
   comp: "Comp",
   write_off: "Write-off",
 }
@@ -168,7 +167,7 @@ function RecordPaymentDialog({ billId }: { billId: string }) {
   const [open, setOpen] = React.useState(false)
   const recordPayment = useRecordPayment(billId)
 
-  const defaults: RecordPaymentFormValues = { tenderType: "cash", amount: 0, tipAmount: 0 }
+  const defaults: RecordPaymentFormValues = { tenderType: "cash", amount: 0 }
   const form = useForm<RecordPaymentFormValues>({
     resolver: zodResolver(recordPaymentSchema),
     defaultValues: defaults,
@@ -184,7 +183,6 @@ function RecordPaymentDialog({ billId }: { billId: string }) {
       await recordPayment.mutateAsync({
         tenderType: values.tenderType,
         amount: String(values.amount),
-        tipAmount: String(values.tipAmount),
       })
       toast.success("Payment recorded.")
       setOpen(false)
@@ -236,20 +234,7 @@ function RecordPaymentDialog({ billId }: { billId: string }) {
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount (bill share + tip together)</FormLabel>
-                  <FormControl>
-                    <Input type="number" min={0} step="0.01" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="tipAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Of which, tip</FormLabel>
+                  <FormLabel>Amount to pay</FormLabel>
                   <FormControl>
                     <Input type="number" min={0} step="0.01" {...field} />
                   </FormControl>
@@ -269,73 +254,6 @@ function RecordPaymentDialog({ billId }: { billId: string }) {
   )
 }
 
-function RefundDialog({ billId, payment }: { billId: string; payment: Payment }) {
-  const [open, setOpen] = React.useState(false)
-  const requestRefund = useRequestRefund(billId)
-  const currentUserId = useCurrentUserId()
-
-  const defaults: RequestRefundFormValues = { amount: 0 }
-  const form = useForm<RequestRefundFormValues>({
-    resolver: zodResolver(requestRefundSchema),
-    defaultValues: defaults,
-  })
-
-  function handleOpenChange(next: boolean) {
-    if (next) form.reset(defaults)
-    setOpen(next)
-  }
-
-  async function onSubmit(values: RequestRefundFormValues) {
-    if (!currentUserId) {
-      toast.error("Could not determine the approving user from your session.")
-      return
-    }
-    try {
-      await requestRefund.mutateAsync({
-        paymentId: payment.id,
-        body: { approvedByUserId: currentUserId, amount: String(values.amount) },
-      })
-      toast.success("Refund processed.")
-      setOpen(false)
-    } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Failed to process this refund.")
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant="ghost" size="sm">Refund</Button>} />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Refund payment</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4" noValidate>
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Refund amount (up to {payment.amount})</FormLabel>
-                  <FormControl>
-                    <Input type="number" min={0} step="0.01" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="submit" disabled={requestRefund.isPending}>
-                {requestRefund.isPending ? "Processing…" : "Process refund"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 export default function BillDetailPage() {
   const params = useParams<{ billId: string }>()
   const billId = params.billId
@@ -343,7 +261,6 @@ export default function BillDetailPage() {
   const perms = usePermissionHelpers()
   const canRead = perms.hasAnywhere("billing.read")
   const canManage = perms.hasAnywhere("billing.manage")
-  const canRefund = perms.hasAnywhere("billing.refund")
   const enabled = !perms.isLoading && canRead
 
   const { data, isLoading, isError, error, refetch } = useBill(billId, { enabled })
@@ -450,9 +367,7 @@ export default function BillDetailPage() {
                     <TableRow>
                       <TableHead>Tender</TableHead>
                       <TableHead>Amount</TableHead>
-                      <TableHead>Tip</TableHead>
                       <TableHead>Status</TableHead>
-                      {canRefund ? <TableHead className="w-24" /> : null}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -460,17 +375,9 @@ export default function BillDetailPage() {
                       <TableRow key={payment.id}>
                         <TableCell className="capitalize">{payment.tenderType}</TableCell>
                         <TableCell className="text-muted-foreground">{payment.amount}</TableCell>
-                        <TableCell className="text-muted-foreground">{payment.tipAmount}</TableCell>
                         <TableCell>
                           <PaymentStatusBadge status={payment.status} />
                         </TableCell>
-                        {canRefund ? (
-                          <TableCell>
-                            {payment.status === "settled" ? (
-                              <RefundDialog billId={billId} payment={payment} />
-                            ) : null}
-                          </TableCell>
-                        ) : null}
                       </TableRow>
                     ))}
                   </TableBody>

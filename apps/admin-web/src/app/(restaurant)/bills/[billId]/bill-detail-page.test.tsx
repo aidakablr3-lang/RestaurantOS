@@ -22,7 +22,6 @@ const usePaymentsMock = vi.fn()
 vi.mock("@/hooks/use-payments", () => ({
   usePayments: (...args: unknown[]) => usePaymentsMock(...args),
   useRecordPayment: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useRequestRefund: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock("@/lib/current-user", () => ({

@@ -6,10 +6,10 @@ import { useAuthStore } from "@/stores/auth-store"
 // claim (JWTTokenService signs it as such; see
 // modules/identity/infrastructure/security/jwt_token_service.py).
 // Decoding it client-side is read-only and purely for pre-filling forms
-// that need an "approving user" id (refunds, stock adjustments) with
-// the person who's actually here doing the approving -- never used for
-// an authorization decision, which the backend always re-derives from
-// the token itself.
+// that need an "approving user" id (bill adjustments, stock adjustments)
+// with the person who's actually here doing the approving -- never used
+// for an authorization decision, which the backend always re-derives
+// from the token itself.
 function decodeAccessTokenSubject(accessToken: string): string | null {
   try {
     const [, payload] = accessToken.split(".")

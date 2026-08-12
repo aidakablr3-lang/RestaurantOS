@@ -1,16 +1,23 @@
 /**
  * Mirrors modules/operations/presentation/api/v1/payment_router.py's
- * PaymentResponseSchema / RefundResponseSchema / RecordPaymentRequestSchema
- * / RequestRefundRequestSchema and the domain's TenderType / PaymentStatus
- * / RefundStatus StrEnums. Field names are camelCase on the wire; money
- * fields are decimal strings.
+ * PaymentResponseSchema / RecordPaymentRequestSchema and the domain's
+ * TenderType / PaymentStatus StrEnums. Field names are camelCase on the
+ * wire; money fields are decimal strings.
+ *
+ * There is no tip field on RecordPaymentRequest -- a tip is not part of
+ * the restaurant bill (P0 correction, 2026-08-12); the customer pays
+ * exactly the bill's amountDue. `Payment.tipAmount` is still reported
+ * on the response (always "0.0000" for any payment recorded after this
+ * correction) purely for backward compatibility with historical rows.
+ *
+ * RestaurantOS v1 has no refund workflow -- see docs/AI_HANDOFF.md.
+ * A failed/disputed transaction is handled entirely by the payment
+ * provider/bank, outside RestaurantOS.
  */
 
 export type TenderType = "cash" | "card" | "wallet"
 
 export type PaymentStatus = "authorized" | "captured" | "settled" | "declined"
-
-export type RefundStatus = "requested" | "approved" | "processed"
 
 export interface Payment {
   id: string
@@ -30,24 +37,6 @@ export interface Payment {
 export interface RecordPaymentRequest {
   tenderType: TenderType
   amount: string
-  tipAmount?: string
   gatewayTokenRef?: string | null
   gatewayLast4?: string | null
-}
-
-export interface Refund {
-  id: string
-  tenantId: string
-  branchId: string
-  paymentId: string
-  orderId: string
-  approvedByUserId: string
-  amount: string
-  status: RefundStatus
-  createdAt: string
-}
-
-export interface RequestRefundRequest {
-  approvedByUserId: string
-  amount: string
 }
