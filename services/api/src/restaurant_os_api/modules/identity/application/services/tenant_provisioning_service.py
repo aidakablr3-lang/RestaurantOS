@@ -214,9 +214,13 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
     ),
     (
         "Bartender",
-        "Reads the menu (drink-menu subset).",
+        (
+            "Reads the menu (drink-menu subset); reads and updates kitchen "
+            "tickets (no separate bar-ticket queue exists yet, so this is the "
+            "same kitchen.read/kitchen.manage grant Kitchen Staff holds)."
+        ),
         RoleScope.BRANCH,
-        frozenset({"menu.read"}),
+        frozenset({"menu.read", "kitchen.read", "kitchen.manage"}),
     ),
     (
         "Inventory Manager",
