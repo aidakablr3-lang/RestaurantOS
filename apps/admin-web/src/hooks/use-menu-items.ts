@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { listMenuCategories } from "@/lib/api/menu-categories"
 import {
   createMenuItem,
   createMenuItemAvailability,
@@ -11,12 +12,14 @@ import {
   replaceMenuItemModifierGroups,
   updateMenuItem,
 } from "@/lib/api/menu-items"
+import { menuCategoryKeys } from "@/hooks/use-menu-categories"
 import type { CreateMenuItemAvailabilityRequest } from "@/types/menu-item-availability"
 import type { CreateMenuItemBranchPriceRequest } from "@/types/menu-item-branch-price"
 import type { ReplaceMenuItemModifierGroupsRequest } from "@/types/menu-item-modifier-groups"
 import type {
   CreateMenuItemRequest,
   ListMenuItemsParams,
+  MenuItem,
   UpdateMenuItemRequest,
 } from "@/types/menu-item"
 
@@ -156,4 +159,37 @@ export function useCreateMenuItemAvailability(menuItemId: string) {
       queryClient.invalidateQueries({ queryKey: menuItemAvailabilityKeys.list(menuItemId) })
     },
   })
+}
+
+// Added for Sprint 7 Step 9 (Order taking): there is no flat "every menu
+// item for a restaurant" endpoint -- MenuItem only ever lists nested
+// under its own MenuCategory (see lib/api/menu-items.ts). Adding an
+// order item needs a single flat pick-list, so this composes categories
+// -> items-per-category via useQueries and flattens client-side, the
+// same two-hop join reservations' own page already does for tables.
+export function useRestaurantMenuItems(
+  restaurantId: string,
+  options?: { enabled?: boolean }
+): { data: MenuItem[]; isLoading: boolean } {
+  const enabled = options?.enabled ?? true
+  const categoriesQuery = useQuery({
+    queryKey: menuCategoryKeys.list(restaurantId, { offset: 0, limit: 100 }),
+    queryFn: () => listMenuCategories(restaurantId, { offset: 0, limit: 100 }),
+    enabled,
+  })
+  const categories = categoriesQuery.data?.data ?? []
+
+  const itemQueries = useQueries({
+    queries: categories.map((category) => ({
+      queryKey: menuItemKeys.list(category.id, { offset: 0, limit: 100 }),
+      queryFn: () => listMenuItems(category.id, { offset: 0, limit: 100 }),
+      enabled: enabled && categoriesQuery.isSuccess,
+    })),
+  })
+
+  const isLoading =
+    categoriesQuery.isLoading || (categories.length > 0 && itemQueries.some((q) => q.isLoading))
+  const data = itemQueries.flatMap((q) => q.data?.data ?? [])
+
+  return { data, isLoading }
 }
