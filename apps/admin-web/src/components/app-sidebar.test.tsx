@@ -85,6 +85,33 @@ describe("AppSidebar", () => {
 
     expect(screen.queryByText("Modifiers")).not.toBeInTheDocument()
   })
+
+  it("shows Discounts, Taxes, Inventory categories, and Suppliers with the matching tenant-wide grants", () => {
+    usePermissionHelpersMock.mockReturnValue(
+      mockPerms({
+        hasTenantWide: (p) =>
+          p === "billing.manage" || p === "inventory.read" || p === "purchasing.read",
+      })
+    )
+
+    render(<AppSidebar />)
+
+    expect(screen.getByText("Discounts")).toBeInTheDocument()
+    expect(screen.getByText("Taxes")).toBeInTheDocument()
+    expect(screen.getByText("Inventory categories")).toBeInTheDocument()
+    expect(screen.getByText("Suppliers")).toBeInTheDocument()
+  })
+
+  it("hides Discounts, Taxes, Inventory categories, and Suppliers without those grants", () => {
+    usePermissionHelpersMock.mockReturnValue(mockPerms())
+
+    render(<AppSidebar />)
+
+    expect(screen.queryByText("Discounts")).not.toBeInTheDocument()
+    expect(screen.queryByText("Taxes")).not.toBeInTheDocument()
+    expect(screen.queryByText("Inventory categories")).not.toBeInTheDocument()
+    expect(screen.queryByText("Suppliers")).not.toBeInTheDocument()
+  })
 })
 
 // MobileNav backs the sidebar's `hidden md:flex` gap below the `md`

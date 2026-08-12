@@ -2,7 +2,15 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayersIcon, LayoutDashboardIcon, MenuIcon, StoreIcon } from "lucide-react"
+import {
+  BoxIcon,
+  LayersIcon,
+  LayoutDashboardIcon,
+  MenuIcon,
+  PercentIcon,
+  StoreIcon,
+  TruckIcon,
+} from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -48,6 +56,30 @@ const NAV_ITEMS: NavItem[] = [
     href: "/modifier-groups",
     icon: LayersIcon,
     isVisible: (perms) => perms.hasTenantWide("menu.read"),
+  },
+  {
+    label: "Discounts",
+    href: "/discounts",
+    icon: PercentIcon,
+    isVisible: (perms) => perms.hasTenantWide("billing.manage"),
+  },
+  {
+    label: "Taxes",
+    href: "/taxes",
+    icon: PercentIcon,
+    isVisible: (perms) => perms.hasTenantWide("billing.manage"),
+  },
+  {
+    label: "Inventory categories",
+    href: "/inventory-categories",
+    icon: BoxIcon,
+    isVisible: (perms) => perms.hasTenantWide("inventory.read"),
+  },
+  {
+    label: "Suppliers",
+    href: "/suppliers",
+    icon: TruckIcon,
+    isVisible: (perms) => perms.hasTenantWide("purchasing.read"),
   },
 ]
 
