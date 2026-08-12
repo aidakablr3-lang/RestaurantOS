@@ -1,4 +1,20 @@
-"""Pydantic request/response schemas for Payment/Refund (Sprint 7 Step 4)."""
+"""Pydantic request/response schemas for Payment/Refund (Sprint 7 Step 4).
+
+``RecordPaymentRequestSchema`` has no ``tip_amount`` field -- a tip is
+not part of the restaurant bill (P0 correction, 2026-08-12); the
+customer pays exactly the bill's ``amountDue``, nothing more. See
+``record_payment.py``'s own docstring for the full business rule.
+``PaymentResponseSchema`` still reports ``tip_amount`` (always
+``0`` for any payment recorded after this correction) purely for
+backward compatibility with any historical rows.
+
+``RequestRefundRequestSchema``/``RefundResponseSchema`` are retained
+for the preserved application-layer refund abstraction, but no longer
+have a route that uses them -- RestaurantOS v1 does not provide a
+customer refund workflow (see ``payment_router.py``'s own docstring
+and ``docs/AI_HANDOFF.md``). A payment-provider/bank-side reversal or
+dispute is handled entirely outside RestaurantOS.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +30,6 @@ from restaurant_os_api.modules.operations.domain.entities import TenderType
 class RecordPaymentRequestSchema(CamelModel):
     tender_type: TenderType
     amount: Decimal = Field(..., gt=0)
-    tip_amount: Decimal = Field(default=Decimal(0), ge=0)
     gateway_token_ref: str | None = None
     gateway_last4: str | None = Field(default=None, max_length=4)
 

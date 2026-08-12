@@ -208,6 +208,8 @@ RequireBillingManageAtAnyScopeDep = Annotated[
 RequireBillingReadAtAnyScopeDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("billing.read"))
 ]
+# Preserved for the RequestRefundUseCase abstraction (see
+# payment_router.py's own docstring) -- not wired to any active route.
 RequireBillingRefundAtAnyScopeDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("billing.refund"))
 ]
@@ -531,6 +533,7 @@ def get_record_payment_use_case(
         payment_repository_factory=SQLAlchemyPaymentRepository,
         ledger_repository_factory=SQLAlchemyLedgerRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
+        table_repository_factory=SQLAlchemyTableRepository,
         resolve_user_permissions=resolve_user_permissions,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
@@ -555,6 +558,9 @@ def get_list_payments_use_case(
 ListPaymentsUseCaseDep = Annotated[ListPaymentsUseCase, Depends(get_list_payments_use_case)]
 
 
+# Preserved application-layer abstraction, not wired to any active route
+# (see payment_router.py's own docstring: RestaurantOS v1 does not
+# provide a customer refund workflow).
 def get_request_refund_use_case(
     session_factory: SessionFactoryDep,
     resolve_user_permissions: ResolveUserPermissionsUseCaseDep,

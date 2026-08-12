@@ -1,4 +1,12 @@
-"""Application-layer DTOs for Payment/Refund (Sprint 7 Step 4)."""
+"""Application-layer DTOs for Payment/Refund (Sprint 7 Step 4).
+
+``RecordPaymentRequestDTO`` deliberately carries no ``tip_amount`` --
+a tip is not part of the restaurant bill (P0 correction, 2026-08-12);
+``RecordPaymentUseCase`` always persists new payments with
+``tip_amount=0``. ``Refund``-related DTOs are retained for the
+preserved application-layer abstraction even though the REST route
+that used to expose them is retired -- see ``payment_router.py``.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +20,6 @@ class RecordPaymentRequestDTO:
     bill_id: str
     tender_type: str
     amount: Decimal
-    tip_amount: Decimal = Decimal(0)
     gateway_token_ref: str | None = None
     gateway_last4: str | None = None
 

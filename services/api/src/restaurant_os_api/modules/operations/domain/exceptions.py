@@ -205,6 +205,22 @@ class AdjustmentApprovalRequiredError(OperationsDomainError):
         self.discount_id = discount_id
 
 
+class TipAdjustmentNotSupportedError(OperationsDomainError):
+    """P0 correction, 2026-08-12: a tip is not part of the restaurant
+    bill. ``BillAdjustmentType.TIP`` is kept in the domain/DB enum for
+    backward compatibility with any historical rows, but
+    ``ApplyBillAdjustmentUseCase`` rejects any *new* attempt to apply
+    one -- adding a positive "tip" adjustment would increase
+    ``amount_due``, exactly what this correction removes."""
+
+    error_code = "TIP_ADJUSTMENT_NOT_SUPPORTED"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Tip is not part of the restaurant bill and cannot be applied as a bill adjustment."
+        )
+
+
 class PaymentNotFoundError(OperationsDomainError):
     error_code = "PAYMENT_NOT_FOUND"
 

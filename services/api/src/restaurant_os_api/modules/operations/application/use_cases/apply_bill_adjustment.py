@@ -8,11 +8,18 @@ type.
 
 **Sign convention, applied here rather than left to the caller:**
 ``discount``/``comp``/``write_off`` are stored as *negative* amounts
-(they reduce ``amount_due``); ``service_charge``/``tip`` are stored as
-*positive* amounts (they increase it). A caller-supplied ``amount`` is
+(they reduce ``amount_due``); ``service_charge`` is stored as a
+*positive* amount (it increases it). A caller-supplied ``amount`` is
 taken as a magnitude and signed automatically by ``adjustment_type`` --
 never trusted as already-signed, so a client can't flip a discount into
 a surcharge by sending a positive number.
+
+**``tip`` is rejected (P0 correction, 2026-08-12):** a tip is not part
+of the restaurant bill, so this use case refuses to apply one as a
+bill adjustment -- that would silently increase ``amount_due``, the
+exact thing this correction removes. The enum value itself is kept in
+the domain/DB for backward compatibility with any historical rows; new
+attempts to use it raise ``TipAdjustmentNotSupportedError``.
 
 If ``discount_id`` is supplied instead of a raw ``amount``, the
 adjustment amount is computed from ``Discount.compute_amount()``
@@ -46,6 +53,7 @@ from restaurant_os_api.modules.operations.domain.exceptions import (
     BillNotFoundError,
     DiscountNotFoundError,
     OrderNotFoundError,
+    TipAdjustmentNotSupportedError,
 )
 from restaurant_os_api.modules.operations.domain.ports import (
     BillRepository,
@@ -122,6 +130,8 @@ class ApplyBillAdjustmentUseCase:
                     raise OrderNotFoundError(bill.order_id)
 
             adjustment_type = BillAdjustmentType(request.adjustment_type)
+            if adjustment_type == BillAdjustmentType.TIP:
+                raise TipAdjustmentNotSupportedError()
             reference_type: str | None = None
             reference_id: str | None = None
 
@@ -163,7 +173,7 @@ class ApplyBillAdjustmentUseCase:
             adjustments = await bill_repo.get_adjustments(tenant_id, bill.id)
             payments = await payment_repo.list_for_bill(tenant_id, bill.id)
             amount_paid = sum(
-                (p.amount - p.tip_amount for p in payments if p.status.value == "settled"),
+                (p.amount for p in payments if p.status.value == "settled"),
                 Decimal(0),
             )
 

@@ -1,5 +1,9 @@
 """GetBillUseCase. ``GET /api/v1/bills/{id}`` -- flat, gated
-``billing.read`` at any scope + fine-grained branch resolution."""
+``billing.read`` at any scope + fine-grained branch resolution.
+
+``amount_paid`` is the sum of every settled payment's full ``amount``
+-- tip is not part of bill settlement (P0 correction, 2026-08-12), so
+nothing is subtracted from a payment's amount here."""
 
 from __future__ import annotations
 
@@ -77,7 +81,7 @@ class GetBillUseCase:
             adjustments = await bill_repo.get_adjustments(tenant_id, bill.id)
             payments = await payment_repo.list_for_bill(tenant_id, bill.id)
             amount_paid = sum(
-                (p.amount - p.tip_amount for p in payments if p.status == PaymentStatus.SETTLED),
+                (p.amount for p in payments if p.status == PaymentStatus.SETTLED),
                 Decimal(0),
             )
 

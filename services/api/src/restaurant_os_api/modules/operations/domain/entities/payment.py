@@ -7,6 +7,13 @@ than waiting on an async gateway callback. The three-state machine is
 kept (not collapsed to a single "paid" flag) so a future real gateway
 integration slots in without a schema/entity change -- only the use
 case's own synchronous chaining would need to become async.
+
+``tip_amount`` is retained on this entity for backward compatibility
+only (P0 correction, 2026-08-12: tip is not part of the restaurant
+bill). ``RecordPaymentUseCase`` always persists ``tip_amount=0`` for
+any payment it creates -- the field is never populated from a client
+request anymore. It is kept, not dropped, so historical rows and the
+read-side ``PaymentResponseSchema`` don't need a migration.
 """
 
 from __future__ import annotations
