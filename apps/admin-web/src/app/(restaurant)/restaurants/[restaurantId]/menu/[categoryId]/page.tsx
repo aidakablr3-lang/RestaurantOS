@@ -129,6 +129,7 @@ export default function MenuItemsPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Price</TableHead>
+                <TableHead>Station</TableHead>
                 <TableHead>Available</TableHead>
                 <TableHead className="w-20" />
               </TableRow>
@@ -146,6 +147,11 @@ export default function MenuItemsPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {item.priceAmount} {item.currencyCode}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {item.station}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={item.isAvailable ? "secondary" : "outline"}>

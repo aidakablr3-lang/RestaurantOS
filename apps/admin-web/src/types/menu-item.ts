@@ -8,6 +8,8 @@
  * Platform (Architecture SS3.1) -- always null today.
  */
 
+export type MenuItemStation = "kitchen" | "bar"
+
 export interface MenuItem {
   id: string
   tenantId: string
@@ -19,6 +21,7 @@ export interface MenuItem {
   displayOrder: number
   recipeId: string | null
   createdAt: string
+  station: MenuItemStation
 }
 
 export interface CreateMenuItemRequest {
@@ -27,6 +30,7 @@ export interface CreateMenuItemRequest {
   currencyCode: string
   isAvailable?: boolean
   displayOrder?: number
+  station?: MenuItemStation
 }
 
 export type UpdateMenuItemRequest = CreateMenuItemRequest

@@ -10,11 +10,24 @@ describe("menuItemSchema", () => {
       currencyCode: "usd",
       isAvailable: true,
       displayOrder: 0,
+      station: "kitchen",
     })
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.currencyCode).toBe("USD")
     }
+  })
+
+  it("rejects a station that isn't kitchen or bar", () => {
+    const result = menuItemSchema.safeParse({
+      name: "Spring Rolls",
+      priceAmount: "8.99",
+      currencyCode: "USD",
+      isAvailable: true,
+      displayOrder: 0,
+      station: "grill",
+    })
+    expect(result.success).toBe(false)
   })
 
   it("rejects an empty name", () => {
@@ -57,6 +70,7 @@ describe("menuItemSchema", () => {
       currencyCode: "USD",
       isAvailable: true,
       displayOrder: 0,
+      station: "bar",
     })
     expect(result.success).toBe(true)
   })

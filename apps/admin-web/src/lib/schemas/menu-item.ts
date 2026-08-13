@@ -24,6 +24,7 @@ export const menuItemSchema = z.object({
     .number()
     .int("Display order must be a whole number.")
     .min(0, "Display order cannot be negative."),
+  station: z.enum(["kitchen", "bar"]),
 })
 
 export type MenuItemFormValues = z.infer<typeof menuItemSchema>

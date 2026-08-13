@@ -33,15 +33,27 @@ import { useTables } from "@/hooks/use-tables"
 import { ApiError } from "@/lib/api-client"
 import { newIdempotencyKey } from "@/lib/idempotency"
 import { type CreateOrderFormValues, createOrderSchema } from "@/lib/schemas/order"
+import type { OrderStatus } from "@/types/order"
 
 const PAGE_SIZE = 20
 const NO_TABLE = "none"
+const ALL_TABLES = "all"
+const ALL_STATUSES = "all"
 
 const ORDER_SOURCE_LABEL: Record<string, string> = {
   pos: "POS (dine-in)",
   qr: "QR (guest self-order)",
   delivery: "Delivery",
   takeaway: "Takeaway",
+}
+
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  open: "Open",
+  fired: "Fired",
+  served: "Served",
+  billed: "Billed",
+  closed: "Closed",
+  voided: "Voided",
 }
 
 function NewOrderDialog({ branchId, tableIds }: { branchId: string; tableIds: { id: string; tableNumber: string }[] }) {
@@ -161,23 +173,48 @@ export default function OrdersPage() {
   const params = useParams<{ branchId: string }>()
   const branchId = params.branchId
   const [offset, setOffset] = React.useState(0)
+  const [tableFilter, setTableFilter] = React.useState(ALL_TABLES)
+  const [statusFilter, setStatusFilter] = React.useState(ALL_STATUSES)
 
   const perms = usePermissionHelpers()
   const canRead = perms.hasAtBranch(branchId, "order.read")
   const canManage = perms.hasAtBranch(branchId, "order.manage")
+  const canReadTables = perms.hasAtBranch(branchId, "table.read")
   const enabled = !perms.isLoading && canRead
 
   const { data, isLoading, isError, error, refetch } = useOrders(
     branchId,
-    { offset, limit: PAGE_SIZE },
+    {
+      offset,
+      limit: PAGE_SIZE,
+      tableId: tableFilter === ALL_TABLES ? undefined : tableFilter,
+      status: statusFilter === ALL_STATUSES ? undefined : (statusFilter as OrderStatus),
+    },
     { enabled }
   )
-  const tablesQuery = useTables(branchId, { offset: 0, limit: 100 }, { enabled: enabled && canManage })
+  const tablesQuery = useTables(branchId, { offset: 0, limit: 100 }, { enabled: enabled && canReadTables })
   const tables = tablesQuery.data?.data ?? []
+  const tableNumberById = Object.fromEntries(tables.map((table) => [table.id, table.tableNumber]))
 
   const orders = data?.data ?? []
   const meta = data?.meta
   const loading = perms.isLoading || isLoading
+
+  const tableFilterLabels = {
+    [ALL_TABLES]: "All tables",
+    ...Object.fromEntries(tables.map((table) => [table.id, `Table ${table.tableNumber}`])),
+  }
+  const statusFilterLabels = { [ALL_STATUSES]: "All statuses", ...ORDER_STATUS_LABEL }
+
+  function handleTableFilterChange(value: string | null) {
+    setTableFilter(value ?? ALL_TABLES)
+    setOffset(0)
+  }
+
+  function handleStatusFilterChange(value: string | null) {
+    setStatusFilter(value ?? ALL_STATUSES)
+    setOffset(0)
+  }
 
   return (
     <div className="grid gap-6">
@@ -188,6 +225,35 @@ export default function OrdersPage() {
       />
 
       <BranchSubNav branchId={branchId} />
+
+      <div className="flex flex-wrap gap-3">
+        <Select value={tableFilter} onValueChange={handleTableFilterChange} items={tableFilterLabels}>
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_TABLES}>All tables</SelectItem>
+            {tables.map((table) => (
+              <SelectItem key={table.id} value={table.id}>
+                Table {table.tableNumber}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={handleStatusFilterChange} items={statusFilterLabels}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_STATUSES}>All statuses</SelectItem>
+            {Object.entries(ORDER_STATUS_LABEL).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {!perms.isLoading && !canRead ? (
         <PermissionRestricted resource="orders" />
@@ -223,6 +289,7 @@ export default function OrdersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Opened</TableHead>
+                <TableHead>Table</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Items</TableHead>
@@ -237,12 +304,15 @@ export default function OrdersPage() {
                     {new Date(order.openedAt).toLocaleString()}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
+                    {order.tableId ? (tableNumberById[order.tableId] ?? "Unknown table") : "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {ORDER_SOURCE_LABEL[order.orderSource] ?? order.orderSource}
                   </TableCell>
                   <TableCell>
                     <OrderStatusBadge status={order.status} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{order.items.length}</TableCell>
+                  <TableCell className="text-muted-foreground">{order.itemCount}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {order.totalAmount} {order.currencyCode}
                   </TableCell>

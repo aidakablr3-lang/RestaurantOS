@@ -42,6 +42,7 @@ export interface Order {
   customerId: string | null
   closedAt: string | null
   originDeviceId: string | null
+  itemCount: number
 }
 
 export interface CreateOrderRequest {
@@ -60,4 +61,6 @@ export interface AddOrderItemRequest {
 export interface ListOrdersParams {
   offset?: number
   limit?: number
+  tableId?: string
+  status?: OrderStatus
 }

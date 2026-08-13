@@ -581,6 +581,14 @@ export default function MenuItemDetailPage() {
             <DetailRow label="Name" value={item.name} />
             <DetailRow label="Price" value={`${item.priceAmount} ${item.currencyCode}`} />
             <DetailRow
+              label="Station"
+              value={
+                <Badge variant="outline" className="capitalize">
+                  {item.station}
+                </Badge>
+              }
+            />
+            <DetailRow
               label="Available"
               value={<Badge variant={item.isAvailable ? "secondary" : "outline"}>{item.isAvailable ? "Available" : "Unavailable"}</Badge>}
             />

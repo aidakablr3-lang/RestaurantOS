@@ -39,8 +39,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useGenerateBill } from "@/hooks/use-bills"
 import { useBranch } from "@/hooks/use-branches"
 import { useRestaurantMenuItems } from "@/hooks/use-menu-items"
-import { useAddOrderItem, useCloseOrder, useFireOrder, useOrder, useVoidOrder } from "@/hooks/use-orders"
+import {
+  useAddOrderItem,
+  useCloseOrder,
+  useFireOrder,
+  useOrder,
+  useVoidOrder,
+  useVoidOrderItem,
+} from "@/hooks/use-orders"
 import { usePermissionHelpers } from "@/hooks/use-permissions"
+import { useTables } from "@/hooks/use-tables"
 import { ApiError } from "@/lib/api-client"
 import { newIdempotencyKey } from "@/lib/idempotency"
 import { type AddOrderItemFormValues, addOrderItemSchema } from "@/lib/schemas/order"
@@ -163,6 +171,7 @@ export default function OrderDetailPage() {
   const canRead = perms.hasAtBranch(branchId, "order.read")
   const canManage = perms.hasAtBranch(branchId, "order.manage")
   const canBill = perms.hasAtBranch(branchId, "billing.manage")
+  const canReadTables = perms.hasAtBranch(branchId, "table.read")
   const enabled = !perms.isLoading && canRead
 
   const { data, isLoading, isError, error, refetch } = useOrder(branchId, orderId, { enabled })
@@ -171,10 +180,14 @@ export default function OrderDetailPage() {
   const restaurantId = branchQuery.data?.data.restaurantId
   const menuItemsQuery = useRestaurantMenuItems(restaurantId ?? "", { enabled: enabled && Boolean(restaurantId) })
   const menuItemNameById = new Map(menuItemsQuery.data.map((item) => [item.id, item.name]))
+  const tablesQuery = useTables(branchId, { offset: 0, limit: 100 }, { enabled: enabled && canReadTables })
+  const tableNumberById = new Map((tablesQuery.data?.data ?? []).map((table) => [table.id, table.tableNumber]))
+  const tableLabel = order?.tableId ? (tableNumberById.get(order.tableId) ?? "Unknown table") : "—"
 
   const fireOrder = useFireOrder(branchId, orderId)
   const closeOrder = useCloseOrder(branchId, orderId)
   const voidOrder = useVoidOrder(branchId, orderId)
+  const voidOrderItem = useVoidOrderItem(branchId, orderId)
   const generateBill = useGenerateBill()
 
   async function handleFire() {
@@ -201,6 +214,15 @@ export default function OrderDetailPage() {
       toast.success("Order voided.")
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to void this order.")
+    }
+  }
+
+  async function handleVoidItem(orderItemId: string) {
+    try {
+      await voidOrderItem.mutateAsync({ orderItemId, idempotencyKey: newIdempotencyKey() })
+      toast.success("Item voided.")
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to void this item.")
     }
   }
 
@@ -268,14 +290,14 @@ export default function OrderDetailPage() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Table</p>
-                <p className="font-medium">{order.tableId ?? "—"}</p>
+                <p className="font-medium">{tableLabel}</p>
               </div>
             </CardContent>
           </Card>
 
           {canManage ? (
             <div className="flex flex-wrap items-center gap-2">
-              {order.status === "open" ? (
+              {order.status === "open" || order.status === "fired" ? (
                 <>
                   <AddItemDialog
                     branchId={branchId}
@@ -286,11 +308,17 @@ export default function OrderDetailPage() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={order.items.length === 0 || fireOrder.isPending}
+                    disabled={
+                      !order.items.some((item) => item.lineStatus === "added") || fireOrder.isPending
+                    }
                     onClick={handleFire}
                   >
                     <FlameIcon />
-                    {fireOrder.isPending ? "Firing…" : "Fire to kitchen"}
+                    {fireOrder.isPending
+                      ? "Firing…"
+                      : order.status === "fired"
+                        ? "Fire new items"
+                        : "Fire to kitchen"}
                   </Button>
                 </>
               ) : null}
@@ -342,28 +370,72 @@ export default function OrderDetailPage() {
                   <TableHead>Quantity</TableHead>
                   <TableHead>Unit price</TableHead>
                   <TableHead>Status</TableHead>
+                  {canManage ? <TableHead className="text-right">Actions</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {order.items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                    <TableCell
+                      colSpan={canManage ? 5 : 4}
+                      className="py-8 text-center text-muted-foreground"
+                    >
                       No items added yet.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  order.items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">
-                        {menuItemNameById.get(item.menuItemId) ?? item.menuItemId}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{item.quantity}</TableCell>
-                      <TableCell className="text-muted-foreground">{item.unitPriceAmount}</TableCell>
-                      <TableCell>
-                        <OrderItemLineStatusBadge status={item.lineStatus} />
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  order.items.map((item) => {
+                    const isVoidingThisItem =
+                      voidOrderItem.isPending && voidOrderItem.variables?.orderItemId === item.id
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">
+                          {menuItemNameById.get(item.menuItemId) ?? item.menuItemId}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{item.quantity}</TableCell>
+                        <TableCell className="text-muted-foreground">{item.unitPriceAmount}</TableCell>
+                        <TableCell>
+                          <OrderItemLineStatusBadge status={item.lineStatus} />
+                        </TableCell>
+                        {canManage ? (
+                          <TableCell className="text-right">
+                            {item.lineStatus === "added" ? (
+                              <AlertDialog>
+                                <AlertDialogTrigger
+                                  render={
+                                    <Button size="sm" variant="ghost" disabled={isVoidingThisItem}>
+                                      <XIcon />
+                                      {isVoidingThisItem ? "Voiding…" : "Void"}
+                                    </Button>
+                                  }
+                                />
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Void this item?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This removes the line from the order and backs its cost out of
+                                      the subtotal. This cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel disabled={isVoidingThisItem}>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleVoidItem(item.id)}
+                                      disabled={isVoidingThisItem}
+                                    >
+                                      {isVoidingThisItem ? "Voiding…" : "Void item"}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            ) : null}
+                          </TableCell>
+                        ) : null}
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

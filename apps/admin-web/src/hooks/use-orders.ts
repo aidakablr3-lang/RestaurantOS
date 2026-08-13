@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { addOrderItem, closeOrder, createOrder, fireOrder, getOrder, listOrders, voidOrder } from "@/lib/api/orders"
+import {
+  addOrderItem,
+  closeOrder,
+  createOrder,
+  fireOrder,
+  getOrder,
+  listOrders,
+  voidOrder,
+  voidOrderItem,
+} from "@/lib/api/orders"
 import type { AddOrderItemRequest, CreateOrderRequest, ListOrdersParams } from "@/types/order"
 
 export const orderKeys = {
@@ -94,6 +103,15 @@ export function useVoidOrder(branchId: string, orderId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (idempotencyKey: string) => voidOrder(orderId, idempotencyKey),
+    onSuccess: () => invalidateOrder(queryClient, branchId, orderId),
+  })
+}
+
+export function useVoidOrderItem(branchId: string, orderId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderItemId, idempotencyKey }: { orderItemId: string; idempotencyKey: string }) =>
+      voidOrderItem(orderId, orderItemId, idempotencyKey),
     onSuccess: () => invalidateOrder(queryClient, branchId, orderId),
   })
 }

@@ -7,6 +7,8 @@ export function listOrders(branchId: string, params: ListOrdersParams) {
   const search = new URLSearchParams()
   search.set("offset", String(params.offset ?? 0))
   search.set("limit", String(params.limit ?? 20))
+  if (params.tableId) search.set("tableId", params.tableId)
+  if (params.status) search.set("status", params.status)
   return apiClient.get<Order[]>(`${BRANCH_BASE(branchId)}?${search.toString()}`)
 }
 
@@ -32,4 +34,10 @@ export function closeOrder(orderId: string, idempotencyKey: string) {
 
 export function voidOrder(orderId: string, idempotencyKey: string) {
   return apiClient.post<Order>(`/api/v1/orders/${orderId}/void`, undefined, { idempotencyKey })
+}
+
+export function voidOrderItem(orderId: string, orderItemId: string, idempotencyKey: string) {
+  return apiClient.post<Order>(`/api/v1/orders/${orderId}/items/${orderItemId}/void`, undefined, {
+    idempotencyKey,
+  })
 }

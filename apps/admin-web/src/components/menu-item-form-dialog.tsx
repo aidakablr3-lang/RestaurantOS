@@ -24,6 +24,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useCreateMenuItem, useUpdateMenuItem } from "@/hooks/use-menu-items"
 import { ApiError } from "@/lib/api-client"
 import { newIdempotencyKey } from "@/lib/idempotency"
@@ -51,6 +52,7 @@ export function MenuItemFormDialog({
     currencyCode: menuItem?.currencyCode ?? "USD",
     isAvailable: menuItem?.isAvailable ?? true,
     displayOrder: menuItem?.displayOrder ?? 0,
+    station: menuItem?.station ?? "kitchen",
   }
 
   const form = useForm<MenuItemFormValues>({
@@ -142,6 +144,31 @@ export function MenuItemFormDialog({
                   <FormControl>
                     <Input type="number" min={0} step={1} {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="station"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Station</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value)}
+                    items={{ kitchen: "Kitchen", bar: "Bar" }}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Choose a station" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="kitchen">Kitchen</SelectItem>
+                      <SelectItem value="bar">Bar</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
