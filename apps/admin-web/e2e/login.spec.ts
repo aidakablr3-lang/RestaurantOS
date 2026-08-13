@@ -2,11 +2,11 @@ import { expect, test } from "@playwright/test"
 import { E2E_ADMIN, loginViaUi } from "./fixtures"
 
 test.describe("Login", () => {
-  test("signs in with valid credentials and lands on the tenant list", async ({ page }) => {
+  test("signs in with valid credentials and lands on the dashboard", async ({ page }) => {
     await loginViaUi(page)
 
-    await expect(page.getByRole("heading", { name: "Tenants" })).toBeVisible()
-    await expect(page).toHaveURL(/\/tenants$/)
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible()
+    await expect(page).toHaveURL(/\/dashboard$/)
   })
 
   test("shows an error toast for the wrong password and stays on the login page", async ({

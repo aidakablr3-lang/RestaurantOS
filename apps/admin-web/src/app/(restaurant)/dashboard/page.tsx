@@ -1,0 +1,194 @@
+"use client"
+
+import Link from "next/link"
+import { BarChart3Icon, CalendarClockIcon, StoreIcon, UtensilsCrossedIcon } from "lucide-react"
+
+import { PageHeader } from "@/components/ui/page-header"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+import { useBranches } from "@/hooks/use-branches"
+import { usePermissionHelpers } from "@/hooks/use-permissions"
+import { useRestaurants } from "@/hooks/use-restaurants"
+
+function StatCard({
+  title,
+  value,
+  isLoading,
+  href,
+}: {
+  title: string
+  value: number | null
+  isLoading: boolean
+  href: string
+}) {
+  return (
+    <Link href={href}>
+      <Card className="transition-colors hover:border-foreground/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            {title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-8 w-12" />
+          ) : (
+            <p className="text-2xl font-semibold">{value ?? "—"}</p>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
+  )
+}
+
+export default function DashboardPage() {
+  const perms = usePermissionHelpers()
+  const canReadRestaurants = perms.hasTenantWide("restaurant.read")
+  const canReadBranches = perms.hasAnywhere("branch.read")
+  const canManageRestaurants = perms.hasTenantWide("restaurant.manage")
+  const canReadReservations = perms.hasAnywhere("reservation.read")
+  const canReadMenu = perms.hasTenantWide("menu.read")
+  const canReadReports = perms.hasAnywhere("reports.read")
+
+  const restaurants = useRestaurants(
+    { offset: 0, limit: 1 },
+    { enabled: !perms.isLoading && canReadRestaurants }
+  )
+  const branches = useBranches(
+    { offset: 0, limit: 1 },
+    { enabled: !perms.isLoading && canReadBranches }
+  )
+
+  const hasAnyAccess = perms.isLoading || canReadRestaurants || canReadBranches
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Dashboard"
+        description="An overview of the restaurants and branches you have access to."
+      />
+
+      {!hasAnyAccess ? (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            You don&apos;t have access to any Restaurant Platform data yet. Ask an
+            owner or manager to grant you a role.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {canReadRestaurants ? (
+              <StatCard
+                title="Restaurants"
+                value={restaurants.data?.meta?.total ?? null}
+                isLoading={perms.isLoading || restaurants.isLoading}
+                href="/restaurants"
+              />
+            ) : null}
+            {canReadBranches ? (
+              <StatCard
+                title="Branches"
+                value={branches.data?.meta?.total ?? null}
+                isLoading={perms.isLoading || branches.isLoading}
+                href="/branches"
+              />
+            ) : null}
+            <Card className="opacity-60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Today&apos;s reservations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Unavailable — select a branch under Reservations to view its list.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            {canReadRestaurants || canReadBranches ? (
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                  <StoreIcon className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">
+                    Restaurants &amp; branches
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {canManageRestaurants
+                      ? "Set up restaurants, add branches, and manage addresses and operating hours."
+                      : "View the restaurants and branches you have access to."}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    render={<Link href={canReadRestaurants ? "/restaurants" : "/branches"} />}
+                    nativeButton={false}
+                  >
+                    {canReadRestaurants ? "Manage restaurants" : "View branches"}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+            {canReadReservations ? (
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                  <CalendarClockIcon className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Reservations</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Reservations are managed per branch -- open a branch to view or update its
+                    list.
+                  </p>
+                  <Button size="sm" variant="outline" render={<Link href="/branches" />} nativeButton={false}>
+                    Go to branches
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+            {canReadMenu ? (
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                  <UtensilsCrossedIcon className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Menu</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Menu categories and items are managed per restaurant -- open a restaurant to
+                    view or edit its menu.
+                  </p>
+                  <Button size="sm" variant="outline" render={<Link href="/restaurants" />} nativeButton={false}>
+                    Go to restaurants
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+            {canReadReports ? (
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                  <BarChart3Icon className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Reports</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    End-of-day sales, payments, and top items are reported per branch -- open a
+                    branch to view its report.
+                  </p>
+                  <Button size="sm" variant="outline" render={<Link href="/branches" />} nativeButton={false}>
+                    Go to branches
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}

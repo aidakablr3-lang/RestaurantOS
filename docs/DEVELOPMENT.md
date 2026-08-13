@@ -125,6 +125,76 @@ DATABASE_URL=<your database URL> python scripts/seed_e2e_fixtures.py
 Prints the tenant ID, email, and password to log in with at
 `http://localhost:3000/login`.
 
+## Restaurant Platform frontend (Sprint 6)
+
+`apps/admin-web` now has two independent route groups sharing one login
+page, API client, and auth store:
+
+- **`(admin)`** -- the original platform-admin surface (`/tenants/*`),
+  gated by the `is_platform_admin` flag on the logged-in user. Unchanged
+  by Sprint 6.
+- **`(restaurant)`** -- the new restaurant back-office surface
+  (`/dashboard`, `/restaurants/*`, `/branches/*`), gated by ordinary
+  tenant RBAC (`GET /api/v1/me/permissions`). This is where login now
+  redirects by default (`/` also redirects here), since it's the
+  primary product surface going forward.
+
+Both route groups authenticate the same way (`POST /api/v1/auth/login`)
+against the same tenant/user -- the only difference is which flag/grant
+that user holds.
+
+**A freshly seeded user holds no RBAC role.**
+`scripts/seed_e2e_fixtures.py` creates a tenant and a user with
+`is_platform_admin=True` (enough for the `(admin)` section), but grants
+no `Role`/`UserRole` rows at all -- every `(restaurant)` screen will
+403 until the user holds at least one. Grant the seeded user "Tenant
+Owner" (tenant-wide, every Restaurant Platform permission) with:
+
+```bash
+cd services/api
+export DATABASE_URL=<your database URL>
+export JWT_PRIVATE_KEY=... JWT_PUBLIC_KEY=...   # same keys the API runs with
+python scripts/backfill_tenant_owner.py \
+  --tenant-id <E2E_TENANT_ID printed by seed_e2e_fixtures.py> \
+  --user-id <the seeded user's id -- query users.id by email, see script's own docstring> \
+  --apply
+```
+
+Safe to re-run; it's a no-op if the user already holds the role.
+
+**Frontend unit tests** (Vitest, added in Sprint 6 -- covers the API
+client's refresh/retry/idempotency logic, the auth store, RBAC
+permission helpers, and form schemas):
+
+```bash
+cd apps/admin-web
+npm run test        # single run
+npm run test:watch  # watch mode
+```
+
+**BACKEND FOLLOW-UP REQUIRED:** `GET /api/v1/branches` (the list
+endpoint backing `/branches` and a restaurant's branch table) always
+returns `address: null`, even for branches that have one --
+`presentation/api/v1/branch_router.py`'s `list_branches` hardcodes it
+rather than hydrating from `AddressRepository`. `GET
+/api/v1/branches/{id}` (the detail endpoint) returns the real address
+correctly. Reconfirmed independently (fresh login, both endpoints, same
+two branches) during Step 6.0.1 stabilization.
+
+This is a genuine backend gap, not something the frontend can fix
+without bad architecture -- the only frontend-side options were (a) an
+N+1 `GET /branches/{id}` call per row to hydrate addresses into a list
+view, which is exactly the kind of workaround-that-becomes-a-liability
+this phase's backend freeze exists to avoid, or (b) stop presenting
+data the list endpoint doesn't actually have. Went with (b): the
+Branches list and the restaurant-detail branch table no longer show a
+City column at all (only Name + Status) -- showing "--" there would
+read as "no address on file" when the branch may well have one. The
+branch *detail* page (`GET /branches/{id}`) still shows the full
+address correctly. Left unfixed on the backend per this phase's
+explicit freeze; the real fix is for `list_branches` to hydrate
+addresses the same way `GetBranchUseCase` already does.
+
 ## Running tests
 
 ```bash
@@ -144,6 +214,7 @@ JWT_PRIVATE_KEY=dummy JWT_PUBLIC_KEY=dummy \
 ```bash
 cd apps/admin-web
 npx tsc --noEmit && npx eslint .
+npm run test    # Vitest unit tests
 npm run build
 
 # End-to-end (needs a running backend + the seed script run against it

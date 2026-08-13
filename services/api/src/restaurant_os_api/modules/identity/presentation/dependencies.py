@@ -9,10 +9,11 @@ constructed fresh per request from those singletons.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Path
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -28,11 +29,16 @@ from restaurant_os_api.modules.identity.application.interfaces import (
 )
 from restaurant_os_api.modules.identity.application.services import TenantProvisioningService
 from restaurant_os_api.modules.identity.application.use_cases import (
+    AssignUserRoleUseCase,
+    CreateRoleUseCase,
+    GetRoleUseCase,
     GetSubscriptionStatusUseCase,
     GetTenantQuotaUsageUseCase,
     GetTenantSettingsUseCase,
     GetTenantUseCase,
     ListFeatureFlagsUseCase,
+    ListPermissionsUseCase,
+    ListRolesUseCase,
     ListTenantsUseCase,
     LoginUserUseCase,
     LogoutUserUseCase,
@@ -40,6 +46,9 @@ from restaurant_os_api.modules.identity.application.use_cases import (
     OnboardTenantUseCase,
     ReactivateTenantUseCase,
     RefreshAccessTokenUseCase,
+    ReplaceRolePermissionsUseCase,
+    ResolveUserPermissionsUseCase,
+    RevokeUserRoleUseCase,
     SuspendTenantUseCase,
     UpdateTenantSettingsUseCase,
     UpdateTenantUseCase,
@@ -48,15 +57,20 @@ from restaurant_os_api.modules.identity.application.use_cases import (
 from restaurant_os_api.modules.identity.domain.exceptions import (
     InsufficientPrivilegesError,
     InvalidAccessTokenError,
+    PermissionDeniedError,
 )
 from restaurant_os_api.modules.identity.infrastructure.database.repositories import (
     SQLAlchemyFeatureFlagRepository,
+    SQLAlchemyPermissionRepository,
+    SQLAlchemyRolePermissionRepository,
+    SQLAlchemyRoleRepository,
     SQLAlchemySessionRepository,
     SQLAlchemySubscriptionRepository,
     SQLAlchemySystemSettingRepository,
     SQLAlchemyTenantDirectoryRepository,
     SQLAlchemyTenantRepository,
     SQLAlchemyUserRepository,
+    SQLAlchemyUserRoleRepository,
 )
 from restaurant_os_api.modules.identity.infrastructure.security import (
     Argon2PasswordHasher,
@@ -203,6 +217,236 @@ async def require_platform_admin(
 PlatformAdminDep = Annotated[AuthenticatedPrincipalDTO, Depends(require_platform_admin)]
 
 
+# --- RBAC Foundation (Sprint 5, Step 2) ---------------------------------
+
+
+def get_resolve_user_permissions_use_case(
+    session_factory: SessionFactoryDep,
+) -> ResolveUserPermissionsUseCase:
+    return ResolveUserPermissionsUseCase(
+        session_factory=session_factory,
+        user_role_repository_factory=SQLAlchemyUserRoleRepository,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+    )
+
+
+ResolveUserPermissionsUseCaseDep = Annotated[
+    ResolveUserPermissionsUseCase, Depends(get_resolve_user_permissions_use_case)
+]
+
+
+def require_permission(
+    code: str,
+) -> Callable[
+    [AuthenticatedPrincipalDTO, ResolveUserPermissionsUseCase], Awaitable[AuthenticatedPrincipalDTO]
+]:
+    """A tenant-wide permission gate (RBAC Foundation Architecture SS8.1) —
+    the caller must hold ``code`` tenant-wide, not merely at some
+    branch. Use for endpoints with no branch dimension at all (e.g.
+    ``POST /restaurants``).
+
+    Deliberately does **not** special-case ``is_platform_admin`` — that
+    flag gates RestaurantOS's own operators managing customer tenants
+    (the pre-existing Tenant Administration surface); it has nothing to
+    do with a tenant's own staff managing their own restaurant, and
+    granting it an implicit RBAC bypass here would quietly merge two
+    mechanisms this whole effort exists to keep separate (RBAC
+    Foundation Architecture SS10.2).
+    """
+
+    async def _dependency(
+        principal: AuthenticatedPrincipalDep,
+        resolve_permissions: ResolveUserPermissionsUseCaseDep,
+    ) -> AuthenticatedPrincipalDTO:
+        resolved = await resolve_permissions.execute(principal.tenant_id, principal.user_id)
+        if not resolved.has(code):
+            raise PermissionDeniedError(code)
+        return principal
+
+    return _dependency
+
+
+def require_branch_permission(
+    code: str,
+) -> Callable[
+    [str, AuthenticatedPrincipalDTO, ResolveUserPermissionsUseCase],
+    Awaitable[AuthenticatedPrincipalDTO],
+]:
+    """A branch-scoped permission gate — the caller must hold ``code``
+    either tenant-wide or specifically at the request's own
+    ``branch_id`` path parameter (RBAC Foundation Architecture SS7/SS8).
+
+    The ``branch_id`` path segment is never trusted as an authorization
+    *claim* — it only identifies *which resource* the request targets.
+    The actual decision comes entirely from the caller's own resolved
+    grants (Commit 3), checked against that target; a caller with no
+    grant at that branch is denied regardless of what the URL says, and
+    a caller who legitimately holds the permission there is allowed
+    regardless of what *other* branches exist. Tenant scope itself is
+    never taken from this parameter either — it always comes from
+    ``principal.tenant_id``, itself derived from the verified access
+    token (never client-supplied), exactly as every other tenant-scoped
+    dependency in this module already works.
+    """
+
+    async def _dependency(
+        branch_id: Annotated[str, Path(min_length=26, max_length=26)],
+        principal: AuthenticatedPrincipalDep,
+        resolve_permissions: ResolveUserPermissionsUseCaseDep,
+    ) -> AuthenticatedPrincipalDTO:
+        resolved = await resolve_permissions.execute(principal.tenant_id, principal.user_id)
+        if not resolved.has(code, branch_id=branch_id):
+            raise PermissionDeniedError(code, branch_id=branch_id)
+        return principal
+
+    return _dependency
+
+
+def require_permission_at_any_scope(
+    code: str,
+) -> Callable[
+    [AuthenticatedPrincipalDTO, ResolveUserPermissionsUseCase], Awaitable[AuthenticatedPrincipalDTO]
+]:
+    """A coarse "holds this permission *somewhere*" gate — tenant-wide,
+    or at any single branch. Fixes the gap RBAC Sprint 5 Step 2's own
+    test matrix found (AI_HANDOFF.md SS21, "Finding 2"): a Branch
+    Manager holding ``roles.assign`` only at their branch was rejected
+    by the plain tenant-wide ``require_permission`` before ever reaching
+    ``AssignUserRoleUseCase``/``RevokeUserRoleUseCase`` — even though
+    those use cases' own ``RoleGrantPolicy`` scope ceiling has always
+    correctly supported a branch-scoped granter (Commit 5).
+
+    Deliberately does **not** itself decide *which* branch(es) the
+    caller may act on, or apply the delegation ceiling — RBAC
+    Foundation Architecture SS16.1 states that guard explicitly belongs
+    to "the grant use case," not the router: "This is enforced
+    server-side in the grant use case, not assumed from frontend
+    behavior." This dependency exists only to keep a caller who holds
+    ``roles.assign`` **nowhere at all** (Waiter, Cashier, Kitchen Staff)
+    out entirely, at the same coarse-grained layer
+    ``require_permission``/``require_branch_permission`` already
+    operate at. The real, fine-grained decision — which specific branch,
+    whether the requested grant's permissions are within the caller's
+    own delegation ceiling, whether a tenant-wide grant is being
+    attempted by a branch-only holder — is made exactly once, inside
+    ``RoleGrantPolicy.ensure_can_grant``/``ensure_can_revoke``, against
+    the caller's full resolved permission set and the specific
+    ``branch_id`` in the request body (for grant) or the existing
+    grant's own ``branch_id`` (for revoke) — neither of which is a URL
+    path parameter, which is exactly why this cannot reuse
+    ``require_branch_permission`` as-is (that dependency reads
+    ``branch_id`` from the URL, and no such URL parameter exists on
+    either ``POST /rbac/user-roles`` or
+    ``DELETE /rbac/user-roles/{user_role_id}``).
+
+    Role *catalogue* management (creating a role, listing roles,
+    replacing a role's permission set) intentionally keeps using the
+    plain tenant-wide ``require_permission`` — a ``Role`` row has no
+    ``branch_id`` at all in the schema (SS4.1), and
+    ``RoleGrantPolicy`` itself applies no scope ceiling to authoring or
+    editing a role definition (only to granting/revoking it to a
+    specific user at a specific scope). Only the two routes that
+    actually create/remove a scoped ``UserRole`` grant need this gate.
+    """
+
+    async def _dependency(
+        principal: AuthenticatedPrincipalDep,
+        resolve_permissions: ResolveUserPermissionsUseCaseDep,
+    ) -> AuthenticatedPrincipalDTO:
+        resolved = await resolve_permissions.execute(principal.tenant_id, principal.user_id)
+        if not resolved.has(code) and not resolved.branch_ids_with(code):
+            raise PermissionDeniedError(code)
+        return principal
+
+    return _dependency
+
+
+def get_create_role_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> CreateRoleUseCase:
+    return CreateRoleUseCase(
+        session_factory=session_factory,
+        resolve_user_permissions_use_case=resolve_permissions,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+def get_get_role_use_case(session_factory: SessionFactoryDep) -> GetRoleUseCase:
+    return GetRoleUseCase(
+        session_factory=session_factory, role_repository_factory=SQLAlchemyRoleRepository
+    )
+
+
+def get_list_roles_use_case(session_factory: SessionFactoryDep) -> ListRolesUseCase:
+    return ListRolesUseCase(
+        session_factory=session_factory, role_repository_factory=SQLAlchemyRoleRepository
+    )
+
+
+def get_replace_role_permissions_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> ReplaceRolePermissionsUseCase:
+    return ReplaceRolePermissionsUseCase(
+        session_factory=session_factory,
+        resolve_user_permissions_use_case=resolve_permissions,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+    )
+
+
+def get_list_permissions_use_case(session_factory: SessionFactoryDep) -> ListPermissionsUseCase:
+    return ListPermissionsUseCase(
+        session_factory=session_factory,
+        permission_repository_factory=SQLAlchemyPermissionRepository,
+    )
+
+
+def get_assign_user_role_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> AssignUserRoleUseCase:
+    return AssignUserRoleUseCase(
+        session_factory=session_factory,
+        resolve_user_permissions_use_case=resolve_permissions,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+        user_role_repository_factory=SQLAlchemyUserRoleRepository,
+        user_repository_factory=SQLAlchemyUserRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+def get_revoke_user_role_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_permissions: ResolveUserPermissionsUseCaseDep,
+) -> RevokeUserRoleUseCase:
+    return RevokeUserRoleUseCase(
+        session_factory=session_factory,
+        resolve_user_permissions_use_case=resolve_permissions,
+        user_role_repository_factory=SQLAlchemyUserRoleRepository,
+        user_repository_factory=SQLAlchemyUserRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CreateRoleUseCaseDep = Annotated[CreateRoleUseCase, Depends(get_create_role_use_case)]
+GetRoleUseCaseDep = Annotated[GetRoleUseCase, Depends(get_get_role_use_case)]
+ListRolesUseCaseDep = Annotated[ListRolesUseCase, Depends(get_list_roles_use_case)]
+ReplaceRolePermissionsUseCaseDep = Annotated[
+    ReplaceRolePermissionsUseCase, Depends(get_replace_role_permissions_use_case)
+]
+ListPermissionsUseCaseDep = Annotated[
+    ListPermissionsUseCase, Depends(get_list_permissions_use_case)
+]
+AssignUserRoleUseCaseDep = Annotated[AssignUserRoleUseCase, Depends(get_assign_user_role_use_case)]
+RevokeUserRoleUseCaseDep = Annotated[RevokeUserRoleUseCase, Depends(get_revoke_user_role_use_case)]
+
+
 # --- Tenant Platform (Sprint 4.1) ---------------------------------------
 
 
@@ -215,6 +459,8 @@ def get_tenant_provisioning_service(
         subscription_repository_factory=SQLAlchemySubscriptionRepository,
         feature_flag_repository_factory=SQLAlchemyFeatureFlagRepository,
         directory_repository_factory=SQLAlchemyTenantDirectoryRepository,
+        role_repository_factory=SQLAlchemyRoleRepository,
+        role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
 

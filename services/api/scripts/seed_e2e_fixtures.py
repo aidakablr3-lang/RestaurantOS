@@ -32,6 +32,8 @@ from restaurant_os_api.modules.identity.application.services import TenantProvis
 from restaurant_os_api.modules.identity.infrastructure.database.models import UserModel
 from restaurant_os_api.modules.identity.infrastructure.database.repositories import (
     SQLAlchemyFeatureFlagRepository,
+    SQLAlchemyRolePermissionRepository,
+    SQLAlchemyRoleRepository,
     SQLAlchemySubscriptionRepository,
     SQLAlchemyTenantDirectoryRepository,
     SQLAlchemyTenantRepository,
@@ -66,6 +68,8 @@ async def main() -> None:
             subscription_repository_factory=SQLAlchemySubscriptionRepository,
             feature_flag_repository_factory=SQLAlchemyFeatureFlagRepository,
             directory_repository_factory=SQLAlchemyTenantDirectoryRepository,
+            role_repository_factory=SQLAlchemyRoleRepository,
+            role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
             outbox_writer_factory=SQLAlchemyOutboxWriter,
         )
         tenant = await provisioning_service.provision(

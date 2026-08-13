@@ -1,0 +1,37 @@
+"""ListInventoryItemsUseCase."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from restaurant_os_api.modules.operations.application.dto import InventoryItemListResultDTO
+from restaurant_os_api.modules.operations.application.use_cases._inventory_mapper import (
+    inventory_item_to_dto,
+)
+from restaurant_os_api.modules.operations.domain.ports import InventoryItemRepository
+from restaurant_os_api.platform.database import UnitOfWork
+from restaurant_os_api.platform.tenancy import TenantContext
+
+
+class ListInventoryItemsUseCase:
+    def __init__(
+        self,
+        *,
+        session_factory: async_sessionmaker[AsyncSession],
+        inventory_item_repository_factory: Callable[[AsyncSession], InventoryItemRepository],
+    ) -> None:
+        self._session_factory = session_factory
+        self._inventory_item_repository_factory = inventory_item_repository_factory
+
+    async def execute(
+        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+    ) -> InventoryItemListResultDTO:
+        async with UnitOfWork(self._session_factory, TenantContext(tenant_id)) as uow:
+            item_repo = self._inventory_item_repository_factory(uow.session)
+            items, total = await item_repo.list_for_branch(
+                tenant_id, branch_id, offset=offset, limit=limit
+            )
+            dtos = [inventory_item_to_dto(i) for i in items]
+        return InventoryItemListResultDTO(items=dtos, total=total, offset=offset, limit=limit)

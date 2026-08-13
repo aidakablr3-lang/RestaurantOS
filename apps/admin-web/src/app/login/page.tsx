@@ -37,8 +37,8 @@ export default function LoginPage() {
     setIsSubmitting(true)
     try {
       const { data } = await login(values)
-      setSession(data, values.tenantId)
-      router.replace("/tenants")
+      setSession(data, values.tenantId, values.email)
+      router.replace("/dashboard")
     } catch (error) {
       const message =
         error instanceof ApiError ? error.message : "Unable to sign in."
@@ -52,9 +52,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>RestaurantOS Admin</CardTitle>
+          <CardTitle>RestaurantOS</CardTitle>
           <CardDescription>
-            Sign in with your platform-admin account.
+            Sign in to manage your restaurants, branches, and operations.
           </CardDescription>
         </CardHeader>
         <CardContent>

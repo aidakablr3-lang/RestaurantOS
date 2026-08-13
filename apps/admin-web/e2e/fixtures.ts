@@ -24,7 +24,7 @@ export async function loginViaUi(page: Page): Promise<void> {
   await page.getByLabel("Email").fill(E2E_ADMIN.email)
   await page.getByLabel("Password").fill(E2E_ADMIN.password)
   await page.getByRole("button", { name: "Sign in" }).click()
-  await page.waitForURL("**/tenants")
+  await page.waitForURL("**/dashboard")
 }
 
 export function uniqueTenantName(prefix: string): string {

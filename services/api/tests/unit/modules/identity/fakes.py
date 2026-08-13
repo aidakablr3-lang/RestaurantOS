@@ -11,8 +11,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from restaurant_os_api.modules.identity.application.interfaces import AccessTokenClaims
-from restaurant_os_api.modules.identity.domain.entities import Session, Tenant, User
+from restaurant_os_api.modules.identity.application.interfaces import (
+    AccessTokenClaims,
+    TokenDecodeError,
+)
+from restaurant_os_api.modules.identity.domain.entities import (
+    Permission,
+    Role,
+    RolePermission,
+    Session,
+    Tenant,
+    User,
+    UserRole,
+)
+from restaurant_os_api.platform.events import DomainEvent
 
 
 class FakeAsyncSession:
@@ -139,13 +151,23 @@ class FakeTokenService:
 
     issued_claims: list[AccessTokenClaims] = field(default_factory=list)
     _refresh_counter: int = 0
+    decode_result: AccessTokenClaims | TokenDecodeError | None = None
+    """Set by a test before calling ``decode_access_token`` -- either the
+    claims to return, or a ``TokenDecodeError`` instance to raise. Left
+    unset (``None``), decoding still raises ``NotImplementedError``,
+    preserving the original "not exercised by login/refresh/logout"
+    invariant for every test that never configures it."""
 
     def issue_access_token(self, claims: AccessTokenClaims) -> str:
         self.issued_claims.append(claims)
         return f"access-token::{claims.subject_user_id}::{claims.session_id}"
 
     def decode_access_token(self, token: str) -> AccessTokenClaims:
-        raise NotImplementedError("Not exercised by the login/refresh/logout use cases.")
+        if self.decode_result is None:
+            raise NotImplementedError("Not exercised by the login/refresh/logout use cases.")
+        if isinstance(self.decode_result, TokenDecodeError):
+            raise self.decode_result
+        return self.decode_result
 
     def generate_refresh_token(self) -> str:
         self._refresh_counter += 1
@@ -153,3 +175,144 @@ class FakeTokenService:
 
     def hash_refresh_token(self, raw_token: str) -> str:
         return f"hashed::{raw_token}"
+
+
+class InMemoryRoleRepository:
+    def __init__(self, roles: dict[str, Role] | None = None) -> None:
+        self._roles = roles or {}
+
+    def _visible(self, tenant_id: str, role: Role) -> bool:
+        return role.tenant_id is None or role.tenant_id == tenant_id
+
+    async def get_by_id(self, tenant_id: str, role_id: str) -> Role | None:
+        role = self._roles.get(role_id)
+        if role is None or not self._visible(tenant_id, role):
+            return None
+        return role
+
+    async def get_by_name(self, tenant_id: str, name: str) -> Role | None:
+        for role in self._roles.values():
+            if role.name == name and self._visible(tenant_id, role):
+                return role
+        return None
+
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[Role], int]:
+        visible = [r for r in self._roles.values() if self._visible(tenant_id, r)]
+        visible.sort(key=lambda r: r.name)
+        return visible[offset : offset + limit], len(visible)
+
+    async def create(self, role: Role) -> Role:
+        self._roles[role.id] = role
+        return role
+
+    async def update(self, role: Role) -> Role:
+        self._roles[role.id] = role
+        return role
+
+
+class InMemoryPermissionRepository:
+    def __init__(self, permissions: dict[str, Permission] | None = None) -> None:
+        self._permissions = permissions or {}
+
+    async def get_by_code(self, code: str) -> Permission | None:
+        return self._permissions.get(code)
+
+    async def list_active(self) -> list[Permission]:
+        return [p for p in self._permissions.values() if p.is_active]
+
+
+class InMemoryRolePermissionRepository:
+    def __init__(self) -> None:
+        # role_id -> {permission_code: RolePermission}
+        self._by_role: dict[str, dict[str, RolePermission]] = {}
+        self._active_permission_codes: frozenset[str] | None = None
+
+    def set_active_permission_codes(self, codes: frozenset[str]) -> None:
+        """Test-only hook: restrict which codes count as "active" when
+        listing, mirroring the port's real semantics (retired
+        Permission rows drop out of resolution even if a stale
+        RolePermission row still references them). Defaults to
+        treating every stored code as active."""
+        self._active_permission_codes = codes
+
+    async def list_permission_codes_for_role(self, role_id: str) -> frozenset[str]:
+        codes = frozenset(self._by_role.get(role_id, {}).keys())
+        if self._active_permission_codes is None:
+            return codes
+        return codes & self._active_permission_codes
+
+    async def add(self, role_permission: RolePermission) -> RolePermission:
+        self._by_role.setdefault(role_permission.role_id, {})[role_permission.permission_code] = (
+            role_permission
+        )
+        return role_permission
+
+    async def remove(self, role_id: str, permission_code: str) -> None:
+        self._by_role.get(role_id, {}).pop(permission_code, None)
+
+    async def replace_for_role(self, role_id: str, permission_codes: frozenset[str]) -> None:
+        from datetime import UTC, datetime
+
+        self._by_role[role_id] = {
+            code: RolePermission(
+                id=f"rp-{role_id}-{code}",
+                role_id=role_id,
+                permission_code=code,
+                created_at=datetime.now(UTC),
+            )
+            for code in permission_codes
+        }
+
+
+class InMemoryUserRoleRepository:
+    def __init__(self, user_roles: dict[str, UserRole] | None = None) -> None:
+        self._user_roles = user_roles or {}
+        self._revoked: set[str] = set()
+
+    async def get_by_id(self, tenant_id: str, user_role_id: str) -> UserRole | None:
+        ur = self._user_roles.get(user_role_id)
+        if ur is None or ur.tenant_id != tenant_id or user_role_id in self._revoked:
+            return None
+        return ur
+
+    async def list_active_for_user(self, tenant_id: str, user_id: str) -> list[UserRole]:
+        return [
+            ur
+            for ur in self._user_roles.values()
+            if ur.tenant_id == tenant_id and ur.user_id == user_id and ur.id not in self._revoked
+        ]
+
+    async def exists(
+        self, tenant_id: str, user_id: str, role_id: str, branch_id: str | None
+    ) -> bool:
+        return any(
+            ur.tenant_id == tenant_id
+            and ur.user_id == user_id
+            and ur.role_id == role_id
+            and ur.branch_id == branch_id
+            and ur.id not in self._revoked
+            for ur in self._user_roles.values()
+        )
+
+    async def create(self, user_role: UserRole) -> UserRole:
+        self._user_roles[user_role.id] = user_role
+        return user_role
+
+    async def revoke(self, tenant_id: str, user_role_id: str) -> UserRole | None:
+        ur = self._user_roles.get(user_role_id)
+        if ur is None or ur.tenant_id != tenant_id or user_role_id in self._revoked:
+            return None
+        self._revoked.add(user_role_id)
+        return ur
+
+
+@dataclass
+class FakeOutboxWriter:
+    """Records every published event in order; never touches a database."""
+
+    published: list[tuple[str, DomainEvent]] = field(default_factory=list)
+
+    async def publish(self, tenant_id: str, event: DomainEvent) -> None:
+        self.published.append((tenant_id, event))

@@ -197,10 +197,39 @@ async def _clean_tables(engine: AsyncEngine) -> AsyncGenerator[None]:
     the ones actually exercising RLS. Covers every table Sprint 4.1
     (Tenant Platform) added, not just the Sprint 3 identity/auth set --
     this fixture predates those tables and was never extended for them.
+
+    ``qr_resolution_rate_limits`` (Sprint 5 Step 4.7) has no RLS at all
+    (ADR 0001) and no ``tenant_id`` column to scope by, so it needs
+    truncating here for the same reason every other table does --
+    otherwise one test's rate-limit counters would carry into the
+    next test reusing the same IP/token strings.
+
+    Sprint 7 (Day-to-Day Operations, migration 0007) added 26 more
+    tables, listed here in the same "extend, don't rebuild" spirit.
     """
     yield
     async with engine.begin() as conn:
         await conn.exec_driver_sql(
-            "TRUNCATE TABLE outbox_events, tenant_directory_entries, feature_flags, "
-            "system_settings, subscriptions, sessions, users, tenants RESTART IDENTITY CASCADE"
+            "TRUNCATE TABLE qr_resolution_rate_limits, idempotency_keys, outbox_events, "
+            "reservations, "
+            "menu_item_modifier_groups, "
+            "menu_item_availabilities, menu_item_branch_prices, modifiers, modifier_groups, "
+            "menu_items, menu_categories, qr_codes, tables, table_zones, operating_hours, "
+            "branches, addresses, restaurants, user_roles, role_permissions, roles, "
+            "tenant_directory_entries, feature_flags, system_settings, subscriptions, "
+            "sessions, users, tenants, "
+            "goods_receipts, purchase_order_items, purchase_orders, suppliers, "
+            "stock_adjustments, stock_movements, inventory_items, inventory_categories, "
+            "recipe_ingredients, recipes, ledger_entries, refunds, payments, "
+            "cash_drawers, bill_adjustments, order_tax_lines, bills, promo_codes, "
+            "discounts, taxes, kitchen_items, kitchen_tickets, order_items, orders, tabs "
+            "RESTART IDENTITY CASCADE"
         )
+        # `permissions` and `chart_of_accounts` are deliberately
+        # excluded: both are fixed platform reference data seeded once
+        # by their own migrations (0003 and 0007 respectively, "same as
+        # currencies" -- see 0007's own docstring), not per-test data.
+        # Truncating `permissions` would break every RBAC test after
+        # the first (`role_permissions.permission_code` is an
+        # ON DELETE RESTRICT foreign key into it); `chart_of_accounts`
+        # has no tenant_id and no per-tenant rows to begin with.
