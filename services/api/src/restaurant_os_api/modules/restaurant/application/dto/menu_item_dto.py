@@ -1,4 +1,10 @@
-"""Application-layer DTOs for MenuItem CRUD (Sprint 5 Step 4.8)."""
+"""Application-layer DTOs for MenuItem CRUD (Sprint 5 Step 4.8).
+
+``station`` (added for kitchen/bar station routing) defaults to
+``"kitchen"`` on create, matching ``MenuItem.station``'s own default --
+existing callers that don't know about stations yet keep getting the
+pre-existing single-ticket-per-order behavior.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +21,7 @@ class CreateMenuItemRequestDTO:
     currency_code: str
     is_available: bool = True
     display_order: int = 0
+    station: str = "kitchen"
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +33,7 @@ class UpdateMenuItemRequestDTO:
     currency_code: str
     is_available: bool
     display_order: int
+    station: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +48,7 @@ class MenuItemDTO:
     display_order: int
     recipe_id: str | None
     created_at: datetime
+    station: str
 
 
 @dataclass(frozen=True, slots=True)

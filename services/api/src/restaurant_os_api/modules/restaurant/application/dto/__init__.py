@@ -7,6 +7,11 @@ from restaurant_os_api.modules.restaurant.application.dto.branch_dto import (
     CreateBranchRequestDTO,
     UpdateBranchRequestDTO,
 )
+from restaurant_os_api.modules.restaurant.application.dto.guest_menu_dto import (
+    GuestMenuCategoryDTO,
+    GuestMenuDTO,
+    GuestMenuItemDTO,
+)
 from restaurant_os_api.modules.restaurant.application.dto.menu_category_dto import (
     CreateMenuCategoryRequestDTO,
     MenuCategoryDTO,
@@ -95,6 +100,9 @@ __all__ = [
     "CreateRestaurantRequestDTO",
     "CreateTableRequestDTO",
     "CreateTableZoneRequestDTO",
+    "GuestMenuCategoryDTO",
+    "GuestMenuDTO",
+    "GuestMenuItemDTO",
     "MenuCategoryDTO",
     "MenuCategoryListResultDTO",
     "MenuItemAvailabilityDTO",

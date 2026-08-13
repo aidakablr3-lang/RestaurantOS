@@ -1,7 +1,10 @@
 from restaurant_os_api.modules.restaurant.domain.entities.address import Address
 from restaurant_os_api.modules.restaurant.domain.entities.branch import Branch, BranchStatus
 from restaurant_os_api.modules.restaurant.domain.entities.menu_category import MenuCategory
-from restaurant_os_api.modules.restaurant.domain.entities.menu_item import MenuItem
+from restaurant_os_api.modules.restaurant.domain.entities.menu_item import (
+    MenuItem,
+    MenuItemStation,
+)
 from restaurant_os_api.modules.restaurant.domain.entities.menu_item_availability import (
     MenuItemAvailability,
 )
@@ -38,6 +41,7 @@ __all__ = [
     "MenuItemAvailability",
     "MenuItemBranchPrice",
     "MenuItemModifierGroup",
+    "MenuItemStation",
     "Modifier",
     "ModifierGroup",
     "ModifierSelectionType",

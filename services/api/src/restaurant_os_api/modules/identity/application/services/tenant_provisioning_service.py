@@ -123,6 +123,7 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "inventory.manage",
                 "purchasing.read",
                 "purchasing.manage",
+                "reports.read",
             }
         ),
     ),
@@ -157,6 +158,7 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "inventory.manage",
                 "purchasing.read",
                 "purchasing.manage",
+                "reports.read",
             }
         ),
     ),
@@ -185,6 +187,7 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
                 "inventory.manage",
                 "purchasing.read",
                 "purchasing.manage",
+                "reports.read",
             }
         ),
     ),
@@ -257,7 +260,7 @@ _DEFAULT_ROLE_CATALOGUE: tuple[tuple[str, str, RoleScope, frozenset[str]], ...] 
             "wasn't built yet); added now that Step 6 completes it."
         ),
         RoleScope.BRANCH,
-        frozenset({"ledger.read", "billing.read", "purchasing.read"}),
+        frozenset({"ledger.read", "billing.read", "purchasing.read", "reports.read"}),
     ),
 )
 

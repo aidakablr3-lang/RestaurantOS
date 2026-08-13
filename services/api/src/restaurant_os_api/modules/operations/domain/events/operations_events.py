@@ -51,6 +51,22 @@ class OrderFired:
 
 
 @dataclass(frozen=True, slots=True)
+class OrderServed:
+    order_id: str
+    occurred_at: datetime
+
+    event_type: ClassVar[str] = "OrderServed"
+    aggregate_type: ClassVar[str] = "order"
+
+    @property
+    def aggregate_id(self) -> str:
+        return self.order_id
+
+    def to_payload(self) -> dict[str, Any]:
+        return {"orderId": self.order_id, "occurredAt": self.occurred_at.isoformat()}
+
+
+@dataclass(frozen=True, slots=True)
 class OrderClosed:
     order_id: str
     occurred_at: datetime

@@ -18,7 +18,7 @@ def order_item_to_dto(item: OrderItem) -> OrderItemDTO:
     )
 
 
-def order_to_dto(order: Order, items: list[OrderItem]) -> OrderDTO:
+def order_to_dto(order: Order, items: list[OrderItem], *, item_count: int | None = None) -> OrderDTO:
     return OrderDTO(
         id=order.id,
         tenant_id=order.tenant_id,
@@ -37,4 +37,5 @@ def order_to_dto(order: Order, items: list[OrderItem]) -> OrderDTO:
         customer_id=order.customer_id,
         closed_at=order.closed_at,
         origin_device_id=order.origin_device_id,
+        item_count=item_count if item_count is not None else len(items),
     )

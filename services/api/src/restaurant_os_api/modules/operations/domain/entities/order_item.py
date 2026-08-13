@@ -2,13 +2,15 @@
 loaded independently of its parent Order.
 
 Architecture doc SS3.1: "Added -> fired -> ready -> served; voidable
-pre-fire only". This step implements ``fire()`` (called by
-``FireOrderUseCase`` for every still-``ADDED`` item) and ``void()``
-(pre-fire cancellation) -- ``ready``/``served`` are enum values the
-DB CHECK constraint and future KDS-bump-to-order-item propagation need,
-but no domain method transitions into them yet in this step, disclosed
-the same way ``InvalidOrderStatusTransitionError`` discloses Order's
-own unreached states.
+pre-fire only". ``fire()`` (called by ``FireOrderUseCase`` for every
+still-``ADDED`` item) and ``void()`` (pre-fire cancellation) were this
+module's first two transitions; ``ready()``/``serve()`` complete the
+graph -- both are driven by ``UpdateKitchenTicketStatusUseCase``'s own
+cascade (a ``KitchenItem`` bump to ``ready``/... a ticket bump to
+``served`` propagates through to the ``OrderItem`` its
+``order_item_id`` points at), the KDS-bump-to-order-item propagation
+this entity's docstring always named as the reason these enum values
+existed before any method reached them.
 """
 
 from __future__ import annotations
@@ -50,6 +52,12 @@ class OrderItem:
 
     def void(self) -> None:
         self._transition_to(OrderItemLineStatus.VOIDED, allowed_from=(OrderItemLineStatus.ADDED,))
+
+    def ready(self) -> None:
+        self._transition_to(OrderItemLineStatus.READY, allowed_from=(OrderItemLineStatus.FIRED,))
+
+    def serve(self) -> None:
+        self._transition_to(OrderItemLineStatus.SERVED, allowed_from=(OrderItemLineStatus.READY,))
 
     def _transition_to(
         self, new_status: OrderItemLineStatus, *, allowed_from: tuple[OrderItemLineStatus, ...]

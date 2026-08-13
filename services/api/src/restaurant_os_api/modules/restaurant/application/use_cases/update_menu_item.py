@@ -42,6 +42,7 @@ from restaurant_os_api.modules.restaurant.application.dto import (
 from restaurant_os_api.modules.restaurant.application.use_cases._menu_item_mapper import (
     menu_item_to_dto,
 )
+from restaurant_os_api.modules.restaurant.domain.entities import MenuItemStation
 from restaurant_os_api.modules.restaurant.domain.events import MenuItemUpdated
 from restaurant_os_api.modules.restaurant.domain.exceptions import MenuItemNotFoundError
 from restaurant_os_api.modules.restaurant.domain.ports import MenuItemRepository
@@ -77,6 +78,7 @@ class UpdateMenuItemUseCase:
             menu_item.currency_code = request.currency_code
             menu_item.is_available = request.is_available
             menu_item.display_order = request.display_order
+            menu_item.station = MenuItemStation(request.station)
 
             menu_item = await menu_item_repo.update(menu_item)
 

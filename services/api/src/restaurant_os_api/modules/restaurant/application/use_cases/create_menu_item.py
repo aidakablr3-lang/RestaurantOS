@@ -37,7 +37,7 @@ from restaurant_os_api.modules.restaurant.application.dto import (
 from restaurant_os_api.modules.restaurant.application.use_cases._menu_item_mapper import (
     menu_item_to_dto,
 )
-from restaurant_os_api.modules.restaurant.domain.entities import MenuItem
+from restaurant_os_api.modules.restaurant.domain.entities import MenuItem, MenuItemStation
 from restaurant_os_api.modules.restaurant.domain.events import MenuItemCreated
 from restaurant_os_api.modules.restaurant.domain.exceptions import MenuCategoryNotFoundError
 from restaurant_os_api.modules.restaurant.domain.ports import (
@@ -85,6 +85,7 @@ class CreateMenuItemUseCase:
                     is_available=request.is_available,
                     display_order=request.display_order,
                     created_at=now,
+                    station=MenuItemStation(request.station),
                 )
             )
 

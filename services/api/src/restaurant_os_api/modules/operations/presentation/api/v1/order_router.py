@@ -2,11 +2,15 @@
 
 ``POST``/``GET`` ``/api/v1/branches/{branch_id}/orders`` (+ item GET)
 stay nested under ``branch_id`` so ``require_branch_permission`` can
-gate them directly. ``items``/``fire``/``close``/``void`` are flat
-(Architecture doc SS6) -- gated by a coarse
-``require_permission_at_any_scope("order.manage")`` here, plus each
-use case's own fine-grained ``resolve_and_authorize_branch`` call once
-the order (and therefore its real ``branch_id``) is loaded.
+gate them directly. ``items``/``fire``/``close``/``void``/``items/
+{order_item_id}/void`` are flat (Architecture doc SS6) -- gated by a
+coarse ``require_permission_at_any_scope("order.manage")`` here, plus
+each use case's own fine-grained ``resolve_and_authorize_branch`` call
+once the order (and therefore its real ``branch_id``) is loaded.
+
+``items/{order_item_id}/void`` is the line-level counterpart to
+``void`` -- pre-fire only, see ``VoidOrderItemUseCase``'s own
+docstring for why a fired line has no void route here.
 
 Every route resolves through a tenant-scoped repository lookup before
 anything else -- cross-scope is a 404, never a distinguishable 403, no
@@ -39,6 +43,7 @@ from restaurant_os_api.modules.operations.presentation.dependencies import (
     RequireOrderManageAtAnyScopeDep,
     RequireOrderManageDep,
     RequireOrderReadDep,
+    VoidOrderItemUseCaseDep,
     VoidOrderUseCaseDep,
 )
 from restaurant_os_api.modules.operations.presentation.schemas.order_schemas import (
@@ -53,6 +58,7 @@ router = APIRouter(tags=["orders"])
 
 BranchIdPath = Annotated[str, Path(min_length=26, max_length=26)]
 OrderIdPath = Annotated[str, Path(min_length=26, max_length=26)]
+OrderItemIdPath = Annotated[str, Path(min_length=26, max_length=26)]
 IdempotencyKeyHeader = Annotated[str | None, Header(alias="Idempotency-Key")]
 
 
@@ -88,6 +94,7 @@ def _order_to_schema(dto: OrderDTO) -> OrderResponseSchema:
         customer_id=dto.customer_id,
         closed_at=dto.closed_at,
         origin_device_id=dto.origin_device_id,
+        item_count=dto.item_count,
     )
 
 
@@ -142,8 +149,17 @@ async def list_orders(
     use_case: ListOrdersUseCaseDep,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    table_id: Annotated[str | None, Query(alias="tableId", min_length=26, max_length=26)] = None,
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
 ) -> ApiResponse[list[OrderResponseSchema]]:
-    result = await use_case.execute(principal.tenant_id, branch_id, offset=offset, limit=limit)
+    result = await use_case.execute(
+        principal.tenant_id,
+        branch_id,
+        offset=offset,
+        limit=limit,
+        table_id=table_id,
+        status=status_filter,
+    )
     return ApiResponse(
         data=[_order_to_schema(o) for o in result.orders],
         meta=PaginationMeta(total=result.total, offset=result.offset, limit=result.limit),
@@ -283,3 +299,36 @@ async def void_order(
         idempotency_key=idempotency_key,
         action_name="void",
     )
+
+
+@router.post(
+    "/api/v1/orders/{order_id}/items/{order_item_id}/void",
+    response_model=ApiResponse[OrderResponseSchema],
+)
+async def void_order_item(
+    order_id: OrderIdPath,
+    order_item_id: OrderItemIdPath,
+    principal: RequireOrderManageAtAnyScopeDep,
+    use_case: VoidOrderItemUseCaseDep,
+    idempotency_guard: IdempotencyGuardDep,
+    idempotency_key: IdempotencyKeyHeader = None,
+) -> JSONResponse:
+    async def execute() -> tuple[int, dict[str, Any]]:
+        result = await use_case.execute(
+            principal.tenant_id, principal.user_id, order_id, order_item_id
+        )
+        response = ApiResponse(data=_order_to_schema(result))
+        return status.HTTP_200_OK, response.model_dump(mode="json", by_alias=True)
+
+    if idempotency_key is None:
+        http_status, response_body = await execute()
+    else:
+        http_status, response_body = await idempotency_guard.run(
+            tenant_id=principal.tenant_id,
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint_request(
+                {"orderId": order_id, "orderItemId": order_item_id, "action": "void_item"}
+            ),
+            execute=execute,
+        )
+    return JSONResponse(status_code=http_status, content=response_body)

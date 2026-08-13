@@ -14,9 +14,11 @@ from restaurant_os_api.modules.operations.application.dto import (
 )
 from restaurant_os_api.modules.operations.presentation.dependencies import (
     CloseCashDrawerUseCaseDep,
+    GetOpenCashDrawerUseCaseDep,
     OpenCashDrawerUseCaseDep,
     RequireBillingManageAtAnyScopeDep,
     RequireBillingManageDep,
+    RequireBillingReadAtAnyScopeDep,
 )
 from restaurant_os_api.modules.operations.presentation.schemas.cash_drawer_schemas import (
     CashDrawerResponseSchema,
@@ -67,6 +69,19 @@ async def open_cash_drawer(
         ),
     )
     return ApiResponse(data=_cash_drawer_to_schema(result))
+
+
+@router.get(
+    "/api/v1/branches/{branch_id}/cash-drawers/open",
+    response_model=ApiResponse[CashDrawerResponseSchema | None],
+)
+async def get_open_cash_drawer(
+    branch_id: BranchIdPath,
+    principal: RequireBillingReadAtAnyScopeDep,
+    use_case: GetOpenCashDrawerUseCaseDep,
+) -> ApiResponse[CashDrawerResponseSchema | None]:
+    result = await use_case.execute(principal.tenant_id, principal.user_id, branch_id)
+    return ApiResponse(data=_cash_drawer_to_schema(result) if result is not None else None)
 
 
 @router.post(

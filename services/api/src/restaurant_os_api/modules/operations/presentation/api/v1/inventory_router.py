@@ -2,11 +2,21 @@
 Step 5).
 
 ``inventory-categories`` are flat, tenant-wide (mirrors
-``ModifierGroupRouter``'s own shape -- no FK parent). ``inventory-items``
-are branch-nested, gated directly by ``require_branch_permission``.
-``stock-movements`` is flat (Architecture doc SS6: manual adjustments/
-waste logging; ``sale_deduction`` is never a direct client-facing POST)
--- coarse ``require_permission_at_any_scope`` here, plus
+``ModifierGroupRouter``'s own shape -- no FK parent). Creating one is
+gated ``require_permission_at_any_scope("inventory.manage")`` --
+*not* a strict tenant-wide requirement -- specifically so the default
+"Inventory Manager" role (seeded branch-scoped only, per
+``tenant_provisioning_service.py``) can manage the category taxonomy
+its own branch's items belong to. A strict tenant-wide gate here made
+that role's own `inventory.manage` grant unable to ever satisfy it,
+since ``Role.default_scope`` is an authoring hint, not a structural
+constraint (see ``role.py``), and the catalogue seeds this role
+branch-scoped -- a real, previously-disclosed RBAC gap (Sprint 7
+full-day operational simulation). ``inventory-items`` are branch-nested,
+gated directly by ``require_branch_permission``. ``stock-movements`` is
+flat (Architecture doc SS6: manual adjustments/waste logging;
+``sale_deduction`` is never a direct client-facing POST) -- coarse
+``require_permission_at_any_scope`` here, plus
 ``RecordStockMovementUseCase``'s/``ListStockMovementsUseCase``'s own
 fine-grained ``resolve_and_authorize_branch`` call once the item's real
 ``branch_id`` is loaded, the same split every other flat Operations
@@ -39,7 +49,6 @@ from restaurant_os_api.modules.operations.presentation.dependencies import (
     RecordStockMovementUseCaseDep,
     RequireInventoryManageAtAnyScopeDep,
     RequireInventoryManageDep,
-    RequireInventoryManageTenantWideDep,
     RequireInventoryReadAtAnyScopeDep,
     RequireInventoryReadDep,
     RequireInventoryReadTenantWideDep,
@@ -105,7 +114,7 @@ def _movement_to_schema(dto: StockMovementDTO) -> StockMovementResponseSchema:
 )
 async def create_inventory_category(
     body: CreateInventoryCategoryRequestSchema,
-    principal: RequireInventoryManageTenantWideDep,
+    principal: RequireInventoryManageAtAnyScopeDep,
     use_case: CreateInventoryCategoryUseCaseDep,
 ) -> ApiResponse[InventoryCategoryResponseSchema]:
     result = await use_case.execute(

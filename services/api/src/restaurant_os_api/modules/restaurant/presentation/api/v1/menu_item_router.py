@@ -119,6 +119,7 @@ def _menu_item_to_schema(dto: MenuItemDTO) -> MenuItemResponseSchema:
         display_order=dto.display_order,
         recipe_id=dto.recipe_id,
         created_at=dto.created_at,
+        station=dto.station,
     )
 
 
@@ -145,6 +146,7 @@ async def create_menu_item(
                 currency_code=body.currency_code,
                 is_available=body.is_available,
                 display_order=body.display_order,
+                station=body.station.value,
             ),
         )
         response = ApiResponse(data=_menu_item_to_schema(result))
@@ -222,6 +224,7 @@ async def update_menu_item(
                 currency_code=body.currency_code,
                 is_available=body.is_available,
                 display_order=body.display_order,
+                station=body.station.value,
             ),
         )
         response = ApiResponse(data=_menu_item_to_schema(result))

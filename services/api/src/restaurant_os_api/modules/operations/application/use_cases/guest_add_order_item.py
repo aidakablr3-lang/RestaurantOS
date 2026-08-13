@@ -1,50 +1,17 @@
-"""AddOrderItemUseCase.
+"""GuestAddOrderItemUseCase.
 
-A flat route (``POST /api/v1/orders/{order_id}/items``, not nested
-under ``branch_id`` -- the order itself already carries its own branch
-context) -- gated the same "coarse router gate, fine-grained use-case
-decision" way ``ChangeTableStatusUseCase`` established: the router
-checks ``order.manage`` at any scope, this use case resolves the
-order's real ``branch_id`` and re-checks the caller's grants against
-that specific branch via ``resolve_and_authorize_branch`` (reused
-directly from the restaurant module -- the same ``branches`` table,
-the same shape of check, no reason to duplicate it).
-
-Legal while the order is ``OPEN`` or already ``FIRED`` -- a real
-restaurant table keeps ordering after the first round goes to the
-kitchen ("and another round of drinks"), so a line item added post-fire
-is a genuine, disclosed capability, not an oversight: it lands in
-``OrderItemLineStatus.ADDED`` same as any other new line, and stays
-there, unfired and un-billed, until the *next* ``FireOrderUseCase``
-call picks it up (``Order.fire()`` is itself idempotent against an
-already-``FIRED`` order for exactly this reason -- see its own
-docstring). Any other order status (``served``/``billed``/``closed``/
-``voided``) still raises ``InvalidOrderStatusTransitionError``.
-``menu_item_id`` is verified to
-belong to the *same restaurant* as the order's own branch (via
-``MenuCategory.restaurant_id`` -- ``MenuItem`` itself carries no
-``restaurant_id`` column, only ``menu_category_id``) -- a menu item
-belonging to an unrelated restaurant is the same cross-scope-is-404
-discipline as everywhere else, raising the restaurant module's own
-``MenuItemNotFoundError`` (reused as-is; Operations doesn't own
-``MenuItem``). A menu item that exists, belongs to the right
-restaurant, but has ``is_available = false`` raises this module's own
-``MenuItemNotAvailableError`` instead -- a genuinely different failure
-mode.
-
-``unit_price_amount`` is snapshotted from ``MenuItem.price_amount``
-directly -- branch-price overrides (``MenuItemBranchPrice``) and
-time-windowed availability overrides (``MenuItemAvailability``) are
-**not** resolved here. A disclosed scope-narrowing: the full
-"what's the effective price/availability for this item at this branch
-right now" resolution is real, separate logic (nothing in the codebase
-provides it as a reusable helper yet) that a future step should add,
-not something worth building ad hoc inside this use case.
-
-Accumulates the new line's cost into ``Order.subtotal_amount``.
-Publishes no event of its own yet -- ``OrderItemAdded`` was considered
-but cut: nothing in this step consumes it, and an unconsumed event is
-speculative surface, not evidence of correctness.
+Backs ``POST /api/v1/qr/{token}/orders/{order_id}/items`` (guest
+ordering). Same rules as the staff-facing ``AddOrderItemUseCase`` --
+legal while the order is ``OPEN`` or already ``FIRED``, ``menu_item_id``
+must belong to the order branch's own restaurant and be available, price
+is snapshotted from ``MenuItem.price_amount`` (same disclosed
+branch-price/availability-override gap) -- but takes no ``user_id`` and
+does no RBAC resolution: the caller has already proven table-presence by
+holding a QR token the router just re-resolved, and
+``ensure_guest_order_access`` re-checks the loaded order's
+``branch_id``/``table_id`` against that resolution before anything else,
+the guest-flow's own authorization model in place of
+``resolve_and_authorize_branch``.
 """
 
 from __future__ import annotations
@@ -55,12 +22,12 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from restaurant_os_api.core.ids import generate_ulid
-from restaurant_os_api.modules.identity.application.use_cases.resolve_user_permissions import (
-    ResolveUserPermissionsUseCase,
-)
 from restaurant_os_api.modules.operations.application.dto import (
     AddOrderItemRequestDTO,
     OrderDTO,
+)
+from restaurant_os_api.modules.operations.application.use_cases._guest_order_guard import (
+    ensure_guest_order_access,
 )
 from restaurant_os_api.modules.operations.application.use_cases._order_mapper import order_to_dto
 from restaurant_os_api.modules.operations.domain.entities import (
@@ -74,10 +41,10 @@ from restaurant_os_api.modules.operations.domain.exceptions import (
     OrderNotFoundError,
 )
 from restaurant_os_api.modules.operations.domain.ports import OrderRepository
-from restaurant_os_api.modules.restaurant.application.branch_authorization import (
-    resolve_and_authorize_branch,
+from restaurant_os_api.modules.restaurant.domain.exceptions import (
+    BranchNotFoundError,
+    MenuItemNotFoundError,
 )
-from restaurant_os_api.modules.restaurant.domain.exceptions import MenuItemNotFoundError
 from restaurant_os_api.modules.restaurant.domain.ports import (
     BranchRepository,
     MenuCategoryRepository,
@@ -86,10 +53,8 @@ from restaurant_os_api.modules.restaurant.domain.ports import (
 from restaurant_os_api.platform.database import UnitOfWork
 from restaurant_os_api.platform.tenancy import TenantContext
 
-PERMISSION_CODE = "order.manage"
 
-
-class AddOrderItemUseCase:
+class GuestAddOrderItemUseCase:
     def __init__(
         self,
         *,
@@ -98,17 +63,15 @@ class AddOrderItemUseCase:
         branch_repository_factory: Callable[[AsyncSession], BranchRepository],
         menu_item_repository_factory: Callable[[AsyncSession], MenuItemRepository],
         menu_category_repository_factory: Callable[[AsyncSession], MenuCategoryRepository],
-        resolve_user_permissions: ResolveUserPermissionsUseCase,
     ) -> None:
         self._session_factory = session_factory
         self._order_repository_factory = order_repository_factory
         self._branch_repository_factory = branch_repository_factory
         self._menu_item_repository_factory = menu_item_repository_factory
         self._menu_category_repository_factory = menu_category_repository_factory
-        self._resolve_user_permissions = resolve_user_permissions
 
     async def execute(
-        self, tenant_id: str, user_id: str, request: AddOrderItemRequestDTO
+        self, tenant_id: str, branch_id: str, table_id: str, request: AddOrderItemRequestDTO
     ) -> OrderDTO:
         now = datetime.now(UTC)
         async with UnitOfWork(self._session_factory, TenantContext(tenant_id)) as uow:
@@ -120,18 +83,14 @@ class AddOrderItemUseCase:
             order = await order_repo.get_by_id(tenant_id, request.order_id)
             if order is None:
                 raise OrderNotFoundError(request.order_id)
-
-            resolved_permissions = await self._resolve_user_permissions.execute(tenant_id, user_id)
-            branch = await resolve_and_authorize_branch(
-                branch_repository=branch_repo,
-                tenant_id=tenant_id,
-                branch_id=order.branch_id,
-                resolved_permissions=resolved_permissions,
-                permission_code=PERMISSION_CODE,
-            )
+            ensure_guest_order_access(order, branch_id=branch_id, table_id=table_id)
 
             if order.status not in (OrderStatus.OPEN, OrderStatus.FIRED):
                 raise InvalidOrderStatusTransitionError(order.id, order.status.value, "item_added")
+
+            branch = await branch_repo.get_by_id(tenant_id, branch_id)
+            if branch is None:
+                raise BranchNotFoundError(branch_id)
 
             menu_item = await menu_item_repo.get_by_id(tenant_id, request.menu_item_id)
             if menu_item is None:

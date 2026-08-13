@@ -5,9 +5,13 @@ scope note). One Order can fan out into multiple tickets (one per
 station); each ticket ages independently.
 
 This step's KitchenTicket status is settable directly via its own
-route, independent of its items' individual statuses -- no invariant
-enforcing "ticket can only be marked ready once every item is ready"
-is implemented yet (that stricter cross-child rule is real, disclosed
+route. ``UpdateKitchenTicketStatusUseCase`` cascades a ``start()``/
+``mark_ready()`` transition down to any child ``KitchenItem`` still
+behind it, so bumping the whole ticket also bumps items nobody bumped
+individually -- but an item can still be bumped ahead of its ticket
+through its own route (a cook marking one item ready before the rest),
+and no invariant enforces "ticket can only be marked ready once every
+item is ready" (that stricter cross-child rule is real, disclosed
 future work, not silently assumed).
 """
 

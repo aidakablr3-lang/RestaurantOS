@@ -25,6 +25,7 @@ from restaurant_os_api.modules.operations.presentation.dependencies import (
     CreateTaxUseCaseDep,
     GenerateBillUseCaseDep,
     GetBillUseCaseDep,
+    ListTaxesUseCaseDep,
     RequireBillingManageAtAnyScopeDep,
     RequireBillingManageTenantWideDep,
     RequireBillingReadAtAnyScopeDep,
@@ -107,6 +108,30 @@ async def create_tax(
             is_active=tax.is_active,
             created_at=tax.created_at,
         )
+    )
+
+
+@router.get(
+    "/api/v1/taxes",
+    response_model=ApiResponse[list[TaxResponseSchema]],
+)
+async def list_taxes(
+    principal: RequireBillingReadAtAnyScopeDep,
+    use_case: ListTaxesUseCaseDep,
+) -> ApiResponse[list[TaxResponseSchema]]:
+    taxes = await use_case.execute(principal.tenant_id)
+    return ApiResponse(
+        data=[
+            TaxResponseSchema(
+                id=tax.id,
+                tenant_id=tax.tenant_id,
+                name=tax.name,
+                rate=tax.rate,
+                is_active=tax.is_active,
+                created_at=tax.created_at,
+            )
+            for tax in taxes
+        ]
     )
 
 

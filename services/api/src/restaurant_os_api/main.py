@@ -33,6 +33,9 @@ from restaurant_os_api.modules.operations.presentation.api.v1.cash_drawer_router
 from restaurant_os_api.modules.operations.presentation.api.v1.discount_router import (
     router as discount_router,
 )
+from restaurant_os_api.modules.operations.presentation.api.v1.guest_order_router import (
+    router as guest_order_router,
+)
 from restaurant_os_api.modules.operations.presentation.api.v1.inventory_router import (
     router as inventory_router,
 )
@@ -50,6 +53,9 @@ from restaurant_os_api.modules.operations.presentation.api.v1.purchasing_router 
 )
 from restaurant_os_api.modules.operations.presentation.api.v1.recipe_router import (
     router as recipe_router,
+)
+from restaurant_os_api.modules.operations.presentation.api.v1.report_router import (
+    router as report_router,
 )
 from restaurant_os_api.modules.operations.presentation.api.v1.tab_router import (
     router as tab_router,
@@ -88,10 +94,13 @@ from restaurant_os_api.modules.restaurant.presentation.api.v1.table_zone_router 
     router as table_zone_router,
 )
 
-# Every route in this API is Bearer-token-gated except these four --
-# the three auth routes (which hand out or invalidate the token itself,
-# so requiring one to call them would be circular) and the one
-# deliberately unauthenticated QR guest-resolution route (ADR 0001).
+# Every route in this API is Bearer-token-gated except these -- the
+# three auth routes (which hand out or invalidate the token itself, so
+# requiring one to call them would be circular), the QR guest-resolution
+# bootstrap route (ADR 0001), and the guest QR *ordering* routes
+# (guest-ordering gap fix): a guest has no login, so every one of these
+# re-resolves the token itself as its only credential
+# (``guest_order_router.py``'s own docstring).
 # Auth is a raw ``Authorization`` header dependency (``require_authenticated_user``),
 # not ``fastapi.security``'s ``HTTPBearer``, so FastAPI never auto-populates
 # ``security`` in the OpenAPI schema on its own -- without this, the schema
@@ -104,6 +113,11 @@ _UNAUTHENTICATED_OPERATIONS: frozenset[tuple[str, str]] = frozenset(
         ("/api/v1/auth/refresh", "post"),
         ("/api/v1/auth/logout", "post"),
         ("/api/v1/qr/{token}", "get"),
+        ("/api/v1/qr/{token}/menu", "get"),
+        ("/api/v1/qr/{token}/orders", "post"),
+        ("/api/v1/qr/{token}/orders/{order_id}/items", "post"),
+        ("/api/v1/qr/{token}/orders/{order_id}/submit", "post"),
+        ("/api/v1/qr/{token}/orders/{order_id}", "get"),
     }
 )
 
@@ -154,6 +168,7 @@ def create_app() -> FastAPI:
     app.include_router(table_router)
     app.include_router(qr_code_router)
     app.include_router(qr_resolution_router)
+    app.include_router(guest_order_router)
     app.include_router(menu_category_router)
     app.include_router(menu_item_router)
     app.include_router(modifier_group_router)
@@ -169,6 +184,7 @@ def create_app() -> FastAPI:
     app.include_router(inventory_router)
     app.include_router(recipe_router)
     app.include_router(purchasing_router)
+    app.include_router(report_router)
 
     @app.get("/health/live", include_in_schema=False)
     async def health_live() -> dict[str, str]:

@@ -67,6 +67,8 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     GetRestaurantUseCase,
     GetTableUseCase,
     GetTableZoneUseCase,
+    GuestGetMenuUseCase,
+    GuestResolveQRCodeUseCase,
     ListAccessibleBranchesUseCase,
     ListMenuCategoriesUseCase,
     ListMenuItemAvailabilitiesUseCase,
@@ -112,7 +114,7 @@ from restaurant_os_api.modules.restaurant.infrastructure.database.repositories i
 )
 from restaurant_os_api.platform.idempotency import IdempotencyGuard
 from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchemyOutboxWriter
-from restaurant_os_api.platform.rate_limiting import QRResolutionRateLimiter
+from restaurant_os_api.platform.rate_limiting import GuestOrderRateLimiter, QRResolutionRateLimiter
 
 __all__ = [
     "AuthenticatedPrincipalDep",
@@ -140,6 +142,9 @@ __all__ = [
     "GetRestaurantUseCaseDep",
     "GetTableUseCaseDep",
     "GetTableZoneUseCaseDep",
+    "GuestGetMenuUseCaseDep",
+    "GuestOrderRateLimiterDep",
+    "GuestResolveQRCodeUseCaseDep",
     "IdempotencyGuardDep",
     "ListAccessibleBranchesUseCaseDep",
     "ListMenuCategoriesUseCaseDep",
@@ -597,6 +602,52 @@ def get_resolve_qr_code_use_case(
 
 
 ResolveQRCodeUseCaseDep = Annotated[ResolveQRCodeUseCase, Depends(get_resolve_qr_code_use_case)]
+
+
+# -- Guest QR ordering (guest-facing, no AuthenticatedPrincipalDep, no RBAC,
+# no tenant context) -- re-resolves the token on every guest-ordering call,
+# gated by its own GuestOrderRateLimiter rather than QRResolutionRateLimiter
+# (see GuestResolveQRCodeUseCase's own docstring for why the two must not
+# share a budget).
+
+
+def get_guest_order_rate_limiter(session_factory: SessionFactoryDep) -> GuestOrderRateLimiter:
+    return GuestOrderRateLimiter(session_factory)
+
+
+GuestOrderRateLimiterDep = Annotated[
+    GuestOrderRateLimiter, Depends(get_guest_order_rate_limiter)
+]
+
+
+def get_guest_resolve_qr_code_use_case(
+    session_factory: SessionFactoryDep,
+    rate_limiter: GuestOrderRateLimiterDep,
+) -> GuestResolveQRCodeUseCase:
+    return GuestResolveQRCodeUseCase(
+        session_factory=session_factory,
+        qr_code_repository_factory=SQLAlchemyQRCodeRepository,
+        rate_limiter=rate_limiter,
+    )
+
+
+GuestResolveQRCodeUseCaseDep = Annotated[
+    GuestResolveQRCodeUseCase, Depends(get_guest_resolve_qr_code_use_case)
+]
+
+
+def get_guest_get_menu_use_case(session_factory: SessionFactoryDep) -> GuestGetMenuUseCase:
+    return GuestGetMenuUseCase(
+        session_factory=session_factory,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        restaurant_repository_factory=SQLAlchemyRestaurantRepository,
+        table_repository_factory=SQLAlchemyTableRepository,
+        menu_category_repository_factory=SQLAlchemyMenuCategoryRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+    )
+
+
+GuestGetMenuUseCaseDep = Annotated[GuestGetMenuUseCase, Depends(get_guest_get_menu_use_case)]
 
 
 # --- Menu Catalogue: MenuCategory + MenuItem (Step 4.8) ---------------------

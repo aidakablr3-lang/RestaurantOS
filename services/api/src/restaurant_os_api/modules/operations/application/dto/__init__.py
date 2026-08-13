@@ -67,6 +67,11 @@ from restaurant_os_api.modules.operations.application.dto.recipe_dto import (
     ReviseRecipeIngredientRequestDTO,
     ReviseRecipeRequestDTO,
 )
+from restaurant_os_api.modules.operations.application.dto.report_dto import (
+    EndOfDayReportDTO,
+    TenderBreakdownDTO,
+    TopMenuItemDTO,
+)
 from restaurant_os_api.modules.operations.application.dto.tab_dto import (
     CreateTabRequestDTO,
     TabDTO,
@@ -93,6 +98,7 @@ __all__ = [
     "CreateTabRequestDTO",
     "DiscountDTO",
     "DiscountListResultDTO",
+    "EndOfDayReportDTO",
     "GenerateBillRequestDTO",
     "GoodsReceiptDTO",
     "InventoryCategoryDTO",
@@ -124,6 +130,8 @@ __all__ = [
     "SupplierDTO",
     "SupplierListResultDTO",
     "TabDTO",
+    "TenderBreakdownDTO",
+    "TopMenuItemDTO",
     "UpdateInventoryItemRequestDTO",
     "UpdateSupplierRequestDTO",
 ]

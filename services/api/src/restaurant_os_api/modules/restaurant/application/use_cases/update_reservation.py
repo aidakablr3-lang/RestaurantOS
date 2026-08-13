@@ -114,9 +114,12 @@ class UpdateReservationUseCase:
                     raise TableNotFoundError(request.table_id)
 
             reservation.table_id = request.table_id
-            reservation.party_size = request.party_size
+            if request.party_size is not None:
+                reservation.party_size = request.party_size
 
-            target_status = ReservationStatus(request.status)
+            target_status = (
+                ReservationStatus(request.status) if request.status is not None else reservation.status
+            )
             status_changed = target_status != reservation.status
             previous_status = reservation.status
             if status_changed:

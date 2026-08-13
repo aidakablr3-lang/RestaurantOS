@@ -70,6 +70,12 @@ from restaurant_os_api.modules.restaurant.application.use_cases.get_table import
 from restaurant_os_api.modules.restaurant.application.use_cases.get_table_zone import (
     GetTableZoneUseCase,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases.guest_get_menu import (
+    GuestGetMenuUseCase,
+)
+from restaurant_os_api.modules.restaurant.application.use_cases.guest_resolve_qr_code import (
+    GuestResolveQRCodeUseCase,
+)
 from restaurant_os_api.modules.restaurant.application.use_cases.list_accessible_branches import (
     ListAccessibleBranchesUseCase,
 )
@@ -171,6 +177,8 @@ __all__ = [
     "GetRestaurantUseCase",
     "GetTableUseCase",
     "GetTableZoneUseCase",
+    "GuestGetMenuUseCase",
+    "GuestResolveQRCodeUseCase",
     "ListAccessibleBranchesUseCase",
     "ListMenuCategoriesUseCase",
     "ListMenuItemAvailabilitiesUseCase",

@@ -166,7 +166,7 @@ async def update_reservation(
                 reservation_id=reservation_id,
                 branch_id=branch_id,
                 party_size=body.party_size,
-                status=body.status.value,
+                status=body.status.value if body.status is not None else None,
                 table_id=body.table_id,
             ),
         )

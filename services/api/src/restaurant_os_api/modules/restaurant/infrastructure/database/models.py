@@ -208,6 +208,8 @@ class MenuItemModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin
     recipe_id: Mapped[str | None] = mapped_column(
         Text, ForeignKey("recipes.id", ondelete="RESTRICT"), nullable=True
     )
+    # Added in migration 0009 -- which KDS station this item routes to.
+    station: Mapped[str] = mapped_column(Text, nullable=False, server_default="kitchen")
 
 
 class ModifierGroupModel(

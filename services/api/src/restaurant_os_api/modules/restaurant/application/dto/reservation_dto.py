@@ -15,11 +15,13 @@ step is necessarily a guest/walk-in reservation with
 no separate flat status-change route the way Table does (Architecture
 SS7 specifies only ``POST``/``GET``/``PATCH`` for Reservation, no
 fourth route) -- the single ``PATCH`` handles both plain field edits
-and status transitions. A target status equal to the reservation's
-current status means "no transition requested, only fields below are
-applied"; a different target status is routed through the matching
-domain transition method (see ``update_reservation.py``), never
-assigned directly.
+and status transitions. ``party_size`` and ``status`` are both
+optional: omitting ``status`` means "no transition requested, only
+other fields are applied"; omitting ``party_size`` means "leave it
+unchanged." A caller can therefore PATCH just a status transition, or
+just a field edit, without resending the other. A non-``None`` target
+status is routed through the matching domain transition method (see
+``update_reservation.py``), never assigned directly.
 """
 
 from __future__ import annotations
@@ -40,8 +42,8 @@ class CreateReservationRequestDTO:
 class UpdateReservationRequestDTO:
     reservation_id: str
     branch_id: str
-    party_size: int
-    status: str
+    party_size: int | None = None
+    status: str | None = None
     table_id: str | None = None
 
 

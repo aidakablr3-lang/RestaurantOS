@@ -16,4 +16,5 @@ def menu_item_to_dto(menu_item: MenuItem) -> MenuItemDTO:
         display_order=menu_item.display_order,
         recipe_id=menu_item.recipe_id,
         created_at=menu_item.created_at,
+        station=menu_item.station.value,
     )

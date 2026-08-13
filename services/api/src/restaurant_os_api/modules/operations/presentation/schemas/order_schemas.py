@@ -55,3 +55,4 @@ class OrderResponseSchema(CamelModel):
     customer_id: str | None
     closed_at: datetime | None
     origin_device_id: str | None
+    item_count: int

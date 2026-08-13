@@ -30,8 +30,13 @@ class CreateReservationRequestSchema(CamelModel):
 
 
 class UpdateReservationRequestSchema(CamelModel):
-    party_size: int = Field(..., gt=0)
-    status: ReservationStatus
+    # partySize/status are both optional -- omitting one means "leave
+    # unchanged" (status omitted = no transition requested), so a caller
+    # doing a pure status change or a pure field edit doesn't have to
+    # resend the other. table_id's existing None-means-"no table"
+    # semantics are unchanged.
+    party_size: int | None = Field(default=None, gt=0)
+    status: ReservationStatus | None = None
     table_id: str | None = Field(default=None, min_length=26, max_length=26)
 
 

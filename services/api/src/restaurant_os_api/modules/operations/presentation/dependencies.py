@@ -53,10 +53,15 @@ from restaurant_os_api.modules.operations.application.use_cases import (
     FireOrderUseCase,
     GenerateBillUseCase,
     GetBillUseCase,
+    GetEndOfDayReportUseCase,
     GetInventoryItemUseCase,
     GetMenuItemRecipeUseCase,
+    GetOpenCashDrawerUseCase,
     GetOrderUseCase,
     GetPurchaseOrderUseCase,
+    GuestAddOrderItemUseCase,
+    GuestGetOrderUseCase,
+    GuestSubmitOrderUseCase,
     ListDiscountsUseCase,
     ListInventoryCategoriesUseCase,
     ListInventoryItemsUseCase,
@@ -66,6 +71,7 @@ from restaurant_os_api.modules.operations.application.use_cases import (
     ListPurchaseOrdersUseCase,
     ListStockMovementsUseCase,
     ListSuppliersUseCase,
+    ListTaxesUseCase,
     OpenCashDrawerUseCase,
     RecordPaymentUseCase,
     RecordStockMovementUseCase,
@@ -76,6 +82,7 @@ from restaurant_os_api.modules.operations.application.use_cases import (
     UpdateKitchenItemStatusUseCase,
     UpdateKitchenTicketStatusUseCase,
     UpdateSupplierUseCase,
+    VoidOrderItemUseCase,
     VoidOrderUseCase,
 )
 from restaurant_os_api.modules.operations.infrastructure.database.repositories import (
@@ -127,10 +134,15 @@ __all__ = [
     "FireOrderUseCaseDep",
     "GenerateBillUseCaseDep",
     "GetBillUseCaseDep",
+    "GetEndOfDayReportUseCaseDep",
     "GetInventoryItemUseCaseDep",
     "GetMenuItemRecipeUseCaseDep",
+    "GetOpenCashDrawerUseCaseDep",
     "GetOrderUseCaseDep",
     "GetPurchaseOrderUseCaseDep",
+    "GuestAddOrderItemUseCaseDep",
+    "GuestGetOrderUseCaseDep",
+    "GuestSubmitOrderUseCaseDep",
     "IdempotencyGuardDep",
     "ListDiscountsUseCaseDep",
     "ListInventoryCategoriesUseCaseDep",
@@ -141,6 +153,7 @@ __all__ = [
     "ListPurchaseOrdersUseCaseDep",
     "ListStockMovementsUseCaseDep",
     "ListSuppliersUseCaseDep",
+    "ListTaxesUseCaseDep",
     "OpenCashDrawerUseCaseDep",
     "RecordPaymentUseCaseDep",
     "RecordStockMovementUseCaseDep",
@@ -166,12 +179,14 @@ __all__ = [
     "RequirePurchasingManageTenantWideDep",
     "RequirePurchasingReadDep",
     "RequirePurchasingReadTenantWideDep",
+    "RequireReportsReadDep",
     "ReviseRecipeUseCaseDep",
     "SendPurchaseOrderUseCaseDep",
     "UpdateInventoryItemUseCaseDep",
     "UpdateKitchenItemStatusUseCaseDep",
     "UpdateKitchenTicketStatusUseCaseDep",
     "UpdateSupplierUseCaseDep",
+    "VoidOrderItemUseCaseDep",
     "VoidOrderUseCaseDep",
 ]
 
@@ -196,6 +211,14 @@ RequireKitchenReadDep = Annotated[
 ]
 RequireKitchenManageAtAnyScopeDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("kitchen.manage"))
+]
+
+# --- Reports (full-day operational simulation gap fix) ---------------------
+# branch_id is already in the URL for the one report route this codebase has,
+# so the coarse require_branch_permission gate is the only check needed --
+# the same shape ListOrdersUseCase/GetOrderUseCase's own router gate uses.
+RequireReportsReadDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_branch_permission("reports.read"))
 ]
 
 # --- Billing + Payments + Ledger (Sprint 7 Step 4) ------------------------
@@ -285,6 +308,24 @@ def get_get_order_use_case(session_factory: SessionFactoryDep) -> GetOrderUseCas
 GetOrderUseCaseDep = Annotated[GetOrderUseCase, Depends(get_get_order_use_case)]
 
 
+def get_get_end_of_day_report_use_case(
+    session_factory: SessionFactoryDep,
+) -> GetEndOfDayReportUseCase:
+    return GetEndOfDayReportUseCase(
+        session_factory=session_factory,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        restaurant_repository_factory=SQLAlchemyRestaurantRepository,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        payment_repository_factory=SQLAlchemyPaymentRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+    )
+
+
+GetEndOfDayReportUseCaseDep = Annotated[
+    GetEndOfDayReportUseCase, Depends(get_get_end_of_day_report_use_case)
+]
+
+
 def get_list_orders_use_case(session_factory: SessionFactoryDep) -> ListOrdersUseCase:
     return ListOrdersUseCase(
         session_factory=session_factory, order_repository_factory=SQLAlchemyOrderRepository
@@ -320,12 +361,63 @@ def get_fire_order_use_case(
         order_repository_factory=SQLAlchemyOrderRepository,
         kitchen_ticket_repository_factory=SQLAlchemyKitchenTicketRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
         resolve_user_permissions=resolve_user_permissions,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
 
 
 FireOrderUseCaseDep = Annotated[FireOrderUseCase, Depends(get_fire_order_use_case)]
+
+
+# --- Guest QR ordering (Sprint 7 guest-ordering gap fix) --------------------
+# No user_id, no ResolveUserPermissionsUseCaseDep -- authorization is
+# ensure_guest_order_access re-checking the caller's freshly re-resolved QR
+# token against the loaded order's own branch_id/table_id (see that helper's
+# own docstring).
+
+
+def get_guest_add_order_item_use_case(
+    session_factory: SessionFactoryDep,
+) -> GuestAddOrderItemUseCase:
+    return GuestAddOrderItemUseCase(
+        session_factory=session_factory,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        menu_category_repository_factory=SQLAlchemyMenuCategoryRepository,
+    )
+
+
+GuestAddOrderItemUseCaseDep = Annotated[
+    GuestAddOrderItemUseCase, Depends(get_guest_add_order_item_use_case)
+]
+
+
+def get_guest_submit_order_use_case(
+    session_factory: SessionFactoryDep,
+) -> GuestSubmitOrderUseCase:
+    return GuestSubmitOrderUseCase(
+        session_factory=session_factory,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        kitchen_ticket_repository_factory=SQLAlchemyKitchenTicketRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+GuestSubmitOrderUseCaseDep = Annotated[
+    GuestSubmitOrderUseCase, Depends(get_guest_submit_order_use_case)
+]
+
+
+def get_guest_get_order_use_case(session_factory: SessionFactoryDep) -> GuestGetOrderUseCase:
+    return GuestGetOrderUseCase(
+        session_factory=session_factory, order_repository_factory=SQLAlchemyOrderRepository
+    )
+
+
+GuestGetOrderUseCaseDep = Annotated[GuestGetOrderUseCase, Depends(get_guest_get_order_use_case)]
 
 
 def get_close_order_use_case(
@@ -336,6 +428,7 @@ def get_close_order_use_case(
         session_factory=session_factory,
         order_repository_factory=SQLAlchemyOrderRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
+        table_repository_factory=SQLAlchemyTableRepository,
         resolve_user_permissions=resolve_user_permissions,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
@@ -352,12 +445,28 @@ def get_void_order_use_case(
         session_factory=session_factory,
         order_repository_factory=SQLAlchemyOrderRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
+        table_repository_factory=SQLAlchemyTableRepository,
         resolve_user_permissions=resolve_user_permissions,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
 
 
 VoidOrderUseCaseDep = Annotated[VoidOrderUseCase, Depends(get_void_order_use_case)]
+
+
+def get_void_order_item_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> VoidOrderItemUseCase:
+    return VoidOrderItemUseCase(
+        session_factory=session_factory,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+VoidOrderItemUseCaseDep = Annotated[VoidOrderItemUseCase, Depends(get_void_order_item_use_case)]
 
 
 def get_create_tab_use_case(session_factory: SessionFactoryDep) -> CreateTabUseCase:
@@ -410,6 +519,10 @@ def get_update_kitchen_ticket_status_use_case(
         kitchen_ticket_repository_factory=SQLAlchemyKitchenTicketRepository,
         order_repository_factory=SQLAlchemyOrderRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        recipe_repository_factory=SQLAlchemyRecipeRepository,
+        inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        stock_movement_repository_factory=SQLAlchemyStockMovementRepository,
         resolve_user_permissions=resolve_user_permissions,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
@@ -448,6 +561,15 @@ def get_create_tax_use_case(session_factory: SessionFactoryDep) -> CreateTaxUseC
 
 
 CreateTaxUseCaseDep = Annotated[CreateTaxUseCase, Depends(get_create_tax_use_case)]
+
+
+def get_list_taxes_use_case(session_factory: SessionFactoryDep) -> ListTaxesUseCase:
+    return ListTaxesUseCase(
+        session_factory=session_factory, tax_repository_factory=SQLAlchemyTaxRepository
+    )
+
+
+ListTaxesUseCaseDep = Annotated[ListTaxesUseCase, Depends(get_list_taxes_use_case)]
 
 
 def get_create_discount_use_case(session_factory: SessionFactoryDep) -> CreateDiscountUseCase:
@@ -605,6 +727,23 @@ def get_close_cash_drawer_use_case(
 
 CloseCashDrawerUseCaseDep = Annotated[
     CloseCashDrawerUseCase, Depends(get_close_cash_drawer_use_case)
+]
+
+
+def get_get_open_cash_drawer_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> GetOpenCashDrawerUseCase:
+    return GetOpenCashDrawerUseCase(
+        session_factory=session_factory,
+        cash_drawer_repository_factory=SQLAlchemyCashDrawerRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+GetOpenCashDrawerUseCaseDep = Annotated[
+    GetOpenCashDrawerUseCase, Depends(get_get_open_cash_drawer_use_case)
 ]
 
 

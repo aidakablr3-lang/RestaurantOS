@@ -62,6 +62,7 @@ class OrderDTO:
     customer_id: str | None
     closed_at: datetime | None
     origin_device_id: str | None
+    item_count: int
 
 
 @dataclass(frozen=True, slots=True)

@@ -207,9 +207,21 @@ class SQLAlchemyOrderRepository:
         return order
 
     async def list_for_branch(
-        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+        self,
+        tenant_id: str,
+        branch_id: str,
+        *,
+        offset: int,
+        limit: int,
+        table_id: str | None = None,
+        status: str | None = None,
     ) -> tuple[list[Order], int]:
-        filters = (OrderModel.tenant_id == tenant_id, OrderModel.branch_id == branch_id)
+        filters = [OrderModel.tenant_id == tenant_id, OrderModel.branch_id == branch_id]
+        if table_id is not None:
+            filters.append(OrderModel.table_id == table_id)
+        if status is not None:
+            filters.append(OrderModel.status == status)
+
         count_stmt = select(func.count()).select_from(OrderModel).where(*filters)
         total = (await self._session.execute(count_stmt)).scalar_one()
 
@@ -222,6 +234,40 @@ class SQLAlchemyOrderRepository:
         )
         models = (await self._session.execute(page_stmt)).scalars().all()
         return [_order_from_model(m) for m in models], total
+
+    async def list_for_branch_opened_between(
+        self, tenant_id: str, branch_id: str, start: datetime, end: datetime
+    ) -> list[Order]:
+        stmt = select(OrderModel).where(
+            OrderModel.tenant_id == tenant_id,
+            OrderModel.branch_id == branch_id,
+            OrderModel.opened_at >= start,
+            OrderModel.opened_at < end,
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_order_from_model(m) for m in models]
+
+    async def list_items_for_orders(self, tenant_id: str, order_ids: list[str]) -> list[OrderItem]:
+        if not order_ids:
+            return []
+        stmt = select(OrderItemModel).where(
+            OrderItemModel.tenant_id == tenant_id, OrderItemModel.order_id.in_(order_ids)
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_order_item_from_model(m) for m in models]
+
+    async def count_items_for_orders(
+        self, tenant_id: str, order_ids: list[str]
+    ) -> dict[str, int]:
+        if not order_ids:
+            return {}
+        stmt = (
+            select(OrderItemModel.order_id, func.count())
+            .where(OrderItemModel.tenant_id == tenant_id, OrderItemModel.order_id.in_(order_ids))
+            .group_by(OrderItemModel.order_id)
+        )
+        rows = (await self._session.execute(stmt)).all()
+        return {order_id: count for order_id, count in rows}
 
     async def get_items(self, tenant_id: str, order_id: str) -> list[OrderItem]:
         stmt = (
@@ -736,6 +782,19 @@ class SQLAlchemyPaymentRepository:
         models = (await self._session.execute(stmt)).scalars().all()
         return [_payment_from_model(m) for m in models]
 
+    async def list_settled_for_branch_between(
+        self, tenant_id: str, branch_id: str, start: datetime, end: datetime
+    ) -> list[Payment]:
+        stmt = select(PaymentModel).where(
+            PaymentModel.tenant_id == tenant_id,
+            PaymentModel.branch_id == branch_id,
+            PaymentModel.status == PaymentStatus.SETTLED.value,
+            PaymentModel.created_at >= start,
+            PaymentModel.created_at < end,
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_payment_from_model(m) for m in models]
+
     async def get_refund_by_id(self, tenant_id: str, refund_id: str) -> Refund | None:
         stmt = select(RefundModel).where(
             RefundModel.id == refund_id, RefundModel.tenant_id == tenant_id
@@ -770,6 +829,19 @@ class SQLAlchemyPaymentRepository:
     async def list_refunds_for_payment(self, tenant_id: str, payment_id: str) -> list[Refund]:
         stmt = select(RefundModel).where(
             RefundModel.tenant_id == tenant_id, RefundModel.payment_id == payment_id
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_refund_from_model(m) for m in models]
+
+    async def list_processed_refunds_for_branch_between(
+        self, tenant_id: str, branch_id: str, start: datetime, end: datetime
+    ) -> list[Refund]:
+        stmt = select(RefundModel).where(
+            RefundModel.tenant_id == tenant_id,
+            RefundModel.branch_id == branch_id,
+            RefundModel.status == RefundStatus.PROCESSED.value,
+            RefundModel.created_at >= start,
+            RefundModel.created_at < end,
         )
         models = (await self._session.execute(stmt)).scalars().all()
         return [_refund_from_model(m) for m in models]

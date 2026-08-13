@@ -21,6 +21,7 @@ from restaurant_os_api.modules.restaurant.domain.entities import (
     MenuItem,
     MenuItemAvailability,
     MenuItemBranchPrice,
+    MenuItemStation,
     Modifier,
     ModifierGroup,
     ModifierSelectionType,
@@ -164,6 +165,7 @@ def _menu_item_from_model(model: MenuItemModel) -> MenuItem:
         display_order=model.display_order,
         created_at=model.created_at,
         recipe_id=model.recipe_id,
+        station=MenuItemStation(model.station),
     )
 
 
@@ -808,6 +810,7 @@ class SQLAlchemyMenuItemRepository:
             is_available=menu_item.is_available,
             display_order=menu_item.display_order,
             recipe_id=menu_item.recipe_id,
+            station=menu_item.station.value,
         )
         self._session.add(model)
         await self._session.flush()
@@ -824,6 +827,7 @@ class SQLAlchemyMenuItemRepository:
                 is_available=menu_item.is_available,
                 display_order=menu_item.display_order,
                 recipe_id=menu_item.recipe_id,
+                station=menu_item.station.value,
             )
         )
         await self._session.execute(stmt)

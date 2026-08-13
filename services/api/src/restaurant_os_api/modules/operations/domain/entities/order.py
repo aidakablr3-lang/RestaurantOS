@@ -4,12 +4,13 @@ Architecture doc SS3.1's graph: ``open -> fired -> served -> billed ->
 closed``; ``open``/``fired -> voided``. Step 3 implemented ``fire()``,
 ``close()``, and ``void()``. Step 4 (Billing) adds ``mark_billed()`` --
 called by ``GenerateBillUseCase`` once a Bill is created for the order.
-``served`` stays a reachable *enum value* (the DB CHECK constraint
-already allows it) with no domain method transitioning into it yet --
-"kitchen finishes -> order marked served" as an automatic
-cross-aggregate trigger is real, separate scope still not taken on, the
-same "don't invent a business rule beyond what's specified" discipline
-``Table.status`` followed in Sprint 5.
+``mark_served()`` (full-day operational simulation fix) is the
+cross-aggregate trigger this docstring used to disclose as unreached:
+``UpdateKitchenTicketStatusUseCase`` calls it once every one of the
+order's own (non-voided) items has itself been cascaded to ``served``
+-- "kitchen finishes -> order marked served" is no longer a business
+rule left un-invented, it is the KDS-bump-to-order-item propagation
+``OrderItem``'s own docstring always pointed at.
 
 ``close()`` deliberately accepts ``fired``, ``served``, *and* ``billed``
 as valid predecessor states -- not just ``billed`` as a strict reading
@@ -70,7 +71,17 @@ class Order:
     origin_device_id: str | None = None
 
     def fire(self) -> None:
-        self._transition_to(OrderStatus.FIRED, allowed_from=(OrderStatus.OPEN,))
+        """``OPEN -> FIRED``, and idempotent when already ``FIRED`` --
+        a caller can legally fire twice: once for the first round of
+        items, again after ``AddOrderItemUseCase`` lets more items onto
+        an already-fired order (Architecture doc SS3.1 says nothing
+        about items arriving only once). Re-firing is what lets
+        ``FireOrderUseCase`` create a second ``KitchenTicket`` for the
+        newly-added items without disturbing the order's own status."""
+        self._transition_to(OrderStatus.FIRED, allowed_from=(OrderStatus.OPEN, OrderStatus.FIRED))
+
+    def mark_served(self) -> None:
+        self._transition_to(OrderStatus.SERVED, allowed_from=(OrderStatus.FIRED,))
 
     def mark_billed(self) -> None:
         """The transition Step 4's ``GenerateBillUseCase`` reaches --

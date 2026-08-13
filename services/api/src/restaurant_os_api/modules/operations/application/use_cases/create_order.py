@@ -19,6 +19,16 @@ A new order always starts ``OrderStatus.OPEN`` with ``subtotal_amount``/
 ``tax_amount`` at ``0`` -- both accumulate as items are added
 (``AddOrderItemUseCase``) and, eventually, as tax lines are computed
 (a Step 4 Billing concern). Publishes ``OrderPlaced``.
+
+A ``table_id`` order also marks that ``Table`` ``occupied`` (full-day
+operational simulation finding: the table board never reflected a
+dine-in order actually being open at it). Unconditional, not gated on
+the table's current status -- ``ChangeTableStatusUseCase``'s own
+docstring already establishes ``Table.status`` has no enforced
+transition graph, and a guest being seated legitimately moves a table
+out of ``reserved`` the same way it would out of ``available``.
+``CloseOrderUseCase``/``VoidOrderUseCase`` are this cascade's other
+half, reverting the table once the order's own lifecycle ends.
 """
 
 from __future__ import annotations
@@ -36,6 +46,7 @@ from restaurant_os_api.modules.operations.domain.entities import Order, OrderSou
 from restaurant_os_api.modules.operations.domain.events import OrderPlaced
 from restaurant_os_api.modules.operations.domain.exceptions import TabNotFoundError
 from restaurant_os_api.modules.operations.domain.ports import OrderRepository, TabRepository
+from restaurant_os_api.modules.restaurant.domain.entities import TableStatus
 from restaurant_os_api.modules.restaurant.domain.exceptions import (
     BranchNotFoundError,
     RestaurantNotFoundError,
@@ -93,6 +104,8 @@ class CreateOrderUseCase:
                 table = await table_repo.get_by_id(tenant_id, request.table_id)
                 if table is None or table.branch_id != request.branch_id:
                     raise TableNotFoundError(request.table_id)
+                table.status = TableStatus.OCCUPIED
+                await table_repo.update(table)
 
             if request.tab_id is not None:
                 tab = await tab_repo.get_by_id(tenant_id, request.tab_id)

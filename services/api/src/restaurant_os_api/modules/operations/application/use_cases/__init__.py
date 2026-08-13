@@ -45,15 +45,30 @@ from restaurant_os_api.modules.operations.application.use_cases.generate_bill im
     GenerateBillUseCase,
 )
 from restaurant_os_api.modules.operations.application.use_cases.get_bill import GetBillUseCase
+from restaurant_os_api.modules.operations.application.use_cases.get_end_of_day_report import (
+    GetEndOfDayReportUseCase,
+)
 from restaurant_os_api.modules.operations.application.use_cases.get_inventory_item import (
     GetInventoryItemUseCase,
 )
 from restaurant_os_api.modules.operations.application.use_cases.get_menu_item_recipe import (
     GetMenuItemRecipeUseCase,
 )
+from restaurant_os_api.modules.operations.application.use_cases.get_open_cash_drawer import (
+    GetOpenCashDrawerUseCase,
+)
 from restaurant_os_api.modules.operations.application.use_cases.get_order import GetOrderUseCase
 from restaurant_os_api.modules.operations.application.use_cases.get_purchase_order import (
     GetPurchaseOrderUseCase,
+)
+from restaurant_os_api.modules.operations.application.use_cases.guest_add_order_item import (
+    GuestAddOrderItemUseCase,
+)
+from restaurant_os_api.modules.operations.application.use_cases.guest_get_order import (
+    GuestGetOrderUseCase,
+)
+from restaurant_os_api.modules.operations.application.use_cases.guest_submit_order import (
+    GuestSubmitOrderUseCase,
 )
 from restaurant_os_api.modules.operations.application.use_cases.list_discounts import (
     ListDiscountsUseCase,
@@ -82,6 +97,7 @@ from restaurant_os_api.modules.operations.application.use_cases.list_stock_movem
 from restaurant_os_api.modules.operations.application.use_cases.list_suppliers import (
     ListSuppliersUseCase,
 )
+from restaurant_os_api.modules.operations.application.use_cases.list_taxes import ListTaxesUseCase
 from restaurant_os_api.modules.operations.application.use_cases.open_cash_drawer import (
     OpenCashDrawerUseCase,
 )
@@ -113,6 +129,9 @@ from restaurant_os_api.modules.operations.application.use_cases.update_supplier 
     UpdateSupplierUseCase,
 )
 from restaurant_os_api.modules.operations.application.use_cases.void_order import VoidOrderUseCase
+from restaurant_os_api.modules.operations.application.use_cases.void_order_item import (
+    VoidOrderItemUseCase,
+)
 
 __all__ = [
     "AddOrderItemUseCase",
@@ -134,10 +153,15 @@ __all__ = [
     "FireOrderUseCase",
     "GenerateBillUseCase",
     "GetBillUseCase",
+    "GetEndOfDayReportUseCase",
     "GetInventoryItemUseCase",
     "GetMenuItemRecipeUseCase",
+    "GetOpenCashDrawerUseCase",
     "GetOrderUseCase",
     "GetPurchaseOrderUseCase",
+    "GuestAddOrderItemUseCase",
+    "GuestGetOrderUseCase",
+    "GuestSubmitOrderUseCase",
     "ListDiscountsUseCase",
     "ListInventoryCategoriesUseCase",
     "ListInventoryItemsUseCase",
@@ -147,6 +171,7 @@ __all__ = [
     "ListPurchaseOrdersUseCase",
     "ListStockMovementsUseCase",
     "ListSuppliersUseCase",
+    "ListTaxesUseCase",
     "OpenCashDrawerUseCase",
     "RecordPaymentUseCase",
     "RecordStockMovementUseCase",
@@ -157,5 +182,6 @@ __all__ = [
     "UpdateKitchenItemStatusUseCase",
     "UpdateKitchenTicketStatusUseCase",
     "UpdateSupplierUseCase",
+    "VoidOrderItemUseCase",
     "VoidOrderUseCase",
 ]
