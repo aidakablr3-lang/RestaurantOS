@@ -615,9 +615,7 @@ def get_guest_order_rate_limiter(session_factory: SessionFactoryDep) -> GuestOrd
     return GuestOrderRateLimiter(session_factory)
 
 
-GuestOrderRateLimiterDep = Annotated[
-    GuestOrderRateLimiter, Depends(get_guest_order_rate_limiter)
-]
+GuestOrderRateLimiterDep = Annotated[GuestOrderRateLimiter, Depends(get_guest_order_rate_limiter)]
 
 
 def get_guest_resolve_qr_code_use_case(

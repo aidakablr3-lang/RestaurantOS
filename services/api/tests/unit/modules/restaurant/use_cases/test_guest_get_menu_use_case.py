@@ -211,7 +211,9 @@ class TestGuestGetMenuUseCase:
 
     async def test_a_nonexistent_branch_raises(self) -> None:
         use_case = _use_case(
-            InMemoryBranchRepository(), InMemoryMenuCategoryRepository(), InMemoryMenuItemRepository()
+            InMemoryBranchRepository(),
+            InMemoryMenuCategoryRepository(),
+            InMemoryMenuItemRepository(),
         )
 
         with pytest.raises(BranchNotFoundError):

@@ -163,11 +163,15 @@ def _refund(**overrides) -> Refund:
     return Refund(**defaults)
 
 
-def _use_case(order_repo, payment_repo, *, branch_repo=None, restaurant_repo=None, menu_item_repo=None):
+def _use_case(
+    order_repo, payment_repo, *, branch_repo=None, restaurant_repo=None, menu_item_repo=None
+):
     return GetEndOfDayReportUseCase(
         session_factory=fake_session_factory_returning(FakeAsyncSession()),
         branch_repository_factory=lambda _s: (
-            branch_repo if branch_repo is not None else InMemoryBranchRepository({BRANCH_ID: _branch()})
+            branch_repo
+            if branch_repo is not None
+            else InMemoryBranchRepository({BRANCH_ID: _branch()})
         ),
         restaurant_repository_factory=lambda _s: (
             restaurant_repo
@@ -208,7 +212,9 @@ class TestGetEndOfDayReportUseCase:
             {
                 ORDER_ID: _order(),
                 VOIDED_ORDER_ID: _order(
-                    id=VOIDED_ORDER_ID, status=OrderStatus.VOIDED, subtotal_amount=Decimal("10.00"),
+                    id=VOIDED_ORDER_ID,
+                    status=OrderStatus.VOIDED,
+                    subtotal_amount=Decimal("10.00"),
                     tax_amount=Decimal("1.00"),
                 ),
             },
@@ -255,9 +261,7 @@ class TestGetEndOfDayReportUseCase:
         assert result.voided_order_count == 0
 
     async def test_refunds_reduce_net_collected_but_not_gross_collected(self) -> None:
-        payment_repo = InMemoryPaymentRepository(
-            {"payment-1": _payment()}, {"refund-1": _refund()}
-        )
+        payment_repo = InMemoryPaymentRepository({"payment-1": _payment()}, {"refund-1": _refund()})
         use_case = _use_case(InMemoryOrderRepository(), payment_repo)
 
         result = await use_case.execute(TENANT_ID, BRANCH_ID, REPORT_DATE)
@@ -319,7 +323,9 @@ class TestGetEndOfDayReportUseCase:
 
     async def test_a_nonexistent_branch_raises(self) -> None:
         use_case = _use_case(
-            InMemoryOrderRepository(), InMemoryPaymentRepository(), branch_repo=InMemoryBranchRepository()
+            InMemoryOrderRepository(),
+            InMemoryPaymentRepository(),
+            branch_repo=InMemoryBranchRepository(),
         )
 
         with pytest.raises(BranchNotFoundError):

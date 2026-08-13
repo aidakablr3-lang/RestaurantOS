@@ -118,7 +118,9 @@ class UpdateReservationUseCase:
                 reservation.party_size = request.party_size
 
             target_status = (
-                ReservationStatus(request.status) if request.status is not None else reservation.status
+                ReservationStatus(request.status)
+                if request.status is not None
+                else reservation.status
             )
             status_changed = target_status != reservation.status
             previous_status = reservation.status

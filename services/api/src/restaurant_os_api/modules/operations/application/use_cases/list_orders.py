@@ -45,7 +45,5 @@ class ListOrdersUseCase:
             counts = await order_repo.count_items_for_orders(
                 tenant_id, [order.id for order in orders]
             )
-            dtos = [
-                order_to_dto(order, [], item_count=counts.get(order.id, 0)) for order in orders
-            ]
+            dtos = [order_to_dto(order, [], item_count=counts.get(order.id, 0)) for order in orders]
         return OrderListResultDTO(orders=dtos, total=total, offset=offset, limit=limit)

@@ -411,7 +411,9 @@ class TestUpdateReservationUseCase:
 
         result = await use_case.execute(
             TENANT_ID,
-            UpdateReservationRequestDTO(reservation_id=RESERVATION_ID, branch_id=BRANCH_ID, party_size=8),
+            UpdateReservationRequestDTO(
+                reservation_id=RESERVATION_ID, branch_id=BRANCH_ID, party_size=8
+            ),
         )
 
         assert result.party_size == 8

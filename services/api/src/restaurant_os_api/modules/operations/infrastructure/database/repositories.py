@@ -256,9 +256,7 @@ class SQLAlchemyOrderRepository:
         models = (await self._session.execute(stmt)).scalars().all()
         return [_order_item_from_model(m) for m in models]
 
-    async def count_items_for_orders(
-        self, tenant_id: str, order_ids: list[str]
-    ) -> dict[str, int]:
+    async def count_items_for_orders(self, tenant_id: str, order_ids: list[str]) -> dict[str, int]:
         if not order_ids:
             return {}
         stmt = (

@@ -18,7 +18,9 @@ def order_item_to_dto(item: OrderItem) -> OrderItemDTO:
     )
 
 
-def order_to_dto(order: Order, items: list[OrderItem], *, item_count: int | None = None) -> OrderDTO:
+def order_to_dto(
+    order: Order, items: list[OrderItem], *, item_count: int | None = None
+) -> OrderDTO:
     return OrderDTO(
         id=order.id,
         tenant_id=order.tenant_id,

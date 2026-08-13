@@ -9,7 +9,9 @@ from restaurant_os_api.modules.identity.application.services.tenant_provisioning
 
 
 def _permissions_for(role_name: str) -> frozenset[str]:
-    return next(perms for name, _desc, _scope, perms in _DEFAULT_ROLE_CATALOGUE if name == role_name)
+    return next(
+        perms for name, _desc, _scope, perms in _DEFAULT_ROLE_CATALOGUE if name == role_name
+    )
 
 
 class TestDefaultRoleCatalogue:

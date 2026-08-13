@@ -244,13 +244,14 @@ class TestUpdateKitchenTicketStatusUseCase:
             kitchen_ticket_repository_factory=lambda _s: ticket_repo,
             order_repository_factory=lambda _s: order_repo,
             branch_repository_factory=lambda _s: branch_repo,
-            menu_item_repository_factory=lambda _s: menu_item_repo
-            or InMemoryMenuItemRepository(),
+            menu_item_repository_factory=lambda _s: menu_item_repo or InMemoryMenuItemRepository(),
             recipe_repository_factory=lambda _s: recipe_repo or InMemoryRecipeRepository(),
-            inventory_item_repository_factory=lambda _s: inventory_item_repo
-            or InMemoryInventoryItemRepository(),
-            stock_movement_repository_factory=lambda _s: stock_movement_repo
-            or InMemoryStockMovementRepository(),
+            inventory_item_repository_factory=lambda _s: (
+                inventory_item_repo or InMemoryInventoryItemRepository()
+            ),
+            stock_movement_repository_factory=lambda _s: (
+                stock_movement_repo or InMemoryStockMovementRepository()
+            ),
             resolve_user_permissions=FakeResolveUserPermissionsUseCase(
                 resolved=ResolvedPermissions(tenant_wide=frozenset({"kitchen.manage"}))
             ),
@@ -440,9 +441,7 @@ class TestUpdateKitchenTicketStatusUseCase:
             inventory_item_id: _inventory_item(id=inventory_item_id, quantity_on_hand=Decimal(50))
         }
         inventory_item_repo = InMemoryInventoryItemRepository(inventory_items)
-        stock_movement_repo = InMemoryStockMovementRepository(
-            inventory_items=inventory_items
-        )
+        stock_movement_repo = InMemoryStockMovementRepository(inventory_items=inventory_items)
         order_repo = InMemoryOrderRepository(
             {ORDER_ID: _order(status=OrderStatus.FIRED)},
             {

@@ -41,9 +41,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "menu_items",
-        sa.Column(
-            "station", sa.Text(), nullable=False, server_default=sa.text("'kitchen'")
-        ),
+        sa.Column("station", sa.Text(), nullable=False, server_default=sa.text("'kitchen'")),
     )
     # Both ``op.create_check_constraint`` and ``op.drop_constraint(...,
     # type_="check")`` re-run the ``ck`` naming convention

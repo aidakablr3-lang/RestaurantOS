@@ -89,9 +89,7 @@ class GetEndOfDayReportUseCase:
         self._payment_repository_factory = payment_repository_factory
         self._menu_item_repository_factory = menu_item_repository_factory
 
-    async def execute(
-        self, tenant_id: str, branch_id: str, report_date: date
-    ) -> EndOfDayReportDTO:
+    async def execute(self, tenant_id: str, branch_id: str, report_date: date) -> EndOfDayReportDTO:
         start = datetime.combine(report_date, time.min, tzinfo=UTC)
         end = start + timedelta(days=1)
 
@@ -126,9 +124,9 @@ class GetEndOfDayReportUseCase:
             active_items = [i for i in items if i.line_status != OrderItemLineStatus.VOIDED]
 
             quantities = _quantity_by_menu_item(active_items)
-            top_menu_item_ids = sorted(
-                quantities, key=lambda mid: quantities[mid], reverse=True
-            )[:_TOP_ITEMS_LIMIT]
+            top_menu_item_ids = sorted(quantities, key=lambda mid: quantities[mid], reverse=True)[
+                :_TOP_ITEMS_LIMIT
+            ]
 
             top_items: list[TopMenuItemDTO] = []
             for menu_item_id in top_menu_item_ids:

@@ -153,7 +153,9 @@ class TestGuestAddOrderItemUseCase:
             session_factory=_session_factory(),
             order_repository_factory=lambda _s: order_repo,
             branch_repository_factory=lambda _s: (
-                branch_repo if branch_repo is not None else InMemoryBranchRepository({BRANCH_ID: _branch()})
+                branch_repo
+                if branch_repo is not None
+                else InMemoryBranchRepository({BRANCH_ID: _branch()})
             ),
             menu_item_repository_factory=lambda _s: (
                 menu_item_repo
@@ -197,7 +199,9 @@ class TestGuestAddOrderItemUseCase:
     async def test_raises_not_available_when_menu_item_is_unavailable(self) -> None:
         use_case = self._use_case(
             InMemoryOrderRepository({ORDER_ID: _order()}),
-            menu_item_repo=InMemoryMenuItemRepository({MENU_ITEM_ID: _menu_item(is_available=False)}),
+            menu_item_repo=InMemoryMenuItemRepository(
+                {MENU_ITEM_ID: _menu_item(is_available=False)}
+            ),
         )
 
         with pytest.raises(MenuItemNotAvailableError):
@@ -233,7 +237,9 @@ class TestGuestAddOrderItemUseCase:
             )
 
     async def test_raises_not_found_for_an_order_at_a_different_table(self) -> None:
-        use_case = self._use_case(InMemoryOrderRepository({ORDER_ID: _order(table_id=OTHER_TABLE_ID)}))
+        use_case = self._use_case(
+            InMemoryOrderRepository({ORDER_ID: _order(table_id=OTHER_TABLE_ID)})
+        )
 
         with pytest.raises(OrderNotFoundError):
             await use_case.execute(
@@ -244,7 +250,9 @@ class TestGuestAddOrderItemUseCase:
             )
 
     async def test_raises_not_found_for_an_order_at_a_different_branch(self) -> None:
-        use_case = self._use_case(InMemoryOrderRepository({ORDER_ID: _order(branch_id=OTHER_BRANCH_ID)}))
+        use_case = self._use_case(
+            InMemoryOrderRepository({ORDER_ID: _order(branch_id=OTHER_BRANCH_ID)})
+        )
 
         with pytest.raises(OrderNotFoundError):
             await use_case.execute(
@@ -277,14 +285,16 @@ class TestGuestSubmitOrderUseCase:
             session_factory=_session_factory(),
             order_repository_factory=lambda _s: order_repo,
             kitchen_ticket_repository_factory=lambda _s: (
-                kitchen_ticket_repo if kitchen_ticket_repo is not None else InMemoryKitchenTicketRepository()
+                kitchen_ticket_repo
+                if kitchen_ticket_repo is not None
+                else InMemoryKitchenTicketRepository()
             ),
             menu_item_repository_factory=lambda _s: (
                 menu_item_repo
                 if menu_item_repo is not None
                 else InMemoryMenuItemRepository({MENU_ITEM_ID: _menu_item()})
             ),
-            outbox_writer_factory=lambda _s: (outbox if outbox is not None else FakeOutboxWriter()),
+            outbox_writer_factory=lambda _s: outbox if outbox is not None else FakeOutboxWriter(),
         )
 
     async def test_fires_added_items_and_creates_a_kitchen_ticket(self) -> None:

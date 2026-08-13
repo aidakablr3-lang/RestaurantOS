@@ -153,9 +153,7 @@ class InMemoryOrderRepository:
         return [
             o
             for o in self._orders.values()
-            if o.tenant_id == tenant_id
-            and o.branch_id == branch_id
-            and start <= o.opened_at < end
+            if o.tenant_id == tenant_id and o.branch_id == branch_id and start <= o.opened_at < end
         ]
 
     async def list_items_for_orders(self, tenant_id: str, order_ids: list[str]) -> list[OrderItem]:
@@ -163,9 +161,7 @@ class InMemoryOrderRepository:
             i for i in self._items.values() if i.tenant_id == tenant_id and i.order_id in order_ids
         ]
 
-    async def count_items_for_orders(
-        self, tenant_id: str, order_ids: list[str]
-    ) -> dict[str, int]:
+    async def count_items_for_orders(self, tenant_id: str, order_ids: list[str]) -> dict[str, int]:
         counts: dict[str, int] = {}
         for item in self._items.values():
             if item.tenant_id == tenant_id and item.order_id in order_ids:

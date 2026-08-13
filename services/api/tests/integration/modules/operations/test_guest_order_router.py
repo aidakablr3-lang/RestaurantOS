@@ -218,7 +218,9 @@ class TestGuestOrderingFullFlow:
         ]
         assert seeded["unavailable_item_id"] not in item_ids
 
-    async def test_no_authentication_is_required_anywhere_in_the_flow(self, session_factory) -> None:
+    async def test_no_authentication_is_required_anywhere_in_the_flow(
+        self, session_factory
+    ) -> None:
         seeded = await _seed_menu(session_factory, tenant_id=generate_ulid())
         qr = await _seed_qr_code(session_factory, seeded)
         client = _client_for(session_factory)
@@ -230,7 +232,9 @@ class TestGuestOrderingFullFlow:
 
 
 class TestGuestOrderingTokenResolutionFailures:
-    async def test_a_revoked_token_returns_not_found_for_the_menu_route(self, session_factory) -> None:
+    async def test_a_revoked_token_returns_not_found_for_the_menu_route(
+        self, session_factory
+    ) -> None:
         seeded = await _seed_menu(session_factory, tenant_id=generate_ulid())
         qr = await _seed_qr_code(session_factory, seeded, status=QRCodeStatus.REVOKED)
 
@@ -266,7 +270,9 @@ class TestGuestOrderingTableIsolation:
 
         assert response.status_code == 404
 
-    async def test_a_guest_cannot_poll_an_order_from_a_different_table(self, session_factory) -> None:
+    async def test_a_guest_cannot_poll_an_order_from_a_different_table(
+        self, session_factory
+    ) -> None:
         seeded = await _seed_menu(session_factory, tenant_id=generate_ulid())
         qr_table_a = await _seed_qr_code(session_factory, seeded, table_id=seeded["table_id"])
         qr_table_b = await _seed_qr_code(session_factory, seeded, table_id=seeded["other_table_id"])
