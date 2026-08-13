@@ -116,6 +116,11 @@ class TestOpenApiSecurityScheme:
             ("/api/v1/auth/refresh", "post"),
             ("/api/v1/auth/logout", "post"),
             ("/api/v1/qr/{token}", "get"),
+            ("/api/v1/qr/{token}/menu", "get"),
+            ("/api/v1/qr/{token}/orders", "post"),
+            ("/api/v1/qr/{token}/orders/{order_id}/items", "post"),
+            ("/api/v1/qr/{token}/orders/{order_id}/submit", "post"),
+            ("/api/v1/qr/{token}/orders/{order_id}", "get"),
         }
 
         checked = 0
@@ -140,7 +145,15 @@ class TestOpenApiSecurityScheme:
         # inventory_router, 2 on recipe_router.
         # Sprint 7 Step 6 (Purchasing) added 10 more: 3 on the supplier
         # routes, 7 on the purchase-order/receipt routes.
+        # The full-day operational simulation's fix pass added 3 more:
+        # GET /taxes, GET the open cash drawer, and POST an order item
+        # void.
+        # Guest QR ordering (guest-ordering gap fix) added 5 more, all
+        # public: GET the menu, POST create order, POST add item, POST
+        # submit, GET order status.
+        # The End-of-Day report (full-day operational simulation gap fix)
+        # added 1 more, authenticated: GET the report.
         # The payment/table-lifecycle P0 correction (2026-08-12) removed
         # 1: POST /payments/{id}/refund -- RestaurantOS v1 has no refund
         # workflow (see docs/AI_HANDOFF.md).
-        assert checked == 115
+        assert checked == 124

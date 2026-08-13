@@ -18,6 +18,7 @@ from restaurant_os_api.modules.operations.application.use_cases import (
     CreateTaxUseCase,
     GenerateBillUseCase,
     GetBillUseCase,
+    ListTaxesUseCase,
 )
 from restaurant_os_api.modules.operations.domain.entities import (
     Bill,
@@ -163,6 +164,36 @@ class TestCreateTaxUseCase:
         assert tax.name == "VAT"
         assert tax.rate == Decimal("0.1")
         assert tax.is_active is True
+
+
+class TestListTaxesUseCase:
+    async def test_lists_only_active_taxes_for_the_tenant(self) -> None:
+        active = Tax(
+            id="01ARZ3NDEKTSV4RRFFQ6TAX002",
+            tenant_id=TENANT_ID,
+            name="VAT",
+            rate=Decimal("0.1"),
+            is_active=True,
+            created_at=datetime.now(UTC),
+        )
+        inactive = Tax(
+            id="01ARZ3NDEKTSV4RRFFQ6TAX003",
+            tenant_id=TENANT_ID,
+            name="Old Tax",
+            rate=Decimal("0.05"),
+            is_active=False,
+            created_at=datetime.now(UTC),
+        )
+        use_case = ListTaxesUseCase(
+            session_factory=_session_factory(),
+            tax_repository_factory=lambda _s: InMemoryTaxRepository(
+                {active.id: active, inactive.id: inactive}
+            ),
+        )
+
+        taxes = await use_case.execute(TENANT_ID)
+
+        assert [t.id for t in taxes] == [active.id]
 
 
 class TestGenerateBillUseCase:

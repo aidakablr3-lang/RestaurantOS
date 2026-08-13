@@ -283,6 +283,7 @@ class TestUpdateMenuItemUseCase:
                 currency_code="EUR",
                 is_available=False,
                 display_order=3,
+                station="bar",
             ),
         )
 
@@ -291,6 +292,7 @@ class TestUpdateMenuItemUseCase:
         assert result.currency_code == "EUR"
         assert result.is_available is False
         assert result.display_order == 3
+        assert result.station == "bar"
         assert len(outbox.published) == 1
         assert isinstance(outbox.published[0][1], MenuItemUpdated)
 
@@ -308,6 +310,7 @@ class TestUpdateMenuItemUseCase:
                 currency_code="USD",
                 is_available=False,
                 display_order=0,
+                station="kitchen",
             ),
         )
         assert result.is_available is False
@@ -326,6 +329,7 @@ class TestUpdateMenuItemUseCase:
                     currency_code="USD",
                     is_available=True,
                     display_order=0,
+                    station="kitchen",
                 ),
             )
 
@@ -346,5 +350,6 @@ class TestUpdateMenuItemUseCase:
                     currency_code="USD",
                     is_available=True,
                     display_order=0,
+                    station="kitchen",
                 ),
             )

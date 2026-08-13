@@ -111,7 +111,12 @@ def _login_sync(client: TestClient, *, tenant_id: str, email: str) -> str:
 
 
 async def _grant_role(
-    session_factory, *, tenant_id: str, user_id: str, permission_codes: frozenset[str]
+    session_factory,
+    *,
+    tenant_id: str,
+    user_id: str,
+    permission_codes: frozenset[str],
+    branch_id: str | None = None,
 ) -> str:
     now = datetime.now(UTC)
     async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
@@ -125,7 +130,7 @@ async def _grant_role(
                 tenant_id=tenant_id,
                 name=f"Role {generate_ulid()}",
                 description=None,
-                default_scope=RoleScope.TENANT,
+                default_scope=RoleScope.BRANCH if branch_id is not None else RoleScope.TENANT,
                 is_system=False,
                 is_active=True,
                 created_at=now,
@@ -138,7 +143,7 @@ async def _grant_role(
                 tenant_id=tenant_id,
                 user_id=user_id,
                 role_id=role.id,
-                branch_id=None,
+                branch_id=branch_id,
                 granted_at=now,
                 granted_by_user_id=None,
             )
@@ -346,3 +351,22 @@ class TestInventoryLifecycle:
             "/api/v1/inventory-categories", headers=_auth_headers(token), json={"name": "Produce"}
         )
         assert response.status_code == 403
+
+    async def test_branch_scoped_inventory_manage_can_create_a_category(
+        self, client: TestClient, owner: dict, session_factory
+    ) -> None:
+        email = "branch-inventory-manager@example.com"
+        user_id = await _seed_user(session_factory, tenant_id=owner["tenant_id"], email=email)
+        await _grant_role(
+            session_factory,
+            tenant_id=owner["tenant_id"],
+            user_id=user_id,
+            permission_codes=frozenset({"inventory.manage"}),
+            branch_id=owner["branch_id"],
+        )
+        token = _login_sync(client, tenant_id=owner["tenant_id"], email=email)
+
+        response = client.post(
+            "/api/v1/inventory-categories", headers=_auth_headers(token), json={"name": "Produce"}
+        )
+        assert response.status_code == 201, response.text

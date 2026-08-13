@@ -319,7 +319,7 @@ class TestPermissionDeniedWithoutRolesAssign:
 
 
 class TestPermissionCatalogue:
-    def test_tenant_owner_sees_all_23_seeded_permissions(
+    def test_tenant_owner_sees_all_24_seeded_permissions(
         self, client: TestClient, tenant_owner: dict
     ) -> None:
         response = client.get(
@@ -327,8 +327,9 @@ class TestPermissionCatalogue:
         )
         assert response.status_code == 200
         codes = {p["code"] for p in response.json()["data"]}
-        # 11 from 0003 + 12 from 0007 (Sprint 7 Step 2, Operations module).
-        assert len(codes) == 23
+        # 11 from 0003 + 12 from 0007 (Sprint 7 Step 2, Operations module)
+        # + 1 from 0010 (reports.read, the End-of-Day report gap fix).
+        assert len(codes) == 24
         assert "roles.assign" in codes
 
 

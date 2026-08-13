@@ -384,6 +384,40 @@ class TestUpdateReservationUseCase:
         assert result.status == "requested"
         assert outbox.published == []
 
+    async def test_a_pure_status_transition_omitting_party_size_leaves_it_unchanged(self) -> None:
+        reservation_repo = InMemoryReservationRepository(
+            {RESERVATION_ID: _reservation(party_size=4)}
+        )
+        outbox = FakeOutboxWriter()
+        use_case = self._use_case(reservation_repo, InMemoryTableRepository(), outbox)
+
+        result = await use_case.execute(
+            TENANT_ID,
+            UpdateReservationRequestDTO(
+                reservation_id=RESERVATION_ID, branch_id=BRANCH_ID, status="confirmed"
+            ),
+        )
+
+        assert result.status == "confirmed"
+        assert result.party_size == 4
+        assert len(outbox.published) == 1
+
+    async def test_a_pure_field_edit_omitting_status_requests_no_transition(self) -> None:
+        reservation_repo = InMemoryReservationRepository(
+            {RESERVATION_ID: _reservation(party_size=2)}
+        )
+        outbox = FakeOutboxWriter()
+        use_case = self._use_case(reservation_repo, InMemoryTableRepository(), outbox)
+
+        result = await use_case.execute(
+            TENANT_ID,
+            UpdateReservationRequestDTO(reservation_id=RESERVATION_ID, branch_id=BRANCH_ID, party_size=8),
+        )
+
+        assert result.party_size == 8
+        assert result.status == "requested"
+        assert outbox.published == []
+
     async def test_unassigning_a_table_by_passing_none_succeeds(self) -> None:
         reservation_repo = InMemoryReservationRepository(
             {RESERVATION_ID: _reservation(table_id=TABLE_ID)}

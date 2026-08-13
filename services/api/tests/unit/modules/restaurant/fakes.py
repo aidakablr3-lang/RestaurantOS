@@ -561,6 +561,22 @@ class FakeQRResolutionRateLimiter:
 
 
 @dataclass
+class FakeGuestOrderRateLimiter:
+    """``GuestOrderRateLimiter`` stand-in: records every ``check()``
+    call, raises ``RateLimitExceededError`` when told to. No
+    ``record_failure`` -- that limiter tracks no separate failed-count
+    (see its own docstring)."""
+
+    raise_on_check: bool = False
+    check_calls: list[tuple[str, str]] = field(default_factory=list)
+
+    async def check(self, *, source_ip: str, token: str) -> None:
+        self.check_calls.append((source_ip, token))
+        if self.raise_on_check:
+            raise RateLimitExceededError()
+
+
+@dataclass
 class FakeOutboxWriter:
     """Records every published event in order; never touches a database."""
 

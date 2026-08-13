@@ -16,6 +16,7 @@ from restaurant_os_api.modules.operations.application.dto import (
 )
 from restaurant_os_api.modules.operations.application.use_cases import (
     CloseCashDrawerUseCase,
+    GetOpenCashDrawerUseCase,
     OpenCashDrawerUseCase,
 )
 from restaurant_os_api.modules.operations.domain.entities import CashDrawer, CashDrawerStatus
@@ -110,6 +111,60 @@ class TestOpenCashDrawerUseCase:
                 TENANT_ID,
                 OpenCashDrawerRequestDTO(branch_id=BRANCH_ID, opening_float_amount=Decimal(50)),
             )
+
+
+class TestGetOpenCashDrawerUseCase:
+    def _use_case(self, drawer_repo, branch_repo, resolved) -> GetOpenCashDrawerUseCase:
+        return GetOpenCashDrawerUseCase(
+            session_factory=_session_factory(),
+            cash_drawer_repository_factory=lambda _s: drawer_repo,
+            branch_repository_factory=lambda _s: branch_repo,
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved),
+        )
+
+    async def test_returns_the_open_drawer_for_the_branch(self) -> None:
+        use_case = self._use_case(
+            InMemoryCashDrawerRepository({DRAWER_ID: _drawer()}),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.read"})),
+        )
+
+        result = await use_case.execute(TENANT_ID, "user-1", BRANCH_ID)
+
+        assert result is not None
+        assert result.id == DRAWER_ID
+        assert result.status == "open"
+
+    async def test_returns_none_when_no_drawer_is_open(self) -> None:
+        use_case = self._use_case(
+            InMemoryCashDrawerRepository(),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.read"})),
+        )
+
+        result = await use_case.execute(TENANT_ID, "user-1", BRANCH_ID)
+
+        assert result is None
+
+    async def test_raises_not_found_for_an_unknown_branch(self) -> None:
+        use_case = self._use_case(
+            InMemoryCashDrawerRepository(),
+            InMemoryBranchRepository(),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.read"})),
+        )
+
+        with pytest.raises(BranchNotFoundError):
+            await use_case.execute(TENANT_ID, "user-1", BRANCH_ID)
+
+    async def test_no_grant_at_all_is_denied(self) -> None:
+        use_case = self._use_case(
+            InMemoryCashDrawerRepository({DRAWER_ID: _drawer()}),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(),
+        )
+
+        with pytest.raises(PermissionDeniedError):
+            await use_case.execute(TENANT_ID, "user-1", BRANCH_ID)
 
 
 class TestCloseCashDrawerUseCase:

@@ -55,7 +55,10 @@ _PERMISSIONS = frozenset(
         "kitchen.read",
         "billing.manage",
         "billing.read",
-        "billing.refund",
+        "menu.manage",
+        "inventory.manage",
+        "inventory.read",
+        "table.read",
     }
 )
 
@@ -162,11 +165,17 @@ async def _grant_role(
 async def _seed_menu(session_factory, *, tenant_id: str) -> dict[str, str]:
     """Seeds Restaurant -> Branch -> MenuCategory -> MenuItem via raw SQL,
     the same convention every other integration test file in this
-    codebase uses for fixture data outside the router under test."""
+    codebase uses for fixture data outside the router under test.
+    Seeds a second, ``bar``-station item alongside the default
+    ``kitchen``-station one so station-routing tests have both to work
+    with, plus one dine-in ``Table`` for the table-status-cascade tests."""
     restaurant_id = generate_ulid()
     branch_id = generate_ulid()
     category_id = generate_ulid()
     item_id = generate_ulid()
+    bar_item_id = generate_ulid()
+    table_zone_id = generate_ulid()
+    table_id = generate_ulid()
     async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
         await uow.session.execute(
             text(
@@ -196,11 +205,40 @@ async def _seed_menu(session_factory, *, tenant_id: str) -> dict[str, str]:
             ),
             {"id": item_id, "tenant_id": tenant_id, "category_id": category_id},
         )
+        await uow.session.execute(
+            text(
+                "INSERT INTO menu_items (id, tenant_id, menu_category_id, name, price_amount, "
+                "currency_code, station) VALUES (:id, :tenant_id, :category_id, 'Soda', 3.00, "
+                "'USD', 'bar')"
+            ),
+            {"id": bar_item_id, "tenant_id": tenant_id, "category_id": category_id},
+        )
+        await uow.session.execute(
+            text(
+                "INSERT INTO table_zones (id, tenant_id, branch_id, name) "
+                "VALUES (:id, :tenant_id, :branch_id, 'Main Floor')"
+            ),
+            {"id": table_zone_id, "tenant_id": tenant_id, "branch_id": branch_id},
+        )
+        await uow.session.execute(
+            text(
+                "INSERT INTO tables (id, tenant_id, branch_id, table_zone_id, table_number, "
+                "capacity) VALUES (:id, :tenant_id, :branch_id, :table_zone_id, '12', 4)"
+            ),
+            {
+                "id": table_id,
+                "tenant_id": tenant_id,
+                "branch_id": branch_id,
+                "table_zone_id": table_zone_id,
+            },
+        )
     return {
         "restaurant_id": restaurant_id,
         "branch_id": branch_id,
         "category_id": category_id,
         "menu_item_id": item_id,
+        "bar_menu_item_id": bar_item_id,
+        "table_id": table_id,
     }
 
 
@@ -465,6 +503,276 @@ class TestOrderKitchenBillingPaymentLifecycle:
             f"/api/v1/branches/{branch_id}/tables", headers=headers
         ).json()["data"]
         assert next(t for t in table_after_final if t["id"] == table_id)["status"] == "available"
+
+    def test_voids_an_added_item_and_backs_out_its_cost(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+
+        create_resp = client.post(
+            f"/api/v1/branches/{branch_id}/orders", headers=headers, json={"orderSource": "pos"}
+        )
+        order_id = create_resp.json()["data"]["id"]
+
+        first_item = client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        ).json()["data"]["items"][0]
+
+        second_resp = client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        )
+        second_item = next(
+            i for i in second_resp.json()["data"]["items"] if i["id"] != first_item["id"]
+        )
+        assert Decimal(second_resp.json()["data"]["subtotalAmount"]) == Decimal("20.00")
+
+        void_resp = client.post(
+            f"/api/v1/orders/{order_id}/items/{first_item['id']}/void", headers=headers
+        )
+        assert void_resp.status_code == 200, void_resp.text
+        voided_order = void_resp.json()["data"]
+        assert Decimal(voided_order["subtotalAmount"]) == Decimal("10.00")
+        voided_item = next(i for i in voided_order["items"] if i["id"] == first_item["id"])
+        assert voided_item["lineStatus"] == "voided"
+
+        fire_resp = client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        assert fire_resp.status_code == 200, fire_resp.text
+        fired_item = next(
+            i for i in fire_resp.json()["data"]["items"] if i["id"] == second_item["id"]
+        )
+        assert fired_item["lineStatus"] == "fired"
+
+        void_fired_resp = client.post(
+            f"/api/v1/orders/{order_id}/items/{second_item['id']}/void", headers=headers
+        )
+        assert void_fired_resp.status_code == 409, void_fired_resp.text
+        assert void_fired_resp.json()["error"]["code"] == "INVALID_ORDER_ITEM_STATUS_TRANSITION"
+
+    def test_adds_and_refires_an_item_onto_an_already_fired_order(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+
+        order_id = client.post(
+            f"/api/v1/branches/{branch_id}/orders", headers=headers, json={"orderSource": "pos"}
+        ).json()["data"]["id"]
+        client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        )
+
+        first_fire = client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        assert first_fire.status_code == 200, first_fire.text
+        assert first_fire.json()["data"]["status"] == "fired"
+
+        first_tickets = client.get(
+            f"/api/v1/branches/{branch_id}/kitchen-tickets", headers=headers
+        ).json()["data"]
+        assert len(first_tickets) == 1
+
+        late_item_resp = client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        )
+        assert late_item_resp.status_code == 201, late_item_resp.text
+        assert late_item_resp.json()["data"]["status"] == "fired"
+
+        second_fire = client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        assert second_fire.status_code == 200, second_fire.text
+        assert all(item["lineStatus"] == "fired" for item in second_fire.json()["data"]["items"])
+
+        second_tickets = client.get(
+            f"/api/v1/branches/{branch_id}/kitchen-tickets", headers=headers
+        ).json()["data"]
+        assert len(second_tickets) == 2
+
+        no_new_items_fire = client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        assert no_new_items_fire.status_code == 409, no_new_items_fire.text
+        assert no_new_items_fire.json()["error"]["code"] == "ORDER_HAS_NO_ITEMS"
+
+    def test_fires_kitchen_and_bar_items_into_separate_station_tickets(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+
+        order_id = client.post(
+            f"/api/v1/branches/{branch_id}/orders", headers=headers, json={"orderSource": "pos"}
+        ).json()["data"]["id"]
+        client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        )
+        client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["bar_menu_item_id"], "quantity": 1},
+        )
+
+        fire_resp = client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        assert fire_resp.status_code == 200, fire_resp.text
+
+        tickets_resp = client.get(f"/api/v1/branches/{branch_id}/kitchen-tickets", headers=headers)
+        assert tickets_resp.status_code == 200, tickets_resp.text
+        tickets = tickets_resp.json()["data"]
+        stations = sorted(t["station"] for t in tickets)
+        assert stations == ["bar", "kitchen"]
+        assert all(len(t["items"]) == 1 for t in tickets)
+
+    def test_serving_an_item_deducts_its_recipe_ingredients_from_inventory(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+
+        category_resp = client.post(
+            "/api/v1/inventory-categories", headers=headers, json={"name": "Produce"}
+        )
+        assert category_resp.status_code == 201, category_resp.text
+        category_id = category_resp.json()["data"]["id"]
+
+        item_resp = client.post(
+            f"/api/v1/branches/{branch_id}/inventory-items",
+            headers=headers,
+            json={"inventoryCategoryId": category_id, "name": "Beef Patty", "unit": "each"},
+        )
+        assert item_resp.status_code == 201, item_resp.text
+        inventory_item_id = item_resp.json()["data"]["id"]
+
+        receipt_resp = client.post(
+            f"/api/v1/inventory-items/{inventory_item_id}/stock-movements",
+            headers=headers,
+            json={
+                "movementType": "adjustment",
+                "quantityDelta": "50",
+                "reason": "initial stock",
+                "approvedByUserId": owner["user_id"],
+            },
+        )
+        assert receipt_resp.status_code == 201, receipt_resp.text
+
+        recipe_resp = client.put(
+            f"/api/v1/menu-items/{owner['menu_item_id']}/recipe",
+            headers=headers,
+            json={
+                "name": "Burger recipe",
+                "ingredients": [
+                    {"inventoryItemId": inventory_item_id, "quantity": "2", "unit": "each"}
+                ],
+            },
+        )
+        assert recipe_resp.status_code == 201, recipe_resp.text
+
+        order_id = client.post(
+            f"/api/v1/branches/{branch_id}/orders", headers=headers, json={"orderSource": "pos"}
+        ).json()["data"]["id"]
+        client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 3},
+        )
+        fire_resp = client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        assert fire_resp.status_code == 200, fire_resp.text
+        ticket_id = client.get(
+            f"/api/v1/branches/{branch_id}/kitchen-tickets", headers=headers
+        ).json()["data"][0]["id"]
+
+        client.post(
+            f"/api/v1/kitchen-tickets/{ticket_id}/status",
+            headers=headers,
+            json={"status": "in_progress"},
+        )
+        client.post(
+            f"/api/v1/kitchen-tickets/{ticket_id}/status", headers=headers, json={"status": "ready"}
+        )
+        served_resp = client.post(
+            f"/api/v1/kitchen-tickets/{ticket_id}/status",
+            headers=headers,
+            json={"status": "served"},
+        )
+        assert served_resp.status_code == 200, served_resp.text
+
+        after_serve = client.get(
+            f"/api/v1/branches/{branch_id}/inventory-items/{inventory_item_id}", headers=headers
+        )
+        assert after_serve.status_code == 200
+        # 2 units/serving * 3 servings ordered = 6 deducted from 50.
+        assert Decimal(after_serve.json()["data"]["quantityOnHand"]) == Decimal(44)
+
+        movements_resp = client.get(
+            f"/api/v1/inventory-items/{inventory_item_id}/stock-movements", headers=headers
+        )
+        assert movements_resp.status_code == 200
+        movements = movements_resp.json()["data"]
+        deduction = next(m for m in movements if m["movementType"] == "sale_deduction")
+        assert Decimal(deduction["quantityDelta"]) == Decimal(-6)
+        assert deduction["referenceType"] == "order_item"
+
+    def test_opening_and_closing_a_table_order_cascades_table_status(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+        table_id = owner["table_id"]
+
+        before = client.get(f"/api/v1/branches/{branch_id}/tables/{table_id}", headers=headers)
+        assert before.status_code == 200
+        assert before.json()["data"]["status"] == "available"
+
+        order_id = client.post(
+            f"/api/v1/branches/{branch_id}/orders",
+            headers=headers,
+            json={"orderSource": "pos", "tableId": table_id},
+        ).json()["data"]["id"]
+
+        after_open = client.get(f"/api/v1/branches/{branch_id}/tables/{table_id}", headers=headers)
+        assert after_open.json()["data"]["status"] == "occupied"
+
+        client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        )
+        client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        close_resp = client.post(f"/api/v1/orders/{order_id}/close", headers=headers)
+        assert close_resp.status_code == 200, close_resp.text
+
+        after_close = client.get(f"/api/v1/branches/{branch_id}/tables/{table_id}", headers=headers)
+        assert after_close.json()["data"]["status"] == "available"
+
+    def test_voiding_a_table_order_marks_the_table_available_again(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+        table_id = owner["table_id"]
+
+        order_id = client.post(
+            f"/api/v1/branches/{branch_id}/orders",
+            headers=headers,
+            json={"orderSource": "pos", "tableId": table_id},
+        ).json()["data"]["id"]
+        assert (
+            client.get(f"/api/v1/branches/{branch_id}/tables/{table_id}", headers=headers).json()[
+                "data"
+            ]["status"]
+            == "occupied"
+        )
+
+        void_resp = client.post(f"/api/v1/orders/{order_id}/void", headers=headers)
+        assert void_resp.status_code == 200, void_resp.text
+
+        after_void = client.get(f"/api/v1/branches/{branch_id}/tables/{table_id}", headers=headers)
+        assert after_void.json()["data"]["status"] == "available"
 
     def test_requires_authentication(self, client: TestClient, owner: dict) -> None:
         response = client.post(

@@ -37,11 +37,13 @@ from restaurant_os_api.modules.operations.domain.entities import (
     OrderItem,
     OrderTaxLine,
     Payment,
+    PaymentStatus,
     PurchaseOrder,
     PurchaseOrderItem,
     Recipe,
     RecipeIngredient,
     Refund,
+    RefundStatus,
     StockAdjustment,
     StockMovement,
     Supplier,
@@ -124,15 +126,51 @@ class InMemoryOrderRepository:
         return order
 
     async def list_for_branch(
-        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+        self,
+        tenant_id: str,
+        branch_id: str,
+        *,
+        offset: int,
+        limit: int,
+        table_id: str | None = None,
+        status: str | None = None,
     ) -> tuple[list[Order], int]:
         visible = [
             o
             for o in self._orders.values()
             if o.tenant_id == tenant_id and o.branch_id == branch_id
         ]
+        if table_id is not None:
+            visible = [o for o in visible if o.table_id == table_id]
+        if status is not None:
+            visible = [o for o in visible if o.status.value == status]
         visible.sort(key=lambda o: o.opened_at, reverse=True)
         return visible[offset : offset + limit], len(visible)
+
+    async def list_for_branch_opened_between(
+        self, tenant_id: str, branch_id: str, start: datetime, end: datetime
+    ) -> list[Order]:
+        return [
+            o
+            for o in self._orders.values()
+            if o.tenant_id == tenant_id
+            and o.branch_id == branch_id
+            and start <= o.opened_at < end
+        ]
+
+    async def list_items_for_orders(self, tenant_id: str, order_ids: list[str]) -> list[OrderItem]:
+        return [
+            i for i in self._items.values() if i.tenant_id == tenant_id and i.order_id in order_ids
+        ]
+
+    async def count_items_for_orders(
+        self, tenant_id: str, order_ids: list[str]
+    ) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in self._items.values():
+            if item.tenant_id == tenant_id and item.order_id in order_ids:
+                counts[item.order_id] = counts.get(item.order_id, 0) + 1
+        return counts
 
     async def get_items(self, tenant_id: str, order_id: str) -> list[OrderItem]:
         return [
@@ -346,6 +384,18 @@ class InMemoryPaymentRepository:
             p for p in self._payments.values() if p.tenant_id == tenant_id and p.bill_id == bill_id
         ]
 
+    async def list_settled_for_branch_between(
+        self, tenant_id: str, branch_id: str, start: datetime, end: datetime
+    ) -> list[Payment]:
+        return [
+            p
+            for p in self._payments.values()
+            if p.tenant_id == tenant_id
+            and p.branch_id == branch_id
+            and p.status == PaymentStatus.SETTLED
+            and start <= p.created_at < end
+        ]
+
     async def get_refund_by_id(self, tenant_id: str, refund_id: str) -> Refund | None:
         refund = self._refunds.get(refund_id)
         if refund is None or refund.tenant_id != tenant_id:
@@ -365,6 +415,18 @@ class InMemoryPaymentRepository:
             r
             for r in self._refunds.values()
             if r.tenant_id == tenant_id and r.payment_id == payment_id
+        ]
+
+    async def list_processed_refunds_for_branch_between(
+        self, tenant_id: str, branch_id: str, start: datetime, end: datetime
+    ) -> list[Refund]:
+        return [
+            r
+            for r in self._refunds.values()
+            if r.tenant_id == tenant_id
+            and r.branch_id == branch_id
+            and r.status == RefundStatus.PROCESSED
+            and start <= r.created_at < end
         ]
 
 
