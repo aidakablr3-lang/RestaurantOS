@@ -1,12 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { applyBillAdjustment, createTax, generateBill, getBill } from "@/lib/api/bills"
+import { applyBillAdjustment, createTax, generateBill, getBill, listTaxes } from "@/lib/api/bills"
 import type { ApplyBillAdjustmentRequest } from "@/types/bill"
 
 export const billKeys = {
   all: ["bills"] as const,
   details: () => [...billKeys.all, "detail"] as const,
   detail: (billId: string) => [...billKeys.details(), billId] as const,
+}
+
+export const taxKeys = {
+  all: ["taxes"] as const,
+  lists: () => [...taxKeys.all, "list"] as const,
+}
+
+export function useTaxes(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: taxKeys.lists(),
+    queryFn: () => listTaxes(),
+    enabled: options?.enabled ?? true,
+  })
 }
 
 export function useBill(billId: string | undefined, options?: { enabled?: boolean }) {
@@ -34,7 +47,11 @@ export function useApplyBillAdjustment(billId: string) {
 }
 
 export function useCreateTax() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createTax,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: taxKeys.lists() })
+    },
   })
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { CalendarClockIcon, StoreIcon, UtensilsCrossedIcon } from "lucide-react"
+import { BarChart3Icon, CalendarClockIcon, StoreIcon, UtensilsCrossedIcon } from "lucide-react"
 
 import { PageHeader } from "@/components/ui/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const canManageRestaurants = perms.hasTenantWide("restaurant.manage")
   const canReadReservations = perms.hasAnywhere("reservation.read")
   const canReadMenu = perms.hasTenantWide("menu.read")
+  const canReadReports = perms.hasAnywhere("reports.read")
 
   const restaurants = useRestaurants(
     { offset: 0, limit: 1 },
@@ -164,6 +165,23 @@ export default function DashboardPage() {
                   </p>
                   <Button size="sm" variant="outline" render={<Link href="/restaurants" />} nativeButton={false}>
                     Go to restaurants
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+            {canReadReports ? (
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                  <BarChart3Icon className="size-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Reports</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    End-of-day sales, payments, and top items are reported per branch -- open a
+                    branch to view its report.
+                  </p>
+                  <Button size="sm" variant="outline" render={<Link href="/branches" />} nativeButton={false}>
+                    Go to branches
                   </Button>
                 </CardContent>
               </Card>

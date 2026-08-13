@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/ui/page-header"
-import { useCloseCashDrawer, useOpenCashDrawer } from "@/hooks/use-cash-drawers"
+import { useCloseCashDrawer, useOpenCashDrawer, useOpenCashDrawerLookup } from "@/hooks/use-cash-drawers"
 import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { ApiError } from "@/lib/api-client"
 import {
@@ -30,17 +30,15 @@ export default function CashDrawerPage() {
 
   const perms = usePermissionHelpers()
   const canManage = perms.hasAtBranch(branchId, "billing.manage")
+  const canRead = canManage || perms.hasAtBranch(branchId, "billing.read")
+  const enabled = !perms.isLoading && canRead
 
-  // The backend has no GET endpoint for "the currently open drawer at
-  // this branch" (only POST to open and POST .../close, both disclosed
-  // in cash_drawer_router.py's own docstring) -- this page can only
-  // track the drawer it itself opened, for as long as this tab stays
-  // open. Reloading the page loses track of an already-open drawer.
-  const [drawer, setDrawer] = React.useState<CashDrawer | null>(null)
+  const openDrawerQuery = useOpenCashDrawerLookup(branchId, { enabled })
   const [closed, setClosed] = React.useState<CashDrawer | null>(null)
+  const drawer = openDrawerQuery.data?.data ?? null
 
   const openDrawer = useOpenCashDrawer(branchId)
-  const closeDrawer = useCloseCashDrawer()
+  const closeDrawer = useCloseCashDrawer(branchId)
 
   const openForm = useForm<OpenCashDrawerFormValues>({
     resolver: zodResolver(openCashDrawerSchema),
@@ -54,11 +52,10 @@ export default function CashDrawerPage() {
 
   async function onOpen(values: OpenCashDrawerFormValues) {
     try {
-      const result = await openDrawer.mutateAsync({
+      await openDrawer.mutateAsync({
         openingFloatAmount: String(values.openingFloatAmount),
         terminalId: values.terminalId || null,
       })
-      setDrawer(result.data)
       setClosed(null)
       toast.success("Cash drawer opened.")
     } catch (error) {
@@ -74,7 +71,6 @@ export default function CashDrawerPage() {
         body: { closingCountedAmount: String(values.closingCountedAmount) },
       })
       setClosed(result.data)
-      setDrawer(null)
       toast.success("Cash drawer closed.")
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Failed to close this cash drawer.")

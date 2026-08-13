@@ -5,6 +5,10 @@ export function createTax(body: CreateTaxRequest) {
   return apiClient.post<Tax>("/api/v1/taxes", body)
 }
 
+export function listTaxes() {
+  return apiClient.get<Tax[]>("/api/v1/taxes")
+}
+
 export function generateBill(orderId: string) {
   return apiClient.post<Bill>(`/api/v1/orders/${orderId}/bill`, undefined)
 }

@@ -29,6 +29,7 @@ export function BranchSubNav({ branchId }: BranchSubNavProps) {
     { label: "Inventory", href: `/branches/${branchId}/inventory-items` },
     { label: "Purchase orders", href: `/branches/${branchId}/purchase-orders` },
     { label: "Cash drawer", href: `/branches/${branchId}/cash-drawer` },
+    { label: "Reports", href: `/branches/${branchId}/reports` },
   ]
 
   return (
