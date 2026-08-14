@@ -31,6 +31,9 @@ infrastructure/docker/dev-jwt/*.pem
 .vscode/
 .idea/
 
+# Claude Code local (machine-specific) settings -- never shared/committed
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db

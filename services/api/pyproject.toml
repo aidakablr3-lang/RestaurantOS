@@ -22,7 +22,16 @@ dev = [
     "pytest-asyncio>=0.24",
     "ruff>=0.7",
     "mypy>=1.13",
-    "httpx>=0.27",
+    # Pinned to the exact httpx version this suite is verified against
+    # (full local pytest run: 1257 passed, 2026-08-15). Originally added
+    # to fix TestClient(client=(ip, port)) failing on a fresh install --
+    # that turned out to be unrelated to the httpx version (current
+    # starlette's TestClient never had a `client` kwarg at all); the real
+    # fix was switching the affected rate-limit tests
+    # (test_guest_order_router.py, test_qr_resolution_router.py) to
+    # httpx.AsyncClient + httpx.ASGITransport directly, which does expose
+    # it. Left pinned since that's what's actually been tested.
+    "httpx>=0.27,<0.28",
 ]
 
 [tool.pytest.ini_options]
