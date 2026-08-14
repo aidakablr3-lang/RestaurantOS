@@ -33,6 +33,7 @@ class EndOfDayReportDTO:
     items_sold_count: int
     gross_sales_amount: Decimal
     voided_sales_amount: Decimal
+    outstanding_amount: Decimal
     total_collected_amount: Decimal
     total_tips_amount: Decimal
     total_refunded_amount: Decimal

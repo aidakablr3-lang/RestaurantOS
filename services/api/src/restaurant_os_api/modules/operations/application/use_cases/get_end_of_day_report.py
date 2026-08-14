@@ -28,6 +28,26 @@ the window: ``Order``/``Payment``/``Refund`` all carry their own
 by branch+date rather than joining through Bill -- a payment settled
 today against an order opened yesterday still counts as today's
 collected revenue, matching how a real end-of-day cash-up works.
+
+``gross_sales_amount`` (and, for internal consistency, the same
+order set's items via ``items_sold_count``/``top_items``) is scoped to
+orders that reached ``SERVED``, ``BILLED``, or ``CLOSED`` -- i.e. sales
+that actually happened -- not "any order opened today that wasn't
+voided." An order still sitting in ``OPEN``/``FIRED`` (never served,
+no bill raised) is not a realized sale and must not inflate this
+figure (Phase 2.1 defect remediation: the full-restaurant-day
+simulation found a still-open, un-served, un-billed order counted
+toward Gross Sales). ``order_count`` intentionally still counts every
+non-voided order regardless of status -- it's a traffic metric, not a
+revenue claim.
+
+``outstanding_amount`` is new: the value of orders that have been
+billed (a ``Bill`` exists) but not yet fully paid -- i.e. still sitting
+in ``OrderStatus.BILLED`` at the end of the window, since full payment
+transitions ``BILLED -> CLOSED``. This is distinct from both
+Gross Sales (realized sales value) and Total Collected (cash actually
+in hand) -- deliberately not conflated, per the same "Gross Sales !=
+Total Collected" distinction Phase 2.1 required.
 """
 
 from __future__ import annotations
@@ -120,8 +140,19 @@ class GetEndOfDayReportUseCase:
             )
 
             voided_orders = [o for o in orders if o.status == OrderStatus.VOIDED]
-            active_orders = [o for o in orders if o.status != OrderStatus.VOIDED]
-            active_items = [i for i in items if i.line_status != OrderItemLineStatus.VOIDED]
+            non_voided_orders = [o for o in orders if o.status != OrderStatus.VOIDED]
+            realized_orders = [
+                o
+                for o in orders
+                if o.status in (OrderStatus.SERVED, OrderStatus.BILLED, OrderStatus.CLOSED)
+            ]
+            realized_order_ids = {o.id for o in realized_orders}
+            billed_orders = [o for o in orders if o.status == OrderStatus.BILLED]
+            active_items = [
+                i
+                for i in items
+                if i.line_status != OrderItemLineStatus.VOIDED and i.order_id in realized_order_ids
+            ]
 
             quantities = _quantity_by_menu_item(active_items)
             top_menu_item_ids = sorted(quantities, key=lambda mid: quantities[mid], reverse=True)[
@@ -140,10 +171,13 @@ class GetEndOfDayReportUseCase:
                 )
 
         gross_sales_amount = sum(
-            (o.subtotal_amount + o.tax_amount for o in active_orders), Decimal(0)
+            (o.subtotal_amount + o.tax_amount for o in realized_orders), Decimal(0)
         )
         voided_sales_amount = sum(
             (o.subtotal_amount + o.tax_amount for o in voided_orders), Decimal(0)
+        )
+        outstanding_amount = sum(
+            (o.subtotal_amount + o.tax_amount for o in billed_orders), Decimal(0)
         )
         items_sold_count = sum(i.quantity for i in active_items)
 
@@ -166,11 +200,12 @@ class GetEndOfDayReportUseCase:
             branch_id=branch_id,
             report_date=report_date.isoformat(),
             currency_code=restaurant.default_currency_code,
-            order_count=len(active_orders),
+            order_count=len(non_voided_orders),
             voided_order_count=len(voided_orders),
             items_sold_count=items_sold_count,
             gross_sales_amount=gross_sales_amount,
             voided_sales_amount=voided_sales_amount,
+            outstanding_amount=outstanding_amount,
             total_collected_amount=total_collected_amount,
             total_tips_amount=total_tips_amount,
             total_refunded_amount=total_refunded_amount,

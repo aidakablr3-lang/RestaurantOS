@@ -53,6 +53,7 @@ async def get_end_of_day_report(
         items_sold_count=result.items_sold_count,
         gross_sales_amount=result.gross_sales_amount,
         voided_sales_amount=result.voided_sales_amount,
+        outstanding_amount=result.outstanding_amount,
         total_collected_amount=result.total_collected_amount,
         total_tips_amount=result.total_tips_amount,
         total_refunded_amount=result.total_refunded_amount,
