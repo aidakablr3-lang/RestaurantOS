@@ -26,6 +26,7 @@ export interface EndOfDayReport {
   itemsSoldCount: number
   grossSalesAmount: string
   voidedSalesAmount: string
+  outstandingAmount: string
   totalCollectedAmount: string
   totalTipsAmount: string
   totalRefundedAmount: string

@@ -37,6 +37,7 @@ const REPORT = {
   itemsSoldCount: 30,
   grossSalesAmount: "300.0000",
   voidedSalesAmount: "10.0000",
+  outstandingAmount: "15.0000",
   totalCollectedAmount: "290.0000",
   totalTipsAmount: "20.0000",
   totalRefundedAmount: "5.0000",
@@ -79,6 +80,7 @@ describe("EndOfDayReportPage", () => {
 
     expect(screen.getByText("300.0000 USD")).toBeInTheDocument()
     expect(screen.getByText("285.0000 USD")).toBeInTheDocument()
+    expect(screen.getByText("15.0000 USD")).toBeInTheDocument()
     expect(screen.getByText("cash")).toBeInTheDocument()
     expect(screen.getByText("card")).toBeInTheDocument()
     expect(screen.getByText("Burger")).toBeInTheDocument()

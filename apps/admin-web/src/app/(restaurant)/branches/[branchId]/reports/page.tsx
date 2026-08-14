@@ -97,6 +97,10 @@ export default function EndOfDayReportPage() {
                   label="Net collected"
                   value={`${report.netCollectedAmount} ${report.currencyCode}`}
                 />
+                <StatCard
+                  label="Outstanding"
+                  value={`${report.outstandingAmount} ${report.currencyCode}`}
+                />
                 <StatCard label="Items sold" value={String(report.itemsSoldCount)} />
                 <StatCard
                   label="Tips"
