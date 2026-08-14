@@ -163,8 +163,10 @@ class TestPermissionRepository:
         assert SEEDED_PERMISSION_CODE in codes
         assert "roles.assign" in codes
         # 11 from 0003 + 12 from 0007 (Sprint 7 Step 2, Operations module)
-        # + 1 from 0010 (reports.read, the End-of-Day report gap fix).
-        assert len(permissions) == 24
+        # + 1 from 0010 (reports.read, the End-of-Day report gap fix)
+        # + 2 from 0012 (inventory_food.manage/read, the food-vs-beverage
+        # inventory permission split).
+        assert len(permissions) == 26
 
     async def test_get_by_code_returns_none_for_unknown_code(self, session_factory) -> None:
         async with UnitOfWork(session_factory) as uow:
