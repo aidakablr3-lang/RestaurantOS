@@ -21,7 +21,12 @@ outside RestaurantOS.
 payment's amount, plus this payment's own amount, against the bill's
 ``amount_due`` (order subtotal + tax + adjustments). A payment equal to
 ``amount_due`` closes the bill; a payment greater than the remaining
-``amount_due`` is rejected.
+``amount_due`` is rejected. The bill row is locked (``SELECT ... FOR
+UPDATE``, via ``get_by_id_for_update``) for the duration of this
+read-guard-write sequence, so two concurrent payments against the same
+bill serialize rather than both reading the same pre-payment
+``amount_paid`` and both passing the guard (P0 defect found in Phase
+2.3, fixed 2026-08-14).
 
 **Ledger posting (Data Architecture v2.0 Group I):** one debit against
 ``CASH``/``CARD_CLEARING`` (by ``tender_type``) for the full payment
@@ -140,7 +145,11 @@ class RecordPaymentUseCase:
             table_repo = self._table_repository_factory(uow.session)
             outbox = self._outbox_writer_factory(uow.session)
 
-            bill = await bill_repo.get_by_id(tenant_id, request.bill_id)
+            # Locked for the rest of this transaction so a concurrent
+            # payment against the same bill blocks here instead of
+            # reading a stale amount_paid and passing the overpayment
+            # guard below alongside this one (P0, Phase 2.3).
+            bill = await bill_repo.get_by_id_for_update(tenant_id, request.bill_id)
             if bill is None:
                 raise BillNotFoundError(request.bill_id)
             if bill.status.value == "closed":

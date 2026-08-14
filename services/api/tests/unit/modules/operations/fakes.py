@@ -300,6 +300,13 @@ class InMemoryBillRepository:
             return None
         return bill
 
+    async def get_by_id_for_update(self, tenant_id: str, bill_id: str) -> Bill | None:
+        # No real row locking against an in-memory dict -- these fakes
+        # are single-threaded, so this is just an alias. The locking
+        # behavior itself is only meaningfully provable against real
+        # Postgres; see the integration regression test.
+        return await self.get_by_id(tenant_id, bill_id)
+
     async def get_by_order_id(self, tenant_id: str, order_id: str) -> Bill | None:
         for bill in self._bills.values():
             if bill.tenant_id == tenant_id and bill.order_id == order_id:

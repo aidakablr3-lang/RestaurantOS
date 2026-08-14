@@ -15,6 +15,7 @@ boundaries unit tests cannot exercise (no real auth/HTTP layer).
 
 from __future__ import annotations
 
+import concurrent.futures
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -442,6 +443,58 @@ class TestOrderKitchenBillingPaymentLifecycle:
         )
         assert exact_resp.status_code == 201, exact_resp.text
         assert exact_resp.json()["data"]["status"] == "settled"
+
+    def test_concurrent_payments_on_the_same_bill_cannot_together_overpay_it(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        # DEFECT 1 (P0) regression, Phase 2.3: RecordPaymentUseCase used
+        # to read the bill and its existing settled payments via
+        # unlocked SELECTs, computing the overpayment guard against that
+        # snapshot -- two real concurrent payments against the same bill
+        # could both pass the guard before either committed, together
+        # overpaying it. The bill is now locked (SELECT ... FOR UPDATE)
+        # for the read-guard-write sequence, so of two concurrent
+        # requests each paying the full amount_due, exactly one must
+        # succeed and the other must be rejected as an overpayment.
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+
+        create_resp = client.post(
+            f"/api/v1/branches/{branch_id}/orders", headers=headers, json={"orderSource": "pos"}
+        )
+        order_id = create_resp.json()["data"]["id"]
+        client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        )
+        client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        bill_resp = client.post(f"/api/v1/orders/{order_id}/bill", headers=headers)
+        bill_id = bill_resp.json()["data"]["id"]
+        amount_due = Decimal(bill_resp.json()["data"]["amountDue"])
+
+        def _pay():
+            return client.post(
+                f"/api/v1/bills/{bill_id}/payments",
+                headers=headers,
+                json={"tenderType": "cash", "amount": str(amount_due)},
+            )
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(_pay) for _ in range(2)]
+            responses = [f.result() for f in futures]
+
+        statuses = sorted(r.status_code for r in responses)
+        assert statuses == [201, 409], [r.text for r in responses]
+
+        bill_after = client.get(f"/api/v1/bills/{bill_id}", headers=headers).json()["data"]
+        assert bill_after["status"] == "closed"
+        assert Decimal(bill_after["amountPaid"]) == amount_due
+
+        payments_after = client.get(f"/api/v1/bills/{bill_id}/payments", headers=headers).json()[
+            "data"
+        ]
+        assert len(payments_after) == 1
 
     def test_partial_then_full_payment_releases_the_table_only_once_settled(
         self, client: TestClient, owner: dict

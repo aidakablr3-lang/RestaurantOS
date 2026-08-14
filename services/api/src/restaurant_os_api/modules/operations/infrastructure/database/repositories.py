@@ -672,6 +672,15 @@ class SQLAlchemyBillRepository:
         model = (await self._session.execute(stmt)).scalar_one_or_none()
         return _bill_from_model(model) if model is not None else None
 
+    async def get_by_id_for_update(self, tenant_id: str, bill_id: str) -> Bill | None:
+        stmt = (
+            select(BillModel)
+            .where(BillModel.id == bill_id, BillModel.tenant_id == tenant_id)
+            .with_for_update()
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _bill_from_model(model) if model is not None else None
+
     async def get_by_order_id(self, tenant_id: str, order_id: str) -> Bill | None:
         stmt = select(BillModel).where(
             BillModel.order_id == order_id, BillModel.tenant_id == tenant_id

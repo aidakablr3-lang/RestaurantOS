@@ -16,6 +16,18 @@ from restaurant_os_api.modules.operations.domain.entities import (
 class BillRepository(Protocol):
     async def get_by_id(self, tenant_id: str, bill_id: str) -> Bill | None: ...
 
+    async def get_by_id_for_update(self, tenant_id: str, bill_id: str) -> Bill | None:
+        """Same as ``get_by_id``, but takes a row lock (``SELECT ... FOR
+        UPDATE``) held for the rest of the caller's transaction.
+
+        Use for any read-modify-write sequence against a bill's paid
+        state (e.g. the overpayment guard in ``RecordPaymentUseCase``) so
+        concurrent requests against the same bill serialize instead of
+        each reading a stale snapshot and both passing a guard that only
+        one of them should.
+        """
+        ...
+
     async def get_by_order_id(self, tenant_id: str, order_id: str) -> Bill | None: ...
 
     async def create(self, bill: Bill) -> Bill: ...
