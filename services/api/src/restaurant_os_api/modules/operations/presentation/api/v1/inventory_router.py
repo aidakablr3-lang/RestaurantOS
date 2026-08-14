@@ -12,7 +12,12 @@ that role's own `inventory.manage` grant unable to ever satisfy it,
 since ``Role.default_scope`` is an authoring hint, not a structural
 constraint (see ``role.py``), and the catalogue seeds this role
 branch-scoped -- a real, previously-disclosed RBAC gap (Sprint 7
-full-day operational simulation). ``inventory-items`` are branch-nested,
+full-day operational simulation). Listing categories is gated the same
+at-any-scope way for the identical reason (found and fixed 2026-08-14
+alongside the food-vs-beverage split below -- the list route had been
+left on the old strict tenant-wide gate even after create was fixed,
+so the same branch-scoped Inventory Manager could create a category but
+never see it in the list). ``inventory-items`` are branch-nested,
 gated directly by ``require_branch_permission``. ``stock-movements`` is
 flat (Architecture doc SS6: manual adjustments/waste logging;
 ``sale_deduction`` is never a direct client-facing POST) -- coarse
@@ -51,7 +56,6 @@ from restaurant_os_api.modules.operations.presentation.dependencies import (
     RequireInventoryManageDep,
     RequireInventoryReadAtAnyScopeDep,
     RequireInventoryReadDep,
-    RequireInventoryReadTenantWideDep,
     UpdateInventoryItemUseCaseDep,
 )
 from restaurant_os_api.modules.operations.presentation.schemas.inventory_schemas import (
@@ -72,7 +76,11 @@ InventoryItemIdPath = Annotated[str, Path(min_length=26, max_length=26)]
 
 def _category_to_schema(dto: InventoryCategoryDTO) -> InventoryCategoryResponseSchema:
     return InventoryCategoryResponseSchema(
-        id=dto.id, tenant_id=dto.tenant_id, name=dto.name, created_at=dto.created_at
+        id=dto.id,
+        tenant_id=dto.tenant_id,
+        name=dto.name,
+        category_type=dto.category_type,
+        created_at=dto.created_at,
     )
 
 
@@ -118,7 +126,9 @@ async def create_inventory_category(
     use_case: CreateInventoryCategoryUseCaseDep,
 ) -> ApiResponse[InventoryCategoryResponseSchema]:
     result = await use_case.execute(
-        principal.tenant_id, CreateInventoryCategoryRequestDTO(name=body.name)
+        principal.tenant_id,
+        principal.user_id,
+        CreateInventoryCategoryRequestDTO(name=body.name, category_type=body.category_type),
     )
     return ApiResponse(data=_category_to_schema(result))
 
@@ -128,10 +138,10 @@ async def create_inventory_category(
     response_model=ApiResponse[list[InventoryCategoryResponseSchema]],
 )
 async def list_inventory_categories(
-    principal: RequireInventoryReadTenantWideDep,
+    principal: RequireInventoryReadAtAnyScopeDep,
     use_case: ListInventoryCategoriesUseCaseDep,
 ) -> ApiResponse[list[InventoryCategoryResponseSchema]]:
-    result = await use_case.execute(principal.tenant_id)
+    result = await use_case.execute(principal.tenant_id, principal.user_id)
     return ApiResponse(data=[_category_to_schema(c) for c in result.categories])
 
 
@@ -148,6 +158,7 @@ async def create_inventory_item(
 ) -> ApiResponse[InventoryItemResponseSchema]:
     result = await use_case.execute(
         principal.tenant_id,
+        principal.user_id,
         CreateInventoryItemRequestDTO(
             branch_id=branch_id,
             inventory_category_id=body.inventory_category_id,
@@ -171,7 +182,9 @@ async def list_inventory_items(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> ApiResponse[list[InventoryItemResponseSchema]]:
-    result = await use_case.execute(principal.tenant_id, branch_id, offset=offset, limit=limit)
+    result = await use_case.execute(
+        principal.tenant_id, principal.user_id, branch_id, offset=offset, limit=limit
+    )
     return ApiResponse(
         data=[_item_to_schema(i) for i in result.items],
         meta=PaginationMeta(total=result.total, offset=result.offset, limit=result.limit),
@@ -188,7 +201,9 @@ async def get_inventory_item(
     principal: RequireInventoryReadDep,
     use_case: GetInventoryItemUseCaseDep,
 ) -> ApiResponse[InventoryItemResponseSchema]:
-    result = await use_case.execute(principal.tenant_id, branch_id, inventory_item_id)
+    result = await use_case.execute(
+        principal.tenant_id, principal.user_id, branch_id, inventory_item_id
+    )
     return ApiResponse(data=_item_to_schema(result))
 
 
@@ -205,6 +220,7 @@ async def update_inventory_item(
 ) -> ApiResponse[InventoryItemResponseSchema]:
     result = await use_case.execute(
         principal.tenant_id,
+        principal.user_id,
         branch_id,
         UpdateInventoryItemRequestDTO(
             inventory_item_id=inventory_item_id,

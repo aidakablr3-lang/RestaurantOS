@@ -752,10 +752,12 @@ GetOpenCashDrawerUseCaseDep = Annotated[
 
 def get_create_inventory_category_use_case(
     session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
 ) -> CreateInventoryCategoryUseCase:
     return CreateInventoryCategoryUseCase(
         session_factory=session_factory,
         inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
+        resolve_user_permissions=resolve_user_permissions,
     )
 
 
@@ -766,10 +768,12 @@ CreateInventoryCategoryUseCaseDep = Annotated[
 
 def get_list_inventory_categories_use_case(
     session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
 ) -> ListInventoryCategoriesUseCase:
     return ListInventoryCategoriesUseCase(
         session_factory=session_factory,
         inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
+        resolve_user_permissions=resolve_user_permissions,
     )
 
 
@@ -780,12 +784,14 @@ ListInventoryCategoriesUseCaseDep = Annotated[
 
 def get_create_inventory_item_use_case(
     session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
 ) -> CreateInventoryItemUseCase:
     return CreateInventoryItemUseCase(
         session_factory=session_factory,
         inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
         inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
     )
 
 
@@ -794,10 +800,15 @@ CreateInventoryItemUseCaseDep = Annotated[
 ]
 
 
-def get_get_inventory_item_use_case(session_factory: SessionFactoryDep) -> GetInventoryItemUseCase:
+def get_get_inventory_item_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> GetInventoryItemUseCase:
     return GetInventoryItemUseCase(
         session_factory=session_factory,
         inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
+        resolve_user_permissions=resolve_user_permissions,
     )
 
 
@@ -808,10 +819,13 @@ GetInventoryItemUseCaseDep = Annotated[
 
 def get_list_inventory_items_use_case(
     session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
 ) -> ListInventoryItemsUseCase:
     return ListInventoryItemsUseCase(
         session_factory=session_factory,
         inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
+        inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
+        resolve_user_permissions=resolve_user_permissions,
     )
 
 
@@ -822,11 +836,13 @@ ListInventoryItemsUseCaseDep = Annotated[
 
 def get_update_inventory_item_use_case(
     session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
 ) -> UpdateInventoryItemUseCase:
     return UpdateInventoryItemUseCase(
         session_factory=session_factory,
         inventory_item_repository_factory=SQLAlchemyInventoryItemRepository,
         inventory_category_repository_factory=SQLAlchemyInventoryCategoryRepository,
+        resolve_user_permissions=resolve_user_permissions,
     )
 
 

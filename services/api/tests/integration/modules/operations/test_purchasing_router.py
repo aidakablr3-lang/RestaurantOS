@@ -188,7 +188,7 @@ async def owner(session_factory, client: TestClient):
 def _create_inventory_item(client: TestClient, owner: dict) -> str:
     headers = _auth_headers(owner["token"])
     category_resp = client.post(
-        "/api/v1/inventory-categories", headers=headers, json={"name": "Produce"}
+        "/api/v1/inventory-categories", headers=headers, json={"name": "Produce", "categoryType": "beverage"}
     )
     category_id = category_resp.json()["data"]["id"]
     item_resp = client.post(

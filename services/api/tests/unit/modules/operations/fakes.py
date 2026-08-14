@@ -570,10 +570,20 @@ class InMemoryInventoryItemRepository:
         return item
 
     async def list_for_branch(
-        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+        self,
+        tenant_id: str,
+        branch_id: str,
+        *,
+        offset: int,
+        limit: int,
+        exclude_category_ids: frozenset[str] = frozenset(),
     ) -> tuple[list[InventoryItem], int]:
         visible = [
-            i for i in self._items.values() if i.tenant_id == tenant_id and i.branch_id == branch_id
+            i
+            for i in self._items.values()
+            if i.tenant_id == tenant_id
+            and i.branch_id == branch_id
+            and i.inventory_category_id not in exclude_category_ids
         ]
         visible.sort(key=lambda i: i.name)
         return visible[offset : offset + limit], len(visible)

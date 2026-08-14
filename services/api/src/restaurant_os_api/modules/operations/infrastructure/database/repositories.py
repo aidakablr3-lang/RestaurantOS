@@ -25,6 +25,7 @@ from restaurant_os_api.modules.operations.domain.entities import (
     GoodsReceipt,
     GoodsReceiptStatus,
     InventoryCategory,
+    InventoryCategoryType,
     InventoryItem,
     KitchenItem,
     KitchenItemStatus,
@@ -993,7 +994,11 @@ class SQLAlchemyLedgerRepository:
 
 def _inventory_category_from_model(model: InventoryCategoryModel) -> InventoryCategory:
     return InventoryCategory(
-        id=model.id, tenant_id=model.tenant_id, name=model.name, created_at=model.created_at
+        id=model.id,
+        tenant_id=model.tenant_id,
+        name=model.name,
+        category_type=InventoryCategoryType(model.category_type),
+        created_at=model.created_at,
     )
 
 
@@ -1094,7 +1099,10 @@ class SQLAlchemyInventoryCategoryRepository:
 
     async def create(self, category: InventoryCategory) -> InventoryCategory:
         model = InventoryCategoryModel(
-            id=category.id, tenant_id=category.tenant_id, name=category.name
+            id=category.id,
+            tenant_id=category.tenant_id,
+            name=category.name,
+            category_type=category.category_type.value,
         )
         self._session.add(model)
         await self._session.flush()
@@ -1167,13 +1175,24 @@ class SQLAlchemyInventoryItemRepository:
         return item
 
     async def list_for_branch(
-        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+        self,
+        tenant_id: str,
+        branch_id: str,
+        *,
+        offset: int,
+        limit: int,
+        exclude_category_ids: frozenset[str] = frozenset(),
     ) -> tuple[list[InventoryItem], int]:
         filters = (
             InventoryItemModel.tenant_id == tenant_id,
             InventoryItemModel.branch_id == branch_id,
             InventoryItemModel.deleted_at.is_(None),
         )
+        if exclude_category_ids:
+            filters = (
+                *filters,
+                InventoryItemModel.inventory_category_id.not_in(exclude_category_ids),
+            )
         count_stmt = select(func.count()).select_from(InventoryItemModel).where(*filters)
         total = (await self._session.execute(count_stmt)).scalar_one()
 

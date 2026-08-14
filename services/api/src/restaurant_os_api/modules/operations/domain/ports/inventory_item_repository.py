@@ -15,7 +15,13 @@ class InventoryItemRepository(Protocol):
     async def update(self, item: InventoryItem) -> InventoryItem: ...
 
     async def list_for_branch(
-        self, tenant_id: str, branch_id: str, *, offset: int, limit: int
+        self,
+        tenant_id: str,
+        branch_id: str,
+        *,
+        offset: int,
+        limit: int,
+        exclude_category_ids: frozenset[str] = frozenset(),
     ) -> tuple[list[InventoryItem], int]: ...
 
     async def get_by_branch_id_and_name(

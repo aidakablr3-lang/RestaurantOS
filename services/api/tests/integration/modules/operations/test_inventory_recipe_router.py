@@ -44,7 +44,16 @@ from restaurant_os_api.platform.tenancy import TenantContext
 
 PASSWORD = "correct horse battery staple"
 
-_PERMISSIONS = frozenset({"inventory.manage", "inventory.read", "menu.manage", "menu.read"})
+_PERMISSIONS = frozenset(
+    {
+        "inventory.manage",
+        "inventory.read",
+        "menu.manage",
+        "menu.read",
+        "inventory_food.manage",
+        "inventory_food.read",
+    }
+)
 
 
 @pytest.fixture(scope="module")
@@ -218,7 +227,7 @@ class TestInventoryLifecycle:
         branch_id = owner["branch_id"]
 
         category_resp = client.post(
-            "/api/v1/inventory-categories", headers=headers, json={"name": "Produce"}
+            "/api/v1/inventory-categories", headers=headers, json={"name": "Produce", "categoryType": "beverage"}
         )
         assert category_resp.status_code == 201, category_resp.text
         category_id = category_resp.json()["data"]["id"]
@@ -299,7 +308,7 @@ class TestInventoryLifecycle:
     ) -> None:
         headers = _auth_headers(owner["token"])
         category_resp = client.post(
-            "/api/v1/inventory-categories", headers=headers, json={"name": "Produce"}
+            "/api/v1/inventory-categories", headers=headers, json={"name": "Produce", "categoryType": "beverage"}
         )
         category_id = category_resp.json()["data"]["id"]
         item_resp = client.post(
@@ -337,7 +346,7 @@ class TestInventoryLifecycle:
         assert revise_again.json()["data"]["version"] == 2
 
     def test_requires_authentication(self, client: TestClient) -> None:
-        response = client.post("/api/v1/inventory-categories", json={"name": "Produce"})
+        response = client.post("/api/v1/inventory-categories", json={"name": "Produce", "categoryType": "beverage"})
         assert response.status_code == 401
 
     async def test_denied_without_inventory_manage(
@@ -348,7 +357,7 @@ class TestInventoryLifecycle:
         token = _login_sync(client, tenant_id=owner["tenant_id"], email=email)
 
         response = client.post(
-            "/api/v1/inventory-categories", headers=_auth_headers(token), json={"name": "Produce"}
+            "/api/v1/inventory-categories", headers=_auth_headers(token), json={"name": "Produce", "categoryType": "beverage"}
         )
         assert response.status_code == 403
 
@@ -367,6 +376,117 @@ class TestInventoryLifecycle:
         token = _login_sync(client, tenant_id=owner["tenant_id"], email=email)
 
         response = client.post(
-            "/api/v1/inventory-categories", headers=_auth_headers(token), json={"name": "Produce"}
+            "/api/v1/inventory-categories", headers=_auth_headers(token), json={"name": "Produce", "categoryType": "beverage"}
         )
         assert response.status_code == 201, response.text
+
+
+class TestFoodVsBeverageGate:
+    """2026-08-14 product decision: food-inventory tracking is de-scoped
+    from the default Inventory Manager workflow (recipe-based deduction
+    can't be trusted to reflect real chef usage) -- liquor/beverage
+    inventory stays fully tracked. A branch-scoped inventory.manage-only
+    grant (the real seeded Inventory Manager shape) can freely manage
+    beverage categories/items, but a food category or item additionally
+    needs the dedicated inventory_food.manage/inventory_food.read (at
+    any scope) -- NOT menu.manage/menu.read, since the real Inventory
+    Manager role already holds those two for recipe editing; reusing
+    them would have restricted nothing. RBAC here is permission-based
+    throughout, never role-name-based -- Restaurant Manager/Tenant Owner
+    hold the new codes by default, Inventory Manager does not."""
+
+    async def _inventory_only_token(self, client: TestClient, owner: dict, session_factory) -> str:
+        email = "inventory-only@example.com"
+        user_id = await _seed_user(session_factory, tenant_id=owner["tenant_id"], email=email)
+        await _grant_role(
+            session_factory,
+            tenant_id=owner["tenant_id"],
+            user_id=user_id,
+            permission_codes=frozenset({"inventory.manage", "inventory.read"}),
+            branch_id=owner["branch_id"],
+        )
+        return _login_sync(client, tenant_id=owner["tenant_id"], email=email)
+
+    async def test_an_inventory_only_grant_is_denied_creating_a_food_category(
+        self, client: TestClient, owner: dict, session_factory
+    ) -> None:
+        token = await self._inventory_only_token(client, owner, session_factory)
+
+        response = client.post(
+            "/api/v1/inventory-categories",
+            headers=_auth_headers(token),
+            json={"name": "Produce", "categoryType": "food"},
+        )
+        assert response.status_code == 403, response.text
+
+    async def test_an_inventory_only_grant_can_still_create_a_beverage_category(
+        self, client: TestClient, owner: dict, session_factory
+    ) -> None:
+        token = await self._inventory_only_token(client, owner, session_factory)
+
+        response = client.post(
+            "/api/v1/inventory-categories",
+            headers=_auth_headers(token),
+            json={"name": "Liquor", "categoryType": "beverage"},
+        )
+        assert response.status_code == 201, response.text
+
+    async def test_an_inventory_only_grant_does_not_see_food_categories_in_the_list(
+        self, client: TestClient, owner: dict, session_factory
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        client.post(
+            "/api/v1/inventory-categories",
+            headers=headers,
+            json={"name": "Liquor", "categoryType": "beverage"},
+        )
+        client.post(
+            "/api/v1/inventory-categories",
+            headers=headers,
+            json={"name": "Produce", "categoryType": "food"},
+        )
+        token = await self._inventory_only_token(client, owner, session_factory)
+
+        response = client.get("/api/v1/inventory-categories", headers=_auth_headers(token))
+        assert response.status_code == 200, response.text
+        names = {c["name"] for c in response.json()["data"]}
+        assert names == {"Liquor"}
+
+    async def test_owner_with_inventory_food_manage_sees_both_and_can_create_food(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        client.post(
+            "/api/v1/inventory-categories",
+            headers=headers,
+            json={"name": "Liquor", "categoryType": "beverage"},
+        )
+        food_resp = client.post(
+            "/api/v1/inventory-categories",
+            headers=headers,
+            json={"name": "Produce", "categoryType": "food"},
+        )
+        assert food_resp.status_code == 201, food_resp.text
+
+        response = client.get("/api/v1/inventory-categories", headers=headers)
+        names = {c["name"] for c in response.json()["data"]}
+        assert names == {"Liquor", "Produce"}
+
+    async def test_an_inventory_only_grant_cannot_create_an_item_under_a_food_category(
+        self, client: TestClient, owner: dict, session_factory
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        category_resp = client.post(
+            "/api/v1/inventory-categories",
+            headers=headers,
+            json={"name": "Produce", "categoryType": "food"},
+        )
+        category_id = category_resp.json()["data"]["id"]
+        token = await self._inventory_only_token(client, owner, session_factory)
+
+        response = client.post(
+            f"/api/v1/branches/{owner['branch_id']}/inventory-items",
+            headers=_auth_headers(token),
+            json={"inventoryCategoryId": category_id, "name": "Chicken", "unit": "kg"},
+        )
+        assert response.status_code == 403, response.text

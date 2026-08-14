@@ -11,6 +11,7 @@ from decimal import Decimal
 @dataclass(frozen=True, slots=True)
 class CreateInventoryCategoryRequestDTO:
     name: str
+    category_type: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +19,7 @@ class InventoryCategoryDTO:
     id: str
     tenant_id: str
     name: str
+    category_type: str
     created_at: datetime
 
 

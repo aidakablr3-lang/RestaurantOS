@@ -11,15 +11,19 @@ from pydantic import Field
 
 from restaurant_os_api.core.response import CamelModel
 
+InventoryCategoryTypeLiteral = Literal["food", "beverage"]
+
 
 class CreateInventoryCategoryRequestSchema(CamelModel):
     name: str = Field(..., min_length=1, max_length=255)
+    category_type: InventoryCategoryTypeLiteral
 
 
 class InventoryCategoryResponseSchema(CamelModel):
     id: str
     tenant_id: str
     name: str
+    category_type: InventoryCategoryTypeLiteral
     created_at: datetime
 
 

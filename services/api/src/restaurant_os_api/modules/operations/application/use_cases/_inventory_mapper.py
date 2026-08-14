@@ -17,6 +17,7 @@ def inventory_category_to_dto(category: InventoryCategory) -> InventoryCategoryD
         id=category.id,
         tenant_id=category.tenant_id,
         name=category.name,
+        category_type=category.category_type.value,
         created_at=category.created_at,
     )
 

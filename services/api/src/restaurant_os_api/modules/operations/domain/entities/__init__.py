@@ -14,6 +14,7 @@ from restaurant_os_api.modules.operations.domain.entities.goods_receipt import (
 )
 from restaurant_os_api.modules.operations.domain.entities.inventory_category import (
     InventoryCategory,
+    InventoryCategoryType,
 )
 from restaurant_os_api.modules.operations.domain.entities.inventory_item import InventoryItem
 from restaurant_os_api.modules.operations.domain.entities.kitchen_item import (
@@ -78,6 +79,7 @@ __all__ = [
     "GoodsReceipt",
     "GoodsReceiptStatus",
     "InventoryCategory",
+    "InventoryCategoryType",
     "InventoryItem",
     "KitchenItem",
     "KitchenItemStatus",
