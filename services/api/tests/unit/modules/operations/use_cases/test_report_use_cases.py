@@ -49,6 +49,9 @@ MENU_ITEM_ID = "01ARZ3NDEKTSV4RRFFQ6MITM01"
 OTHER_MENU_ITEM_ID = "01ARZ3NDEKTSV4RRFFQ6MITM02"
 ORDER_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR01"
 VOIDED_ORDER_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR02"
+OPEN_ORDER_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR03"
+BILLED_ORDER_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR04"
+CLOSED_ORDER_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR05"
 REPORT_DATE = date(2026, 8, 12)
 IN_WINDOW = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
 BEFORE_WINDOW = datetime(2026, 8, 11, 23, 0, tzinfo=UTC)
@@ -229,6 +232,144 @@ class TestGetEndOfDayReportUseCase:
         assert result.voided_order_count == 1
         assert result.gross_sales_amount == Decimal("22.00")
         assert result.voided_sales_amount == Decimal("11.00")
+
+    async def test_a_never_served_open_order_does_not_inflate_gross_sales(self) -> None:
+        # Defect #2 remediation (Phase 2.1): an order still sitting in
+        # OPEN (never fired, never served, no bill raised -- the same
+        # bucket a failed/insufficient-stock add-item attempt would leave
+        # an order in, since there is no separate "failed" order status
+        # in this domain model) is not a realized sale and must not
+        # inflate Gross Sales.
+        order_repo = InMemoryOrderRepository(
+            {
+                ORDER_ID: _order(),
+                OPEN_ORDER_ID: _order(
+                    id=OPEN_ORDER_ID,
+                    status=OrderStatus.OPEN,
+                    subtotal_amount=Decimal("999.00"),
+                    tax_amount=Decimal("99.90"),
+                ),
+            },
+            {"item-1": _order_item()},
+        )
+        use_case = _use_case(order_repo, InMemoryPaymentRepository())
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID, REPORT_DATE)
+
+        assert result.gross_sales_amount == Decimal("22.00")
+        assert result.outstanding_amount == Decimal(0)
+        # order_count is a traffic metric, not a revenue claim -- the
+        # still-open order legitimately counts as a non-voided order.
+        assert result.order_count == 2
+
+    async def test_a_billed_but_unpaid_order_counts_toward_gross_sales_and_outstanding(
+        self,
+    ) -> None:
+        order_repo = InMemoryOrderRepository(
+            {
+                BILLED_ORDER_ID: _order(
+                    id=BILLED_ORDER_ID,
+                    status=OrderStatus.BILLED,
+                    subtotal_amount=Decimal("15.00"),
+                    tax_amount=Decimal("1.50"),
+                )
+            }
+        )
+        use_case = _use_case(order_repo, InMemoryPaymentRepository())
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID, REPORT_DATE)
+
+        assert result.gross_sales_amount == Decimal("16.50")
+        assert result.outstanding_amount == Decimal("16.50")
+        assert result.total_collected_amount == Decimal(0)
+
+    async def test_a_fully_paid_closed_order_is_not_outstanding(self) -> None:
+        order_repo = InMemoryOrderRepository(
+            {CLOSED_ORDER_ID: _order(id=CLOSED_ORDER_ID, status=OrderStatus.CLOSED)}
+        )
+        payment_repo = InMemoryPaymentRepository({"payment-1": _payment()})
+        use_case = _use_case(order_repo, payment_repo)
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID, REPORT_DATE)
+
+        assert result.gross_sales_amount == Decimal("22.00")
+        assert result.outstanding_amount == Decimal(0)
+        assert result.total_collected_amount == Decimal("22.00")
+
+    async def test_a_partially_paid_billed_order_stays_outstanding(self) -> None:
+        # A partial payment does not transition the order out of BILLED
+        # (RecordPaymentUseCase only closes it once fully paid), so it
+        # must still show up as outstanding, with only the actual
+        # partial amount reflected in Total Collected.
+        order_repo = InMemoryOrderRepository(
+            {
+                BILLED_ORDER_ID: _order(
+                    id=BILLED_ORDER_ID,
+                    status=OrderStatus.BILLED,
+                    subtotal_amount=Decimal("20.00"),
+                    tax_amount=Decimal("2.00"),
+                )
+            }
+        )
+        payment_repo = InMemoryPaymentRepository(
+            {"payment-1": _payment(amount=Decimal("10.00"), tip_amount=Decimal(0))}
+        )
+        use_case = _use_case(order_repo, payment_repo)
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID, REPORT_DATE)
+
+        assert result.gross_sales_amount == Decimal("22.00")
+        assert result.outstanding_amount == Decimal("22.00")
+        assert result.total_collected_amount == Decimal("10.00")
+
+    async def test_mixed_order_states_produce_correct_gross_sales_outstanding_and_voided_totals(
+        self,
+    ) -> None:
+        # Combined EOD scenario: one served/paid order, one billed/unpaid
+        # order, one never-served open order, and one voided order, all
+        # in the same window -- verifies every total against a
+        # hand-calculated expected value simultaneously.
+        order_repo = InMemoryOrderRepository(
+            {
+                CLOSED_ORDER_ID: _order(
+                    id=CLOSED_ORDER_ID,
+                    status=OrderStatus.CLOSED,
+                    subtotal_amount=Decimal("20.00"),
+                    tax_amount=Decimal("2.00"),
+                ),
+                BILLED_ORDER_ID: _order(
+                    id=BILLED_ORDER_ID,
+                    status=OrderStatus.BILLED,
+                    subtotal_amount=Decimal("15.00"),
+                    tax_amount=Decimal("1.50"),
+                ),
+                OPEN_ORDER_ID: _order(
+                    id=OPEN_ORDER_ID,
+                    status=OrderStatus.OPEN,
+                    subtotal_amount=Decimal("50.00"),
+                    tax_amount=Decimal("5.00"),
+                ),
+                VOIDED_ORDER_ID: _order(
+                    id=VOIDED_ORDER_ID,
+                    status=OrderStatus.VOIDED,
+                    subtotal_amount=Decimal("10.00"),
+                    tax_amount=Decimal("1.00"),
+                ),
+            }
+        )
+        payment_repo = InMemoryPaymentRepository(
+            {"payment-1": _payment(amount=Decimal("22.00"), tip_amount=Decimal("3.00"))}
+        )
+        use_case = _use_case(order_repo, payment_repo)
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID, REPORT_DATE)
+
+        assert result.order_count == 3  # CLOSED + BILLED + OPEN, non-voided
+        assert result.voided_order_count == 1
+        assert result.gross_sales_amount == Decimal("38.50")  # 22.00 (closed) + 16.50 (billed)
+        assert result.outstanding_amount == Decimal("16.50")  # billed only
+        assert result.voided_sales_amount == Decimal("11.00")
+        assert result.total_collected_amount == Decimal("22.00")
 
     async def test_voided_line_items_do_not_count_toward_items_sold(self) -> None:
         order_repo = InMemoryOrderRepository(

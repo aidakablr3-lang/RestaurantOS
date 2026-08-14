@@ -205,6 +205,38 @@ async def _seed_order_with_payment(
         )
 
 
+async def _seed_order(
+    session_factory,
+    *,
+    tenant_id: str,
+    branch_id: str,
+    status: str,
+    opened_at: datetime,
+    subtotal: str = "20.00",
+    tax: str = "2.00",
+) -> str:
+    order_id = generate_ulid()
+    async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
+        await uow.session.execute(
+            text(
+                "INSERT INTO orders (id, tenant_id, branch_id, order_source, status, "
+                "subtotal_amount, tax_amount, currency_code, opened_at) "
+                "VALUES (:id, :tenant_id, :branch_id, 'pos', :status, :subtotal, :tax, 'USD', "
+                ":opened_at)"
+            ),
+            {
+                "id": order_id,
+                "tenant_id": tenant_id,
+                "branch_id": branch_id,
+                "status": status,
+                "subtotal": subtotal,
+                "tax": tax,
+                "opened_at": opened_at,
+            },
+        )
+    return order_id
+
+
 class TestEndOfDayReport:
     async def test_a_reports_read_holder_gets_the_full_report(self, session_factory) -> None:
         tenant_id = generate_ulid()
@@ -277,6 +309,57 @@ class TestEndOfDayReport:
         data = response.json()["data"]
         assert data["orderCount"] == 0
         assert data["grossSalesAmount"] == "0"
+
+    async def test_a_never_served_order_is_excluded_and_a_billed_unpaid_order_is_outstanding(
+        self, session_factory
+    ) -> None:
+        # Defect #2 remediation (Phase 2.1): an OPEN order that was never
+        # served/billed must not inflate Gross Sales, and a BILLED order
+        # with no settled payment must show up as Outstanding, not as
+        # Gross Sales == Total Collected.
+        tenant_id = generate_ulid()
+        seeded = await _seed_branch(session_factory, tenant_id=tenant_id)
+        report_moment = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
+        await _seed_order(
+            session_factory,
+            tenant_id=tenant_id,
+            branch_id=seeded["branch_id"],
+            status="open",
+            opened_at=report_moment,
+            subtotal="999.00",
+            tax="99.90",
+        )
+        await _seed_order(
+            session_factory,
+            tenant_id=tenant_id,
+            branch_id=seeded["branch_id"],
+            status="billed",
+            opened_at=report_moment,
+            subtotal="15.00",
+            tax="1.50",
+        )
+        user_id = await _seed_user(session_factory, tenant_id=tenant_id, email="owner3@example.com")
+        await _grant_role(
+            session_factory,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            permission_codes=frozenset({"reports.read"}),
+        )
+        client_ = _client_for(session_factory)
+        token = _login_sync(client_, tenant_id=tenant_id, email="owner3@example.com")
+
+        response = client_.get(
+            f"/api/v1/branches/{seeded['branch_id']}/reports/end-of-day",
+            params={"date": "2026-08-12"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200, response.text
+        data = response.json()["data"]
+        assert data["orderCount"] == 2
+        assert data["grossSalesAmount"] == "16.5000"
+        assert data["outstandingAmount"] == "16.5000"
+        assert data["totalCollectedAmount"] == "0"
 
     async def test_a_user_without_reports_read_is_denied(self, session_factory) -> None:
         tenant_id = generate_ulid()
