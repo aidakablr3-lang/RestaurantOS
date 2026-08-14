@@ -254,7 +254,9 @@ class RecordPaymentUseCase:
                 order.close(closed_at=now)
                 await order_repo.update(order)
                 if order.table_id is not None:
-                    await release_table_if_occupied(table_repo, tenant_id, order.table_id)
+                    await release_table_if_occupied(
+                        table_repo, order_repo, tenant_id, order.table_id
+                    )
 
             await outbox.publish(
                 tenant_id,

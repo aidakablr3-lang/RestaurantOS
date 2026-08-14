@@ -99,7 +99,7 @@ class VoidOrderUseCase:
             order = await order_repo.update(order)
 
             if order.table_id is not None:
-                await release_table_if_occupied(table_repo, tenant_id, order.table_id)
+                await release_table_if_occupied(table_repo, order_repo, tenant_id, order.table_id)
 
             await outbox.publish(tenant_id, OrderVoided(order_id=order.id, occurred_at=now))
 

@@ -247,6 +247,19 @@ class SQLAlchemyOrderRepository:
         models = (await self._session.execute(stmt)).scalars().all()
         return [_order_from_model(m) for m in models]
 
+    async def has_active_orders_for_table(self, tenant_id: str, table_id: str) -> bool:
+        stmt = (
+            select(OrderModel.id)
+            .where(
+                OrderModel.tenant_id == tenant_id,
+                OrderModel.table_id == table_id,
+                OrderModel.status.notin_([OrderStatus.CLOSED.value, OrderStatus.VOIDED.value]),
+            )
+            .limit(1)
+        )
+        result = (await self._session.execute(stmt)).scalar_one_or_none()
+        return result is not None
+
     async def list_items_for_orders(self, tenant_id: str, order_ids: list[str]) -> list[OrderItem]:
         if not order_ids:
             return []
