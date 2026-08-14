@@ -110,6 +110,7 @@ async def _grant_role(
     user_id: str,
     permission_codes: frozenset[str],
     is_active: bool = True,
+    branch_id: str | None = None,
 ) -> str:
     now = datetime.now(UTC)
     async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
@@ -123,7 +124,7 @@ async def _grant_role(
                 tenant_id=tenant_id,
                 name=f"Role {generate_ulid()}",
                 description=None,
-                default_scope=RoleScope.TENANT,
+                default_scope=RoleScope.BRANCH if branch_id is not None else RoleScope.TENANT,
                 is_system=False,
                 is_active=is_active,
                 created_at=now,
@@ -136,12 +137,25 @@ async def _grant_role(
                 tenant_id=tenant_id,
                 user_id=user_id,
                 role_id=role.id,
-                branch_id=None,
+                branch_id=branch_id,
                 granted_at=now,
                 granted_by_user_id=None,
             )
         )
     return user_role.id
+
+
+async def _create_branch(session_factory, *, tenant_id: str, restaurant_id: str, name: str) -> str:
+    branch_id = generate_ulid()
+    async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
+        await uow.session.execute(
+            text(
+                "INSERT INTO branches (id, tenant_id, restaurant_id, name) "
+                "VALUES (:id, :tenant_id, :restaurant_id, :name)"
+            ),
+            {"id": branch_id, "tenant_id": tenant_id, "restaurant_id": restaurant_id, "name": name},
+        )
+    return branch_id
 
 
 async def _revoke_role(session_factory, *, tenant_id: str, user_role_id: str) -> None:
@@ -397,6 +411,41 @@ class TestCreateMenuItem:
             json=_create_body(name="Second"),
         )
         assert second.status_code == 403
+
+    async def test_a_branch_scoped_menu_manage_grant_can_create_a_menu_item(
+        self, client: TestClient, owner: dict, restaurant_id: str, menu_category: dict, session_factory
+    ) -> None:
+        # DEFECT 2 (P1) regression, Phase 2.3: MenuCategory/MenuItem have no
+        # branch dimension at all (they belong to Restaurant, not Branch),
+        # but RequireMenuManageDep used to require the plain tenant-wide
+        # require_permission -- so Restaurant Manager and Inventory Manager,
+        # both of whom the real seeded role catalogue grants menu.manage
+        # only branch-scoped, were rejected outright and couldn't manage
+        # the menu at all. It now uses require_permission_at_any_scope, so
+        # a grant scoped to just one branch is sufficient.
+        branch_id = await _create_branch(
+            session_factory,
+            tenant_id=owner["tenant_id"],
+            restaurant_id=restaurant_id,
+            name="Downtown",
+        )
+        email = "branch-scoped-manager@example.com"
+        user_id = await _seed_user(session_factory, tenant_id=owner["tenant_id"], email=email)
+        await _grant_role(
+            session_factory,
+            tenant_id=owner["tenant_id"],
+            user_id=user_id,
+            permission_codes=frozenset({"menu.read", "menu.manage"}),
+            branch_id=branch_id,
+        )
+        token = _login_sync(client, tenant_id=owner["tenant_id"], email=email)
+
+        response = client.post(
+            f"/api/v1/menu-categories/{menu_category['id']}/menu-items",
+            headers=_auth_headers(token),
+            json=_create_body(),
+        )
+        assert response.status_code == 201, response.text
 
     def test_missing_required_field_is_rejected(
         self, client: TestClient, owner: dict, menu_category: dict

@@ -650,10 +650,11 @@ GuestGetMenuUseCaseDep = Annotated[GuestGetMenuUseCase, Depends(get_guest_get_me
 
 # --- Menu Catalogue: MenuCategory + MenuItem (Step 4.8) ---------------------
 # Neither entity has a branch dimension (Architecture SS3.1 -- both belong to
-# Restaurant, deliberately not Branch, per SS3's "no Menu wrapper" decision),
-# so every gate here is the plain tenant-wide require_permission("menu.read"/
-# "menu.manage"), the same shape RequireRestaurantManageDep/
-# RequireRestaurantReadDep already use for the same reason. ModifierGroup/
+# Restaurant, deliberately not Branch, per SS3's "no Menu wrapper" decision).
+# RequireMenuManageDep/RequireMenuReadDep (defined further below, alongside
+# the Modifiers section) gate every route here -- see DEFECT 2's comment at
+# their definition for why they use the "holds it at any scope" gate rather
+# than the plain tenant-wide one Restaurant/Branch use. ModifierGroup/
 # Modifier/MenuItemModifierGroup are wired below (Step 4.9). MenuItemBranchPrice,
 # MenuItemAvailability, and Reservation remain out of scope.
 
@@ -758,10 +759,25 @@ def get_update_menu_item_use_case(session_factory: SessionFactoryDep) -> UpdateM
 
 UpdateMenuItemUseCaseDep = Annotated[UpdateMenuItemUseCase, Depends(get_update_menu_item_use_case)]
 
+## DEFECT 2 (P1, Phase 2.3 pilot-hardening, fixed 2026-08-14): these two
+## gates used the strict tenant-wide-only ``require_permission``, which
+## rejected Restaurant Manager and Inventory Manager -- both hold
+## ``menu.manage``/``menu.read`` only branch-scoped per the real seeded
+## role catalogue -- from every menu/category/modifier/recipe route below,
+## even though MenuCategory/MenuItem/ModifierGroup/Modifier/Recipe are all
+## genuinely tenant-scoped entities with no ``branch_id`` at all (see the
+## Modifiers section comment above). Because there is no branch dimension
+## on these entities to further restrict to, "holds the permission at any
+## one branch" is exactly the right ceiling -- not a security loosening,
+## since a branch-scoped grant here was already conceptually "manage the
+## (single, shared) restaurant's menu," just rejected by an accidentally
+## stricter gate than the underlying data model needed.
 RequireMenuManageDep = Annotated[
-    AuthenticatedPrincipalDTO, Depends(require_permission("menu.manage"))
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("menu.manage"))
 ]
-RequireMenuReadDep = Annotated[AuthenticatedPrincipalDTO, Depends(require_permission("menu.read"))]
+RequireMenuReadDep = Annotated[
+    AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("menu.read"))
+]
 
 
 # --- Modifiers: ModifierGroup + Modifier + attachment (Step 4.9) ------------
