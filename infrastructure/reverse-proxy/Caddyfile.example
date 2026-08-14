@@ -1,0 +1,31 @@
+# Example Caddy config for a single-hotel RestaurantOS pilot VPS.
+#
+# Caddy over nginx here specifically because it gets you automatic
+# Let's Encrypt HTTPS (issuance + renewal) with zero extra tooling --
+# no certbot, no cron-renewal script, no separate ACME client to keep
+# patched. For a one-VPS pilot with no existing nginx investment, that
+# removes an entire operational surface nginx would otherwise add back.
+# Revisit if the pilot grows into a multi-node/CDN-fronted setup where
+# nginx's ecosystem (or a managed load balancer) starts to matter more
+# than setup simplicity.
+#
+# Copy to /etc/caddy/Caddyfile on the VPS, replace the two domains
+# below, and `systemctl reload caddy`. See
+# docs/RestaurantOS_Production_Deployment_Guide.md "HTTPS" section.
+
+# Staff/admin app (apps/admin-web, run via
+# infrastructure/systemd/restaurantos-web.service.example on 127.0.0.1:3000).
+admin.your-hotel-domain.com {
+    reverse_proxy 127.0.0.1:3000
+}
+
+# API (services/api, run via docker-compose.prod.yml on 127.0.0.1:8000).
+# Guest QR ordering hits this origin directly from customers' phones
+# (apps/admin-web's (guest) route group calls it as an API, not through
+# the admin app's own origin) -- if guest ordering is served from the
+# same admin-web deployment, api.* only needs to be reachable by
+# admin-web's server-side fetches and the guest's browser, not
+# separately hardened beyond what CORS_ALLOWED_ORIGINS already does.
+api.your-hotel-domain.com {
+    reverse_proxy 127.0.0.1:8000
+}

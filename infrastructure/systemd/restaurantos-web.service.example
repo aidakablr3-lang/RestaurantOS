@@ -1,0 +1,36 @@
+# Example systemd unit for apps/admin-web in production.
+#
+# Not containerized -- see docker-compose.prod.yml's own comment for why.
+# `next build` bakes NEXT_PUBLIC_* values in at build time (Next.js does
+# not read them at runtime), so this must be rebuilt whenever
+# NEXT_PUBLIC_API_BASE_URL changes -- see the deployment guide's
+# "Updating RestaurantOS" section.
+#
+# Install: copy to /etc/systemd/system/restaurantos-web.service, adjust
+# User/WorkingDirectory, then:
+#   systemctl daemon-reload
+#   systemctl enable --now restaurantos-web
+
+[Unit]
+Description=RestaurantOS admin-web (Next.js production server)
+After=network.target
+
+[Service]
+Type=simple
+User=restaurantos
+WorkingDirectory=/opt/restaurantos/apps/admin-web
+# Build once per deploy (see the deployment guide) with
+# NEXT_PUBLIC_API_BASE_URL already set to the real API origin --
+# `npm run build`, not run here. This unit only starts the already-built
+# production server.
+ExecStart=/usr/bin/npm run start -- --port 3000
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+# next start binds 0.0.0.0 by default; only the reverse proxy (Caddy on
+# 127.0.0.1 or the same host) should ever reach this port -- enforce
+# that with the host firewall (ufw/nftables), not by relying on Next.js
+# itself to restrict its bind address.
+
+[Install]
+WantedBy=multi-user.target
