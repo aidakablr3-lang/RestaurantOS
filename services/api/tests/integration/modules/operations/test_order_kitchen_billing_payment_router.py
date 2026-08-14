@@ -750,7 +750,9 @@ class TestOrderKitchenBillingPaymentLifecycle:
         branch_id = owner["branch_id"]
 
         category_resp = client.post(
-            "/api/v1/inventory-categories", headers=headers, json={"name": "Produce", "categoryType": "beverage"}
+            "/api/v1/inventory-categories",
+            headers=headers,
+            json={"name": "Produce", "categoryType": "beverage"},
         )
         assert category_resp.status_code == 201, category_resp.text
         category_id = category_resp.json()["data"]["id"]

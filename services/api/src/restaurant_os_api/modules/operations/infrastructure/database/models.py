@@ -483,9 +483,7 @@ class InventoryCategoryModel(
     __table_args__ = (
         ulid_check_constraint("id"),
         Index("uq_inventory_categories_tenant_id_name", "tenant_id", "name", unique=True),
-        CheckConstraint(
-            "category_type IN ('food', 'beverage')", name="category_type_is_valid"
-        ),
+        CheckConstraint("category_type IN ('food', 'beverage')", name="category_type_is_valid"),
     )
 
     name: Mapped[str] = mapped_column(Text, nullable=False)

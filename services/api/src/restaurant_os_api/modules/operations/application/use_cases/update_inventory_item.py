@@ -74,9 +74,7 @@ class UpdateInventoryItemUseCase:
             if item is None or item.branch_id != branch_id:
                 raise InventoryItemNotFoundError(request.inventory_item_id)
 
-            current_category = await category_repo.get_by_id(
-                tenant_id, item.inventory_category_id
-            )
+            current_category = await category_repo.get_by_id(tenant_id, item.inventory_category_id)
             touches_food = (
                 current_category is not None
                 and current_category.category_type is InventoryCategoryType.FOOD

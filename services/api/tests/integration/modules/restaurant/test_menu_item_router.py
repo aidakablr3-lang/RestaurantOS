@@ -413,7 +413,12 @@ class TestCreateMenuItem:
         assert second.status_code == 403
 
     async def test_a_branch_scoped_menu_manage_grant_can_create_a_menu_item(
-        self, client: TestClient, owner: dict, restaurant_id: str, menu_category: dict, session_factory
+        self,
+        client: TestClient,
+        owner: dict,
+        restaurant_id: str,
+        menu_category: dict,
+        session_factory,
     ) -> None:
         # DEFECT 2 (P1) regression, Phase 2.3: MenuCategory/MenuItem have no
         # branch dimension at all (they belong to Restaurant, not Branch),

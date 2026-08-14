@@ -55,7 +55,9 @@ class ListInventoryCategoriesUseCase:
             categories = await category_repo.list_for_tenant(tenant_id)
 
         if not can_see_food:
-            categories = [c for c in categories if c.category_type is not InventoryCategoryType.FOOD]
+            categories = [
+                c for c in categories if c.category_type is not InventoryCategoryType.FOOD
+            ]
 
         return InventoryCategoryListResultDTO(
             categories=[inventory_category_to_dto(c) for c in categories]

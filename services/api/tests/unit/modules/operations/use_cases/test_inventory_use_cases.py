@@ -107,11 +107,15 @@ def _item(**overrides) -> InventoryItem:
 
 
 class TestCreateInventoryCategoryUseCase:
-    def _use_case(self, category_repo, resolved: ResolvedPermissions | None = None) -> CreateInventoryCategoryUseCase:
+    def _use_case(
+        self, category_repo, resolved: ResolvedPermissions | None = None
+    ) -> CreateInventoryCategoryUseCase:
         return CreateInventoryCategoryUseCase(
             session_factory=_session_factory(),
             inventory_category_repository_factory=lambda _s: category_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved or ResolvedPermissions()),
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=resolved or ResolvedPermissions()
+            ),
         )
 
     async def test_creates_a_beverage_category_with_no_menu_permission_needed(self) -> None:
@@ -131,7 +135,9 @@ class TestCreateInventoryCategoryUseCase:
 
         with pytest.raises(InventoryCategoryNameConflictError):
             await use_case.execute(
-                TENANT_ID, "user-1", CreateInventoryCategoryRequestDTO(name="Produce", category_type="beverage")
+                TENANT_ID,
+                "user-1",
+                CreateInventoryCategoryRequestDTO(name="Produce", category_type="beverage"),
             )
 
     async def test_a_food_category_requires_inventory_food_manage(self) -> None:
@@ -163,7 +169,9 @@ class TestCreateInventoryCategoryUseCase:
     ) -> None:
         use_case = self._use_case(
             InMemoryInventoryCategoryRepository(),
-            resolved=ResolvedPermissions(by_branch={BRANCH_ID: frozenset({"inventory_food.manage"})}),
+            resolved=ResolvedPermissions(
+                by_branch={BRANCH_ID: frozenset({"inventory_food.manage"})}
+            ),
         )
 
         result = await use_case.execute(
@@ -176,11 +184,15 @@ class TestCreateInventoryCategoryUseCase:
 
 
 class TestListInventoryCategoriesUseCase:
-    def _use_case(self, category_repo, resolved: ResolvedPermissions | None = None) -> ListInventoryCategoriesUseCase:
+    def _use_case(
+        self, category_repo, resolved: ResolvedPermissions | None = None
+    ) -> ListInventoryCategoriesUseCase:
         return ListInventoryCategoriesUseCase(
             session_factory=_session_factory(),
             inventory_category_repository_factory=lambda _s: category_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved or ResolvedPermissions()),
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=resolved or ResolvedPermissions()
+            ),
         )
 
     async def test_lists_categories_for_the_tenant(self) -> None:
@@ -230,7 +242,9 @@ class TestCreateInventoryItemUseCase:
             inventory_item_repository_factory=lambda _s: item_repo,
             inventory_category_repository_factory=lambda _s: category_repo,
             branch_repository_factory=lambda _s: branch_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved or ResolvedPermissions()),
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=resolved or ResolvedPermissions()
+            ),
         )
 
     async def test_creates_an_item_with_zero_quantity_on_hand(self) -> None:
@@ -356,12 +370,16 @@ class TestCreateInventoryItemUseCase:
 
 
 class TestGetInventoryItemUseCase:
-    def _use_case(self, item_repo, category_repo, resolved: ResolvedPermissions | None = None) -> GetInventoryItemUseCase:
+    def _use_case(
+        self, item_repo, category_repo, resolved: ResolvedPermissions | None = None
+    ) -> GetInventoryItemUseCase:
         return GetInventoryItemUseCase(
             session_factory=_session_factory(),
             inventory_item_repository_factory=lambda _s: item_repo,
             inventory_category_repository_factory=lambda _s: category_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved or ResolvedPermissions()),
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=resolved or ResolvedPermissions()
+            ),
         )
 
     async def test_returns_the_item(self) -> None:
@@ -416,7 +434,9 @@ class TestListInventoryItemsUseCase:
             session_factory=_session_factory(),
             inventory_item_repository_factory=lambda _s: item_repo,
             inventory_category_repository_factory=lambda _s: category_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved or ResolvedPermissions()),
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=resolved or ResolvedPermissions()
+            ),
         )
 
     async def test_lists_items_for_the_branch_with_pagination(self) -> None:
@@ -455,7 +475,9 @@ class TestListInventoryItemsUseCase:
         assert result.total == 1
         assert result.items[0].id == ITEM_ID
 
-    async def test_includes_items_under_food_categories_for_a_caller_with_inventory_food_read(self) -> None:
+    async def test_includes_items_under_food_categories_for_a_caller_with_inventory_food_read(
+        self,
+    ) -> None:
         food_item_id = "01ARZ3NDEKTSV4RRFFQ6FOODIT"
         items = {
             ITEM_ID: _item(),
@@ -488,7 +510,9 @@ class TestUpdateInventoryItemUseCase:
             session_factory=_session_factory(),
             inventory_item_repository_factory=lambda _s: item_repo,
             inventory_category_repository_factory=lambda _s: category_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved or ResolvedPermissions()),
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=resolved or ResolvedPermissions()
+            ),
         )
 
     async def test_updates_editable_fields_without_touching_quantity_on_hand(self) -> None:
@@ -661,7 +685,9 @@ class TestRecordStockMovementUseCase:
             inventory_item_repository_factory=lambda _s: item_repo,
             stock_movement_repository_factory=lambda _s: movement_repo,
             branch_repository_factory=lambda _s: branch_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved or ResolvedPermissions()),
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=resolved or ResolvedPermissions()
+            ),
             outbox_writer_factory=lambda _s: outbox,
         )
 
@@ -846,7 +872,9 @@ class TestListStockMovementsUseCase:
             inventory_item_repository_factory=lambda _s: item_repo,
             stock_movement_repository_factory=lambda _s: movement_repo,
             branch_repository_factory=lambda _s: branch_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved or ResolvedPermissions()),
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=resolved or ResolvedPermissions()
+            ),
         )
 
     async def test_lists_movements_for_an_item(self) -> None:

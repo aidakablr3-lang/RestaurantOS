@@ -227,7 +227,9 @@ class TestInventoryLifecycle:
         branch_id = owner["branch_id"]
 
         category_resp = client.post(
-            "/api/v1/inventory-categories", headers=headers, json={"name": "Produce", "categoryType": "beverage"}
+            "/api/v1/inventory-categories",
+            headers=headers,
+            json={"name": "Produce", "categoryType": "beverage"},
         )
         assert category_resp.status_code == 201, category_resp.text
         category_id = category_resp.json()["data"]["id"]
@@ -308,7 +310,9 @@ class TestInventoryLifecycle:
     ) -> None:
         headers = _auth_headers(owner["token"])
         category_resp = client.post(
-            "/api/v1/inventory-categories", headers=headers, json={"name": "Produce", "categoryType": "beverage"}
+            "/api/v1/inventory-categories",
+            headers=headers,
+            json={"name": "Produce", "categoryType": "beverage"},
         )
         category_id = category_resp.json()["data"]["id"]
         item_resp = client.post(
@@ -346,7 +350,9 @@ class TestInventoryLifecycle:
         assert revise_again.json()["data"]["version"] == 2
 
     def test_requires_authentication(self, client: TestClient) -> None:
-        response = client.post("/api/v1/inventory-categories", json={"name": "Produce", "categoryType": "beverage"})
+        response = client.post(
+            "/api/v1/inventory-categories", json={"name": "Produce", "categoryType": "beverage"}
+        )
         assert response.status_code == 401
 
     async def test_denied_without_inventory_manage(
@@ -357,7 +363,9 @@ class TestInventoryLifecycle:
         token = _login_sync(client, tenant_id=owner["tenant_id"], email=email)
 
         response = client.post(
-            "/api/v1/inventory-categories", headers=_auth_headers(token), json={"name": "Produce", "categoryType": "beverage"}
+            "/api/v1/inventory-categories",
+            headers=_auth_headers(token),
+            json={"name": "Produce", "categoryType": "beverage"},
         )
         assert response.status_code == 403
 
@@ -376,7 +384,9 @@ class TestInventoryLifecycle:
         token = _login_sync(client, tenant_id=owner["tenant_id"], email=email)
 
         response = client.post(
-            "/api/v1/inventory-categories", headers=_auth_headers(token), json={"name": "Produce", "categoryType": "beverage"}
+            "/api/v1/inventory-categories",
+            headers=_auth_headers(token),
+            json={"name": "Produce", "categoryType": "beverage"},
         )
         assert response.status_code == 201, response.text
 

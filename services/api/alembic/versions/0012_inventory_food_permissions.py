@@ -61,12 +61,14 @@ def upgrade() -> None:
         [{"code": code, "module": _MODULE, "description": desc} for code, desc in _NEW_PERMISSIONS],
     )
 
-    role_ids = bind.execute(
-        sa.text(
-            "SELECT id FROM roles WHERE is_system = true AND name = ANY(:names)"
-        ),
-        {"names": list(_GRANTED_ROLE_NAMES)},
-    ).scalars().all()
+    role_ids = (
+        bind.execute(
+            sa.text("SELECT id FROM roles WHERE is_system = true AND name = ANY(:names)"),
+            {"names": list(_GRANTED_ROLE_NAMES)},
+        )
+        .scalars()
+        .all()
+    )
 
     role_permissions_table = sa.table(
         "role_permissions",
