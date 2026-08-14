@@ -35,6 +35,7 @@ from restaurant_os_api.modules.operations.domain.entities import (
     LedgerEntry,
     Order,
     OrderItem,
+    OrderStatus,
     OrderTaxLine,
     Payment,
     PaymentStatus,
@@ -155,6 +156,14 @@ class InMemoryOrderRepository:
             for o in self._orders.values()
             if o.tenant_id == tenant_id and o.branch_id == branch_id and start <= o.opened_at < end
         ]
+
+    async def has_active_orders_for_table(self, tenant_id: str, table_id: str) -> bool:
+        return any(
+            o.tenant_id == tenant_id
+            and o.table_id == table_id
+            and o.status not in (OrderStatus.CLOSED, OrderStatus.VOIDED)
+            for o in self._orders.values()
+        )
 
     async def list_items_for_orders(self, tenant_id: str, order_ids: list[str]) -> list[OrderItem]:
         return [

@@ -504,6 +504,68 @@ class TestOrderKitchenBillingPaymentLifecycle:
         ).json()["data"]
         assert next(t for t in table_after_final if t["id"] == table_id)["status"] == "available"
 
+    def test_a_second_order_on_the_table_keeps_it_occupied_until_both_settle(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        # Defect #1 remediation (Phase 2.1): a table with two independent
+        # orders against it (e.g. a second round ordered before the first
+        # round's bill is paid) must stay occupied until BOTH orders are
+        # settled -- not just the first one.
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+        table_id = owner["table_id"]
+
+        def _open_bill_and_pay(order_id: str) -> None:
+            client.post(
+                f"/api/v1/orders/{order_id}/items",
+                headers=headers,
+                json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+            )
+            client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+            bill_resp = client.post(f"/api/v1/orders/{order_id}/bill", headers=headers)
+            assert bill_resp.status_code == 201, bill_resp.text
+            bill = bill_resp.json()["data"]
+            payment_resp = client.post(
+                f"/api/v1/bills/{bill['id']}/payments",
+                headers=headers,
+                json={"tenderType": "cash", "amount": bill["amountDue"]},
+            )
+            assert payment_resp.status_code == 201, payment_resp.text
+
+        order1_resp = client.post(
+            f"/api/v1/branches/{branch_id}/orders",
+            headers=headers,
+            json={"orderSource": "pos", "tableId": table_id},
+        )
+        order1_id = order1_resp.json()["data"]["id"]
+
+        # A second, independent order against the same table before the
+        # first order's bill is settled -- e.g. a second round.
+        order2_resp = client.post(
+            f"/api/v1/branches/{branch_id}/orders",
+            headers=headers,
+            json={"orderSource": "pos", "tableId": table_id},
+        )
+        order2_id = order2_resp.json()["data"]["id"]
+
+        _open_bill_and_pay(order1_id)
+
+        table_after_first = client.get(
+            f"/api/v1/branches/{branch_id}/tables", headers=headers
+        ).json()["data"]
+        assert next(t for t in table_after_first if t["id"] == table_id)["status"] == "occupied"
+        order1_after = client.get(
+            f"/api/v1/branches/{branch_id}/orders/{order1_id}", headers=headers
+        ).json()["data"]
+        assert order1_after["status"] == "closed"
+
+        _open_bill_and_pay(order2_id)
+
+        table_after_second = client.get(
+            f"/api/v1/branches/{branch_id}/tables", headers=headers
+        ).json()["data"]
+        assert next(t for t in table_after_second if t["id"] == table_id)["status"] == "available"
+
     def test_voids_an_added_item_and_backs_out_its_cost(
         self, client: TestClient, owner: dict
     ) -> None:

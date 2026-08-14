@@ -85,7 +85,9 @@ MENU_CATEGORY_ID = "01ARZ3NDEKTSV4RRFFQ6MCAT01"
 OTHER_MENU_CATEGORY_ID = "01ARZ3NDEKTSV4RRFFQ6MCAT02"
 MENU_ITEM_ID = "01ARZ3NDEKTSV4RRFFQ6MITM01"
 ORDER_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR01"
+ORDER2_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR02"
 TABLE_ID = "01ARZ3NDEKTSV4RRFFQ6TABL01"
+OTHER_TENANT_ID = "01ARZ3NDEKTSV4RRFFQ6TNT002"
 
 
 def _session_factory():
@@ -640,6 +642,34 @@ class TestCloseOrderUseCase:
         assert table is not None
         assert table.status == TableStatus.AVAILABLE
 
+    async def test_closing_one_order_leaves_the_table_occupied_when_a_sibling_is_still_active(
+        self,
+    ) -> None:
+        # Defect #1 remediation: closing this order must not release the
+        # table while a second, still-active order sits on it.
+        table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
+        use_case = CloseOrderUseCase(
+            session_factory=_session_factory(),
+            order_repository_factory=lambda _s: InMemoryOrderRepository(
+                {
+                    ORDER_ID: _order(status=OrderStatus.FIRED, table_id=TABLE_ID),
+                    ORDER2_ID: _order(id=ORDER2_ID, status=OrderStatus.FIRED, table_id=TABLE_ID),
+                }
+            ),
+            branch_repository_factory=lambda _s: InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            table_repository_factory=lambda _s: table_repo,
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=ResolvedPermissions(tenant_wide=frozenset({"order.manage"}))
+            ),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        await use_case.execute(TENANT_ID, "user-1", ORDER_ID)
+
+        table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
+        assert table is not None
+        assert table.status == TableStatus.OCCUPIED
+
     async def test_closing_does_not_override_a_manually_cleaning_table(self) -> None:
         table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.CLEANING)})
         use_case = CloseOrderUseCase(
@@ -701,6 +731,32 @@ class TestVoidOrderUseCase:
         table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
         assert table is not None
         assert table.status == TableStatus.AVAILABLE
+
+    async def test_voiding_one_order_leaves_the_table_occupied_when_a_sibling_is_still_active(
+        self,
+    ) -> None:
+        table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
+        use_case = VoidOrderUseCase(
+            session_factory=_session_factory(),
+            order_repository_factory=lambda _s: InMemoryOrderRepository(
+                {
+                    ORDER_ID: _order(table_id=TABLE_ID),
+                    ORDER2_ID: _order(id=ORDER2_ID, status=OrderStatus.FIRED, table_id=TABLE_ID),
+                }
+            ),
+            branch_repository_factory=lambda _s: InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            table_repository_factory=lambda _s: table_repo,
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
+                resolved=ResolvedPermissions(tenant_wide=frozenset({"order.manage"}))
+            ),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        await use_case.execute(TENANT_ID, "user-1", ORDER_ID)
+
+        table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
+        assert table is not None
+        assert table.status == TableStatus.OCCUPIED
 
     async def test_raises_not_found_for_an_unknown_order(self) -> None:
         use_case = VoidOrderUseCase(
@@ -789,3 +845,41 @@ class TestVoidOrderItemUseCase:
 
         with pytest.raises(PermissionDeniedError):
             await use_case.execute(TENANT_ID, "user-1", ORDER_ID, "item-1")
+
+
+class TestHasActiveOrdersForTable:
+    """Direct repository-level coverage for the query the Defect #1
+    remediation added -- ``release_table_if_occupied`` relies on this
+    being scoped correctly per tenant and per table."""
+
+    async def test_true_when_an_open_order_exists_for_the_table(self) -> None:
+        repo = InMemoryOrderRepository({ORDER_ID: _order(table_id=TABLE_ID)})
+
+        assert await repo.has_active_orders_for_table(TENANT_ID, TABLE_ID) is True
+
+    async def test_false_when_the_only_order_is_closed(self) -> None:
+        repo = InMemoryOrderRepository(
+            {ORDER_ID: _order(table_id=TABLE_ID, status=OrderStatus.CLOSED)}
+        )
+
+        assert await repo.has_active_orders_for_table(TENANT_ID, TABLE_ID) is False
+
+    async def test_false_when_the_only_order_is_voided(self) -> None:
+        repo = InMemoryOrderRepository(
+            {ORDER_ID: _order(table_id=TABLE_ID, status=OrderStatus.VOIDED)}
+        )
+
+        assert await repo.has_active_orders_for_table(TENANT_ID, TABLE_ID) is False
+
+    async def test_false_for_an_active_order_belonging_to_another_tenant(self) -> None:
+        repo = InMemoryOrderRepository(
+            {ORDER_ID: _order(tenant_id=OTHER_TENANT_ID, table_id=TABLE_ID)}
+        )
+
+        assert await repo.has_active_orders_for_table(TENANT_ID, TABLE_ID) is False
+
+    async def test_false_for_an_active_order_on_a_different_table(self) -> None:
+        other_table_id = "01ARZ3NDEKTSV4RRFFQ6TABL02"
+        repo = InMemoryOrderRepository({ORDER_ID: _order(table_id=other_table_id)})
+
+        assert await repo.has_active_orders_for_table(TENANT_ID, TABLE_ID) is False

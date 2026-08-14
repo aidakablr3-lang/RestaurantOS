@@ -56,7 +56,9 @@ from tests.unit.modules.restaurant.fakes import InMemoryBranchRepository, InMemo
 TENANT_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 BRANCH_ID = "01ARZ3NDEKTSV4RRFFQ6BRNCH1"
 ORDER_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR01"
+ORDER2_ID = "01ARZ3NDEKTSV4RRFFQ6ORDR02"
 BILL_ID = "01ARZ3NDEKTSV4RRFFQ6BILL01"
+BILL2_ID = "01ARZ3NDEKTSV4RRFFQ6BILL02"
 PAYMENT_ID = "01ARZ3NDEKTSV4RRFFQ6PAY001"
 TABLE_ID = "01ARZ3NDEKTSV4RRFFQ6TABL01"
 
@@ -275,6 +277,138 @@ class TestRecordPaymentUseCase:
         table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
         assert table is not None
         assert table.status == TableStatus.OCCUPIED
+
+    async def test_settling_one_of_two_orders_on_the_table_leaves_it_occupied(self) -> None:
+        # Defect #1 remediation: a second, still-active order against the
+        # same table must keep it occupied even after the first order's
+        # bill is fully paid and closed.
+        bill_repo = InMemoryBillRepository({BILL_ID: _bill()})
+        order_repo = InMemoryOrderRepository(
+            {
+                ORDER_ID: _order(table_id=TABLE_ID),
+                ORDER2_ID: _order(id=ORDER2_ID, table_id=TABLE_ID, status=OrderStatus.FIRED),
+            }
+        )
+        table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
+        use_case = self._use_case(
+            bill_repo,
+            order_repo,
+            InMemoryPaymentRepository(),
+            InMemoryLedgerRepository(),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+            FakeOutboxWriter(),
+            table_repo=table_repo,
+        )
+
+        await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            RecordPaymentRequestDTO(bill_id=BILL_ID, tender_type="cash", amount=Decimal(110)),
+        )
+
+        table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
+        assert table is not None
+        assert table.status == TableStatus.OCCUPIED
+        updated_order = await order_repo.get_by_id(TENANT_ID, ORDER_ID)
+        assert updated_order is not None
+        assert updated_order.status == OrderStatus.CLOSED
+
+    async def test_settling_the_last_active_order_on_the_table_releases_it(self) -> None:
+        # Same setup as above, but the sibling order was already settled
+        # earlier -- this payment is for the table's last remaining
+        # active order, so only now should the table become available.
+        bill_repo = InMemoryBillRepository({BILL2_ID: _bill(id=BILL2_ID, order_id=ORDER2_ID)})
+        order_repo = InMemoryOrderRepository(
+            {
+                ORDER_ID: _order(table_id=TABLE_ID, status=OrderStatus.CLOSED),
+                ORDER2_ID: _order(id=ORDER2_ID, table_id=TABLE_ID),
+            }
+        )
+        table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
+        use_case = self._use_case(
+            bill_repo,
+            order_repo,
+            InMemoryPaymentRepository(),
+            InMemoryLedgerRepository(),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+            FakeOutboxWriter(),
+            table_repo=table_repo,
+        )
+
+        await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            RecordPaymentRequestDTO(bill_id=BILL2_ID, tender_type="cash", amount=Decimal(110)),
+        )
+
+        table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
+        assert table is not None
+        assert table.status == TableStatus.AVAILABLE
+
+    async def test_a_voided_sibling_order_does_not_block_release(self) -> None:
+        # A voided order on the same table must not count as "active" --
+        # it should not prevent the table from being released.
+        bill_repo = InMemoryBillRepository({BILL_ID: _bill()})
+        order_repo = InMemoryOrderRepository(
+            {
+                ORDER_ID: _order(table_id=TABLE_ID),
+                ORDER2_ID: _order(id=ORDER2_ID, table_id=TABLE_ID, status=OrderStatus.VOIDED),
+            }
+        )
+        table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
+        use_case = self._use_case(
+            bill_repo,
+            order_repo,
+            InMemoryPaymentRepository(),
+            InMemoryLedgerRepository(),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+            FakeOutboxWriter(),
+            table_repo=table_repo,
+        )
+
+        await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            RecordPaymentRequestDTO(bill_id=BILL_ID, tender_type="cash", amount=Decimal(110)),
+        )
+
+        table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
+        assert table is not None
+        assert table.status == TableStatus.AVAILABLE
+
+    async def test_an_active_order_on_a_different_table_does_not_block_release(self) -> None:
+        other_table_id = "01ARZ3NDEKTSV4RRFFQ6TABL02"
+        bill_repo = InMemoryBillRepository({BILL_ID: _bill()})
+        order_repo = InMemoryOrderRepository(
+            {
+                ORDER_ID: _order(table_id=TABLE_ID),
+                ORDER2_ID: _order(id=ORDER2_ID, table_id=other_table_id, status=OrderStatus.FIRED),
+            }
+        )
+        table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
+        use_case = self._use_case(
+            bill_repo,
+            order_repo,
+            InMemoryPaymentRepository(),
+            InMemoryLedgerRepository(),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+            FakeOutboxWriter(),
+            table_repo=table_repo,
+        )
+
+        await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            RecordPaymentRequestDTO(bill_id=BILL_ID, tender_type="cash", amount=Decimal(110)),
+        )
+
+        table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
+        assert table is not None
+        assert table.status == TableStatus.AVAILABLE
 
     async def test_raises_overpayment_when_amount_exceeds_amount_due(self) -> None:
         use_case = self._use_case(
