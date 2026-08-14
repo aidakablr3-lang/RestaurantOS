@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi.testclient import TestClient
+import httpx
 from sqlalchemy import text
 
 from restaurant_os_api.core.ids import generate_qr_token, generate_ulid
@@ -34,10 +34,26 @@ from restaurant_os_api.platform.rate_limiting.guest_order_limiter import (
 from restaurant_os_api.platform.tenancy import TenantContext
 
 
-def _client_for(session_factory, *, ip: str = "203.0.113.10") -> TestClient:
+def _client_for(session_factory, *, ip: str = "203.0.113.10") -> httpx.AsyncClient:
+    # An httpx.AsyncClient over httpx.ASGITransport, not starlette's
+    # TestClient -- TestClient dropped the client=(ip, port) shortcut this
+    # file needs to spoof the caller's IP for rate-limit tests (it now only
+    # accepts base_url/headers/etc., no per-request transport-level
+    # override), and ASGITransport still exposes it directly. Must be async:
+    # ASGITransport only implements the async transport interface, and this
+    # suite's session-scoped `session_factory` fixture holds an asyncpg
+    # connection pool bound to pytest-asyncio's single session event loop
+    # (see pyproject.toml's `asyncio_default_fixture_loop_scope = "session"`
+    # comment) -- running requests through any transport that hops onto a
+    # different event loop/thread (e.g. a sync client wrapping a background
+    # anyio portal) deadlocks on Windows the same way a second connection
+    # pool would. Every test method in this file is already `async def`, so
+    # this just needs `await` added at each call site.
     app = create_app()
     app.dependency_overrides[get_session_factory] = lambda: session_factory
-    return TestClient(app, client=(ip, 12345))
+    return httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, client=(ip, 12345)), base_url="http://testserver"
+    )
 
 
 async def _seed_menu(session_factory, *, tenant_id: str) -> dict[str, str]:
@@ -169,7 +185,7 @@ class TestGuestOrderingFullFlow:
         qr = await _seed_qr_code(session_factory, seeded)
         client = _client_for(session_factory)
 
-        menu_response = client.get(f"/api/v1/qr/{qr.token}/menu")
+        menu_response = await client.get(f"/api/v1/qr/{qr.token}/menu")
         assert menu_response.status_code == 200, menu_response.text
         menu_body = menu_response.json()["data"]
         assert menu_body["branchId"] == seeded["branch_id"]
@@ -180,7 +196,7 @@ class TestGuestOrderingFullFlow:
         item_ids = [item["id"] for cat in menu_body["categories"] for item in cat["items"]]
         assert item_ids == [seeded["menu_item_id"]]
 
-        create_response = client.post(f"/api/v1/qr/{qr.token}/orders")
+        create_response = await client.post(f"/api/v1/qr/{qr.token}/orders")
         assert create_response.status_code == 201, create_response.text
         order = create_response.json()["data"]
         assert order["status"] == "open"
@@ -188,7 +204,7 @@ class TestGuestOrderingFullFlow:
         assert order["tableId"] == seeded["table_id"]
         order_id = order["id"]
 
-        add_item_response = client.post(
+        add_item_response = await client.post(
             f"/api/v1/qr/{qr.token}/orders/{order_id}/items",
             json={"menuItemId": seeded["menu_item_id"], "quantity": 2},
         )
@@ -197,13 +213,13 @@ class TestGuestOrderingFullFlow:
         assert after_add["subtotalAmount"] == "20.0000"
         assert len(after_add["items"]) == 1
 
-        submit_response = client.post(f"/api/v1/qr/{qr.token}/orders/{order_id}/submit")
+        submit_response = await client.post(f"/api/v1/qr/{qr.token}/orders/{order_id}/submit")
         assert submit_response.status_code == 200, submit_response.text
         fired = submit_response.json()["data"]
         assert fired["status"] == "fired"
         assert fired["items"][0]["lineStatus"] == "fired"
 
-        status_response = client.get(f"/api/v1/qr/{qr.token}/orders/{order_id}")
+        status_response = await client.get(f"/api/v1/qr/{qr.token}/orders/{order_id}")
         assert status_response.status_code == 200, status_response.text
         assert status_response.json()["data"]["status"] == "fired"
 
@@ -211,7 +227,7 @@ class TestGuestOrderingFullFlow:
         seeded = await _seed_menu(session_factory, tenant_id=generate_ulid())
         qr = await _seed_qr_code(session_factory, seeded)
 
-        response = _client_for(session_factory).get(f"/api/v1/qr/{qr.token}/menu")
+        response = await _client_for(session_factory).get(f"/api/v1/qr/{qr.token}/menu")
 
         item_ids = [
             item["id"] for cat in response.json()["data"]["categories"] for item in cat["items"]
@@ -226,9 +242,9 @@ class TestGuestOrderingFullFlow:
         client = _client_for(session_factory)
 
         # Deliberately no Authorization header on any call.
-        assert client.get(f"/api/v1/qr/{qr.token}/menu").status_code == 200
-        order_id = client.post(f"/api/v1/qr/{qr.token}/orders").json()["data"]["id"]
-        assert client.get(f"/api/v1/qr/{qr.token}/orders/{order_id}").status_code == 200
+        assert (await client.get(f"/api/v1/qr/{qr.token}/menu")).status_code == 200
+        order_id = (await client.post(f"/api/v1/qr/{qr.token}/orders")).json()["data"]["id"]
+        assert (await client.get(f"/api/v1/qr/{qr.token}/orders/{order_id}")).status_code == 200
 
 
 class TestGuestOrderingTokenResolutionFailures:
@@ -238,7 +254,7 @@ class TestGuestOrderingTokenResolutionFailures:
         seeded = await _seed_menu(session_factory, tenant_id=generate_ulid())
         qr = await _seed_qr_code(session_factory, seeded, status=QRCodeStatus.REVOKED)
 
-        response = _client_for(session_factory).get(f"/api/v1/qr/{qr.token}/menu")
+        response = await _client_for(session_factory).get(f"/api/v1/qr/{qr.token}/menu")
 
         assert response.status_code == 404
         assert response.json() == {"error": "not_found"}
@@ -246,7 +262,7 @@ class TestGuestOrderingTokenResolutionFailures:
     async def test_a_nonexistent_token_returns_not_found_for_order_creation(
         self, session_factory
     ) -> None:
-        response = _client_for(session_factory).post("/api/v1/qr/no-such-token/orders")
+        response = await _client_for(session_factory).post("/api/v1/qr/no-such-token/orders")
 
         assert response.status_code == 404
         assert response.json() == {"error": "not_found"}
@@ -261,9 +277,9 @@ class TestGuestOrderingTableIsolation:
         qr_table_b = await _seed_qr_code(session_factory, seeded, table_id=seeded["other_table_id"])
         client = _client_for(session_factory)
 
-        order_id = client.post(f"/api/v1/qr/{qr_table_a.token}/orders").json()["data"]["id"]
+        order_id = (await client.post(f"/api/v1/qr/{qr_table_a.token}/orders")).json()["data"]["id"]
 
-        response = client.post(
+        response = await client.post(
             f"/api/v1/qr/{qr_table_b.token}/orders/{order_id}/items",
             json={"menuItemId": seeded["menu_item_id"], "quantity": 1},
         )
@@ -278,9 +294,9 @@ class TestGuestOrderingTableIsolation:
         qr_table_b = await _seed_qr_code(session_factory, seeded, table_id=seeded["other_table_id"])
         client = _client_for(session_factory)
 
-        order_id = client.post(f"/api/v1/qr/{qr_table_a.token}/orders").json()["data"]["id"]
+        order_id = (await client.post(f"/api/v1/qr/{qr_table_a.token}/orders")).json()["data"]["id"]
 
-        response = client.get(f"/api/v1/qr/{qr_table_b.token}/orders/{order_id}")
+        response = await client.get(f"/api/v1/qr/{qr_table_b.token}/orders/{order_id}")
 
         assert response.status_code == 404
 
@@ -308,7 +324,7 @@ class TestGuestOrderingRateLimit:
                 },
             )
 
-        response = _client_for(session_factory, ip=ip).get(f"/api/v1/qr/{qr.token}/menu")
+        response = await _client_for(session_factory, ip=ip).get(f"/api/v1/qr/{qr.token}/menu")
 
         assert response.status_code == 429
         assert response.json() == {"error": "rate_limited"}
@@ -336,10 +352,10 @@ class TestGuestOrderingRateLimit:
             )
 
         blocked_client = _client_for(session_factory, ip="198.51.100.210")
-        blocked_response = blocked_client.get(f"/api/v1/qr/{qr_a.token}/menu")
+        blocked_response = await blocked_client.get(f"/api/v1/qr/{qr_a.token}/menu")
         assert blocked_response.status_code == 429
 
-        other_response = blocked_client.get(f"/api/v1/qr/{qr_b.token}/menu")
+        other_response = await blocked_client.get(f"/api/v1/qr/{qr_b.token}/menu")
         assert other_response.status_code == 200
 
     async def test_qr_resolution_and_guest_order_rate_limits_are_isolated_namespaces(
@@ -363,6 +379,6 @@ class TestGuestOrderingRateLimit:
                 {"id": generate_ulid(), "bucket_key": ip, "window_start": window_start},
             )
 
-        response = _client_for(session_factory, ip=ip).get(f"/api/v1/qr/{qr.token}/menu")
+        response = await _client_for(session_factory, ip=ip).get(f"/api/v1/qr/{qr.token}/menu")
 
         assert response.status_code == 200

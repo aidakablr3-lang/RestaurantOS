@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-from fastapi.testclient import TestClient
+import httpx
 from sqlalchemy import text
 
 from restaurant_os_api.core.ids import generate_qr_token, generate_ulid
@@ -58,10 +58,26 @@ from restaurant_os_api.platform.tenancy import TenantContext
 RESOLUTION_PATH = "/api/v1/qr/{token}"
 
 
-def _client(session_factory, *, ip: str = "203.0.113.10") -> TestClient:
+def _client(session_factory, *, ip: str = "203.0.113.10") -> httpx.AsyncClient:
+    # An httpx.AsyncClient over httpx.ASGITransport, not starlette's
+    # TestClient -- TestClient dropped the client=(ip, port) shortcut this
+    # file needs to spoof the caller's IP for rate-limit tests (it now only
+    # accepts base_url/headers/etc., no per-request transport-level
+    # override), and ASGITransport still exposes it directly. Must be async:
+    # ASGITransport only implements the async transport interface, and this
+    # suite's session-scoped `session_factory` fixture holds an asyncpg
+    # connection pool bound to pytest-asyncio's single session event loop
+    # (see pyproject.toml's `asyncio_default_fixture_loop_scope = "session"`
+    # comment) -- running requests through any transport that hops onto a
+    # different event loop/thread (e.g. a sync client wrapping a background
+    # anyio portal) deadlocks on Windows the same way a second connection
+    # pool would. Every test method in this file is already `async def`, so
+    # this just needs `await` added at each call site.
     app = create_app()
     app.dependency_overrides[get_session_factory] = lambda: session_factory
-    return TestClient(app, client=(ip, 12345))
+    return httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, client=(ip, 12345)), base_url="http://testserver"
+    )
 
 
 async def _seed_tenant(session_factory, tenant_id: str) -> None:
@@ -198,7 +214,7 @@ class TestResolution:
         table = await _seed_table(session_factory, generate_ulid())
         qr = await _seed_qr_code(session_factory, table)
 
-        response = _client(session_factory).get(RESOLUTION_PATH.format(token=qr.token))
+        response = await _client(session_factory).get(RESOLUTION_PATH.format(token=qr.token))
 
         assert response.status_code == 200
         assert response.json() == {
@@ -211,7 +227,7 @@ class TestResolution:
         table = await _seed_table(session_factory, generate_ulid())
         qr = await _seed_qr_code(session_factory, table)
 
-        response = _client(session_factory).get(RESOLUTION_PATH.format(token=qr.token))
+        response = await _client(session_factory).get(RESOLUTION_PATH.format(token=qr.token))
 
         assert set(response.json().keys()) == {"tenant_id", "branch_id", "table_id"}
 
@@ -219,13 +235,13 @@ class TestResolution:
         table = await _seed_table(session_factory, generate_ulid())
         qr = await _seed_qr_code(session_factory, table, status=QRCodeStatus.REVOKED)
 
-        response = _client(session_factory).get(RESOLUTION_PATH.format(token=qr.token))
+        response = await _client(session_factory).get(RESOLUTION_PATH.format(token=qr.token))
 
         assert response.status_code == 404
         assert response.json() == {"error": "not_found"}
 
     async def test_a_nonexistent_token_does_not_resolve(self, session_factory) -> None:
-        response = _client(session_factory).get(
+        response = await _client(session_factory).get(
             RESOLUTION_PATH.format(token="totally-nonexistent-token")
         )
 
@@ -237,7 +253,7 @@ class TestResolution:
         qr = await _seed_qr_code(session_factory, table)
 
         # Deliberately no Authorization header at all.
-        response = _client(session_factory).get(RESOLUTION_PATH.format(token=qr.token))
+        response = await _client(session_factory).get(RESOLUTION_PATH.format(token=qr.token))
 
         assert response.status_code == 200
 
@@ -247,7 +263,7 @@ class TestResolution:
         table = await _seed_table(session_factory, generate_ulid())
         qr = await _seed_qr_code(session_factory, table)
 
-        response = _client(session_factory).get(
+        response = await _client(session_factory).get(
             RESOLUTION_PATH.format(token=qr.token),
             headers={"Authorization": "Bearer not-a-real-jwt-at-all"},
         )
@@ -263,8 +279,10 @@ class TestEnumerationProtection:
         revoked = await _seed_qr_code(session_factory, table, status=QRCodeStatus.REVOKED)
         client = _client(session_factory)
 
-        missing_response = client.get(RESOLUTION_PATH.format(token="totally-nonexistent-token"))
-        revoked_response = client.get(RESOLUTION_PATH.format(token=revoked.token))
+        missing_response = await client.get(
+            RESOLUTION_PATH.format(token="totally-nonexistent-token")
+        )
+        revoked_response = await client.get(RESOLUTION_PATH.format(token=revoked.token))
 
         assert missing_response.status_code == revoked_response.status_code == 404
         assert missing_response.json() == revoked_response.json() == {"error": "not_found"}
@@ -274,7 +292,7 @@ class TestEnumerationProtection:
         table = await _seed_table(session_factory, generate_ulid())
         revoked = await _seed_qr_code(session_factory, table, status=QRCodeStatus.REVOKED)
 
-        response = _client(session_factory).get(RESOLUTION_PATH.format(token=revoked.token))
+        response = await _client(session_factory).get(RESOLUTION_PATH.format(token=revoked.token))
 
         body_text = response.text
         assert table["tenant_id"] not in body_text
@@ -293,12 +311,16 @@ class TestRateLimitBucketIsolation:
         )
 
         qr = await _seed_qr_code(session_factory, table)
-        response = _client(session_factory, ip=ip_a).get(RESOLUTION_PATH.format(token=qr.token))
+        response = await _client(session_factory, ip=ip_a).get(
+            RESOLUTION_PATH.format(token=qr.token)
+        )
         assert response.status_code == 429
         assert response.json() == {"error": "rate_limited"}
 
         # IP B has made zero requests -- its bucket is untouched.
-        response = _client(session_factory, ip=ip_b).get(RESOLUTION_PATH.format(token=qr.token))
+        response = await _client(session_factory, ip=ip_b).get(
+            RESOLUTION_PATH.format(token=qr.token)
+        )
         assert response.status_code == 200
 
     async def test_exhausting_one_tokens_total_limit_does_not_affect_a_different_token(
@@ -315,11 +337,11 @@ class TestRateLimitBucketIsolation:
         )
 
         blocked_client = _client(session_factory, ip="198.51.100.200")
-        response = blocked_client.get(RESOLUTION_PATH.format(token=qr_a.token))
+        response = await blocked_client.get(RESOLUTION_PATH.format(token=qr_a.token))
         assert response.status_code == 429
 
         # Token B has never been requested -- its bucket is untouched.
-        response = blocked_client.get(RESOLUTION_PATH.format(token=qr_b.token))
+        response = await blocked_client.get(RESOLUTION_PATH.format(token=qr_b.token))
         assert response.status_code == 200
 
 
@@ -349,7 +371,7 @@ class TestFailedResolutionStricterLimit:
             failed_count=_IP_FAILED_LIMIT,
         )
 
-        response = _client(session_factory, ip=ip).get(
+        response = await _client(session_factory, ip=ip).get(
             RESOLUTION_PATH.format(token="nonexistent-token")
         )
 
@@ -369,7 +391,7 @@ class TestFailedResolutionStricterLimit:
             failed_count=_TOKEN_FAILED_LIMIT,
         )
 
-        response = _client(session_factory, ip="198.51.100.150").get(
+        response = await _client(session_factory, ip="198.51.100.150").get(
             RESOLUTION_PATH.format(token=same_nonexistent_token)
         )
 
@@ -389,7 +411,9 @@ class TestSuccessfulResolutionIsNotThrottledByFailureLimits:
         qr = await _seed_qr_code(session_factory, table)
         client = _client(session_factory, ip="198.51.100.180")
 
-        responses = [client.get(RESOLUTION_PATH.format(token=qr.token)) for _ in range(attempts)]
+        responses = [
+            await client.get(RESOLUTION_PATH.format(token=qr.token)) for _ in range(attempts)
+        ]
 
         assert all(r.status_code == 200 for r in responses)
 
@@ -447,7 +471,7 @@ class TestRateLimiterConcurrency:
 
 class TestMalformedTokenSafety:
     async def test_a_very_long_token_does_not_cause_a_server_error(self, session_factory) -> None:
-        response = _client(session_factory, ip="198.51.100.90").get(
+        response = await _client(session_factory, ip="198.51.100.90").get(
             RESOLUTION_PATH.format(token="x" * 10_000)
         )
 
@@ -457,13 +481,15 @@ class TestMalformedTokenSafety:
     async def test_a_token_shaped_like_a_sql_injection_attempt_is_handled_safely(
         self, session_factory
     ) -> None:
-        response = _client(session_factory, ip="198.51.100.91").get("/api/v1/qr/" + "' OR '1'='1")
+        response = await _client(session_factory, ip="198.51.100.91").get(
+            "/api/v1/qr/" + "' OR '1'='1"
+        )
 
         assert response.status_code == 404
         assert response.json() == {"error": "not_found"}
 
     async def test_a_random_high_entropy_token_does_not_resolve(self, session_factory) -> None:
-        response = _client(session_factory, ip="198.51.100.92").get(
+        response = await _client(session_factory, ip="198.51.100.92").get(
             RESOLUTION_PATH.format(token=generate_qr_token())
         )
 
@@ -479,7 +505,7 @@ class TestNoAuthenticationOrRBACIsConsulted:
         qr = await _seed_qr_code(session_factory, table)
         other_tenant_id = generate_ulid()
 
-        response = _client(session_factory, ip="198.51.100.93").get(
+        response = await _client(session_factory, ip="198.51.100.93").get(
             RESOLUTION_PATH.format(token=qr.token), params={"tenant_id": other_tenant_id}
         )
 
@@ -495,8 +521,8 @@ class TestNoAuthenticationOrRBACIsConsulted:
         qr_b = await _seed_qr_code(session_factory, table_b)
         client = _client(session_factory, ip="198.51.100.94")
 
-        response_a = client.get(RESOLUTION_PATH.format(token=qr_a.token))
-        response_b = client.get(RESOLUTION_PATH.format(token=qr_b.token))
+        response_a = await client.get(RESOLUTION_PATH.format(token=qr_a.token))
+        response_b = await client.get(RESOLUTION_PATH.format(token=qr_b.token))
 
         assert response_a.json()["tenant_id"] == table_a["tenant_id"]
         assert response_b.json()["tenant_id"] == table_b["tenant_id"]
@@ -507,7 +533,7 @@ class TestOpenAPIRegistration:
     async def test_the_resolution_route_is_registered_and_requires_no_security(
         self, session_factory
     ) -> None:
-        schema = _client(session_factory).get("/openapi.json").json()
+        schema = (await _client(session_factory).get("/openapi.json")).json()
 
         path_item = schema["paths"]["/api/v1/qr/{token}"]
         get_operation = path_item["get"]
