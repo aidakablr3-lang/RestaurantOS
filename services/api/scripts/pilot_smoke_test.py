@@ -81,11 +81,26 @@ async def check_database(results: Results, database_url: str | None) -> None:
 
 def check_alembic(results: Results) -> None:
     try:
+        # `sys.executable -m alembic`, not a bare `alembic` on PATH: this
+        # script is routinely invoked as `path/to/venv/python.exe
+        # pilot_smoke_test.py`, which does not put that same venv's
+        # Scripts/bin directory on subprocess PATH -- bare "alembic" then
+        # resolves to whatever (if anything) is globally on PATH, not
+        # necessarily this environment's alembic. -m guarantees the same
+        # interpreter/environment already running this script.
         current = subprocess.run(
-            ["alembic", "current"], capture_output=True, text=True, timeout=30, check=False
+            [sys.executable, "-m", "alembic", "current"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
         heads = subprocess.run(
-            ["alembic", "heads"], capture_output=True, text=True, timeout=30, check=False
+            [sys.executable, "-m", "alembic", "heads"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
         if current.returncode != 0 or heads.returncode != 0:
             results.fail(
@@ -105,7 +120,7 @@ def check_alembic(results: Results) -> None:
     except FileNotFoundError:
         results.skip(
             "3. Alembic migration state",
-            "alembic not on PATH -- run this script from services/api with its venv active",
+            "alembic module not importable by this interpreter",
         )
     except Exception as exc:  # noqa: BLE001
         results.fail("3. Alembic migration state", str(exc))
@@ -305,10 +320,18 @@ async def check_qr(client: httpx.AsyncClient, results: Results, qr_token: str | 
     try:
         r = await client.get(f"/api/v1/qr/{qr_token}")
         if r.status_code == 200:
-            data = r.json()["data"]
+            # Deliberately NOT the standard ApiResponse envelope -- ADR 0001
+            # and architecture SS7 both specify this bootstrap route's
+            # response literally as {tenant_id, branch_id, table_id}, no
+            # envelope, no camelCase (see qr_resolution_schemas.py's own
+            # docstring). Confirmed live during Phase 1 deployment
+            # validation; this check previously assumed the standard
+            # envelope shape and always failed once actually exercised
+            # with a real --qr-token.
+            data = r.json()
             results.ok(
                 "14. QR verification",
-                f"resolved to table '{data.get('table', {}).get('tableNumber')}'",
+                f"resolved to table_id '{data.get('table_id')}'",
             )
         else:
             results.fail("14. QR verification", f"status={r.status_code}: {r.text}")
