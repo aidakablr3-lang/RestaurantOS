@@ -55,6 +55,8 @@ def _kitchen_ticket_to_schema(dto: Any) -> KitchenTicketResponseSchema:
                 id=item.id,
                 kitchen_ticket_id=item.kitchen_ticket_id,
                 order_item_id=item.order_item_id,
+                menu_item_name=item.menu_item_name,
+                quantity=item.quantity,
                 status=item.status,
                 created_at=item.created_at,
             )
@@ -143,6 +145,8 @@ async def change_kitchen_item_status(
                 id=result.id,
                 kitchen_ticket_id=result.kitchen_ticket_id,
                 order_item_id=result.order_item_id,
+                menu_item_name=result.menu_item_name,
+                quantity=result.quantity,
                 status=result.status,
                 created_at=result.created_at,
             )

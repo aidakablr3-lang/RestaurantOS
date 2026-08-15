@@ -94,7 +94,11 @@ from restaurant_os_api.modules.operations.domain.ports import (
 from restaurant_os_api.modules.restaurant.application.branch_authorization import (
     resolve_and_authorize_branch,
 )
-from restaurant_os_api.modules.restaurant.domain.ports import BranchRepository, TableRepository
+from restaurant_os_api.modules.restaurant.domain.ports import (
+    BranchRepository,
+    RestaurantRepository,
+    TableRepository,
+)
 from restaurant_os_api.platform.database import UnitOfWork
 from restaurant_os_api.platform.outbox import OutboxWriter
 from restaurant_os_api.platform.tenancy import TenantContext
@@ -119,6 +123,7 @@ class RecordPaymentUseCase:
         ledger_repository_factory: Callable[[AsyncSession], LedgerRepository],
         branch_repository_factory: Callable[[AsyncSession], BranchRepository],
         table_repository_factory: Callable[[AsyncSession], TableRepository],
+        restaurant_repository_factory: Callable[[AsyncSession], RestaurantRepository],
         resolve_user_permissions: ResolveUserPermissionsUseCase,
         outbox_writer_factory: Callable[[AsyncSession], OutboxWriter],
     ) -> None:
@@ -129,6 +134,7 @@ class RecordPaymentUseCase:
         self._ledger_repository_factory = ledger_repository_factory
         self._branch_repository_factory = branch_repository_factory
         self._table_repository_factory = table_repository_factory
+        self._restaurant_repository_factory = restaurant_repository_factory
         self._resolve_user_permissions = resolve_user_permissions
         self._outbox_writer_factory = outbox_writer_factory
 
@@ -143,6 +149,7 @@ class RecordPaymentUseCase:
             ledger_repo = self._ledger_repository_factory(uow.session)
             branch_repo = self._branch_repository_factory(uow.session)
             table_repo = self._table_repository_factory(uow.session)
+            restaurant_repo = self._restaurant_repository_factory(uow.session)
             outbox = self._outbox_writer_factory(uow.session)
 
             # Locked for the rest of this transaction so a concurrent
@@ -156,7 +163,7 @@ class RecordPaymentUseCase:
                 raise BillAlreadyClosedError(bill.id)
 
             resolved_permissions = await self._resolve_user_permissions.execute(tenant_id, user_id)
-            await resolve_and_authorize_branch(
+            branch = await resolve_and_authorize_branch(
                 branch_repository=branch_repo,
                 tenant_id=tenant_id,
                 branch_id=bill.branch_id,
@@ -169,6 +176,18 @@ class RecordPaymentUseCase:
                 order = await order_repo.get_by_id(tenant_id, bill.order_id)
                 if order is None:
                     raise OrderNotFoundError(bill.order_id)
+
+            # Order-based bills carry their own currency_code. Tab-based
+            # bills have no Order to read one from, so it's resolved from
+            # the branch's own Restaurant instead -- was hardcoded "USD"
+            # regardless of tenant currency until this fix.
+            if order is not None:
+                currency_code = order.currency_code
+            else:
+                restaurant = await restaurant_repo.get_by_id(tenant_id, branch.restaurant_id)
+                currency_code = (
+                    restaurant.default_currency_code if restaurant is not None else "USD"
+                )
 
             adjustments = await bill_repo.get_adjustments(tenant_id, bill.id)
             adjustments_total = sum((a.amount for a in adjustments), Decimal(0))
@@ -192,7 +211,7 @@ class RecordPaymentUseCase:
                 bill_id=bill.id,
                 tender_type=TenderType(request.tender_type),
                 amount=request.amount,
-                currency_code=order.currency_code if order is not None else "USD",
+                currency_code=currency_code,
                 tip_amount=Decimal(0),
                 status=PaymentStatus.AUTHORIZED,
                 created_at=now,

@@ -38,6 +38,8 @@ from restaurant_os_api.modules.operations.domain.exceptions import (
 from restaurant_os_api.modules.restaurant.domain.entities import (
     Branch,
     BranchStatus,
+    Restaurant,
+    RestaurantStatus,
     Table,
     TableStatus,
 )
@@ -51,7 +53,11 @@ from tests.unit.modules.operations.fakes import (
     InMemoryPaymentRepository,
     fake_session_factory_returning,
 )
-from tests.unit.modules.restaurant.fakes import InMemoryBranchRepository, InMemoryTableRepository
+from tests.unit.modules.restaurant.fakes import (
+    InMemoryBranchRepository,
+    InMemoryRestaurantRepository,
+    InMemoryTableRepository,
+)
 
 TENANT_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 BRANCH_ID = "01ARZ3NDEKTSV4RRFFQ6BRNCH1"
@@ -110,6 +116,20 @@ def _bill(**overrides) -> Bill:
     return Bill(**defaults)
 
 
+def _restaurant(**overrides) -> Restaurant:
+    defaults = {
+        "id": "restaurant-1",
+        "tenant_id": TENANT_ID,
+        "legal_name": "R",
+        "display_name": "R",
+        "default_currency_code": "USD",
+        "status": RestaurantStatus.ACTIVE,
+        "created_at": datetime.now(UTC),
+    }
+    defaults.update(overrides)
+    return Restaurant(**defaults)
+
+
 def _table(**overrides) -> Table:
     defaults = {
         "id": TABLE_ID,
@@ -154,6 +174,7 @@ class TestRecordPaymentUseCase:
         resolved,
         outbox,
         table_repo=None,
+        restaurant_repo=None,
     ) -> RecordPaymentUseCase:
         return RecordPaymentUseCase(
             session_factory=_session_factory(),
@@ -163,6 +184,9 @@ class TestRecordPaymentUseCase:
             ledger_repository_factory=lambda _s: ledger_repo,
             branch_repository_factory=lambda _s: branch_repo,
             table_repository_factory=lambda _s: table_repo or InMemoryTableRepository(),
+            restaurant_repository_factory=lambda _s: (
+                restaurant_repo or InMemoryRestaurantRepository({"restaurant-1": _restaurant()})
+            ),
             resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved),
             outbox_writer_factory=lambda _s: outbox,
         )
@@ -409,6 +433,32 @@ class TestRecordPaymentUseCase:
         table = await table_repo.get_by_id(TENANT_ID, TABLE_ID)
         assert table is not None
         assert table.status == TableStatus.AVAILABLE
+
+    async def test_a_tab_based_payment_resolves_currency_from_the_restaurant(self) -> None:
+        # Tab-based bills carry no order_id, so there's no Order to read
+        # currency_code from -- this must resolve from the branch's own
+        # Restaurant instead of falling back to a hardcoded "USD".
+        tab_bill = _bill(order_id=None, tab_id="tab-1")
+        use_case = self._use_case(
+            InMemoryBillRepository({BILL_ID: tab_bill}),
+            InMemoryOrderRepository(),
+            InMemoryPaymentRepository(),
+            InMemoryLedgerRepository(),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+            FakeOutboxWriter(),
+            restaurant_repo=InMemoryRestaurantRepository(
+                {"restaurant-1": _restaurant(default_currency_code="INR")}
+            ),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            RecordPaymentRequestDTO(bill_id=BILL_ID, tender_type="cash", amount=Decimal(0)),
+        )
+
+        assert result.currency_code == "INR"
 
     async def test_raises_overpayment_when_amount_exceeds_amount_due(self) -> None:
         use_case = self._use_case(

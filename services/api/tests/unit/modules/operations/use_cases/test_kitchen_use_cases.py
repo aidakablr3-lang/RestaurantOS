@@ -200,12 +200,19 @@ def _inventory_item(**overrides) -> InventoryItem:
 
 
 class TestListKitchenTicketsUseCase:
-    async def test_lists_tickets_for_the_branch_via_the_order_join(self) -> None:
-        use_case = ListKitchenTicketsUseCase(
+    def _use_case(
+        self, ticket_repo, order_repo=None, menu_item_repo=None
+    ) -> ListKitchenTicketsUseCase:
+        return ListKitchenTicketsUseCase(
             session_factory=_session_factory(),
-            kitchen_ticket_repository_factory=lambda _s: InMemoryKitchenTicketRepository(
-                {TICKET_ID: _ticket()}, {}, {ORDER_ID: _order()}
-            ),
+            kitchen_ticket_repository_factory=lambda _s: ticket_repo,
+            order_repository_factory=lambda _s: order_repo or InMemoryOrderRepository(),
+            menu_item_repository_factory=lambda _s: menu_item_repo or InMemoryMenuItemRepository(),
+        )
+
+    async def test_lists_tickets_for_the_branch_via_the_order_join(self) -> None:
+        use_case = self._use_case(
+            InMemoryKitchenTicketRepository({TICKET_ID: _ticket()}, {}, {ORDER_ID: _order()})
         )
 
         result = await use_case.execute(TENANT_ID, BRANCH_ID, offset=0, limit=20)
@@ -214,16 +221,47 @@ class TestListKitchenTicketsUseCase:
         assert result.tickets[0].id == TICKET_ID
 
     async def test_excludes_tickets_whose_order_belongs_to_a_different_branch(self) -> None:
-        use_case = ListKitchenTicketsUseCase(
-            session_factory=_session_factory(),
-            kitchen_ticket_repository_factory=lambda _s: InMemoryKitchenTicketRepository(
+        use_case = self._use_case(
+            InMemoryKitchenTicketRepository(
                 {TICKET_ID: _ticket()}, {}, {ORDER_ID: _order(branch_id="other-branch")}
-            ),
+            )
         )
 
         result = await use_case.execute(TENANT_ID, BRANCH_ID, offset=0, limit=20)
 
         assert result.total == 0
+
+    async def test_enriches_items_with_the_menu_item_name_and_quantity(self) -> None:
+        menu_item_id = "menu-item-1"
+        order_repo = InMemoryOrderRepository(
+            {ORDER_ID: _order()},
+            {"order-item-1": _order_item(menu_item_id=menu_item_id, quantity=2)},
+        )
+        menu_item_repo = InMemoryMenuItemRepository(
+            {menu_item_id: _menu_item(id=menu_item_id, name="Grilled Salmon")}
+        )
+        ticket_repo = InMemoryKitchenTicketRepository(
+            {TICKET_ID: _ticket()}, {ITEM_ID: _item()}, {ORDER_ID: _order()}
+        )
+        use_case = self._use_case(ticket_repo, order_repo, menu_item_repo)
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID, offset=0, limit=20)
+
+        item = result.tickets[0].items[0]
+        assert item.menu_item_name == "Grilled Salmon"
+        assert item.quantity == 2
+
+    async def test_falls_back_to_unknown_item_when_the_order_item_is_missing(self) -> None:
+        ticket_repo = InMemoryKitchenTicketRepository(
+            {TICKET_ID: _ticket()}, {ITEM_ID: _item()}, {ORDER_ID: _order()}
+        )
+        use_case = self._use_case(ticket_repo)
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID, offset=0, limit=20)
+
+        item = result.tickets[0].items[0]
+        assert item.menu_item_name == "Unknown item"
+        assert item.quantity == 0
 
 
 class TestUpdateKitchenTicketStatusUseCase:
@@ -555,12 +593,15 @@ class TestUpdateKitchenTicketStatusUseCase:
 
 
 class TestUpdateKitchenItemStatusUseCase:
-    def _use_case(self, ticket_repo, order_repo, branch_repo) -> UpdateKitchenItemStatusUseCase:
+    def _use_case(
+        self, ticket_repo, order_repo, branch_repo, *, menu_item_repo=None
+    ) -> UpdateKitchenItemStatusUseCase:
         return UpdateKitchenItemStatusUseCase(
             session_factory=_session_factory(),
             kitchen_ticket_repository_factory=lambda _s: ticket_repo,
             order_repository_factory=lambda _s: order_repo,
             branch_repository_factory=lambda _s: branch_repo,
+            menu_item_repository_factory=lambda _s: menu_item_repo or InMemoryMenuItemRepository(),
             resolve_user_permissions=FakeResolveUserPermissionsUseCase(
                 resolved=ResolvedPermissions(tenant_wide=frozenset({"kitchen.manage"}))
             ),
@@ -582,6 +623,33 @@ class TestUpdateKitchenItemStatusUseCase:
         )
 
         assert result.status == KitchenItemStatus.READY.value
+
+    async def test_enriches_the_result_with_the_menu_item_name_and_quantity(self) -> None:
+        menu_item_id = "menu-item-1"
+        order_repo = InMemoryOrderRepository(
+            {ORDER_ID: _order()},
+            {"order-item-1": _order_item(menu_item_id=menu_item_id, quantity=4)},
+        )
+        menu_item_repo = InMemoryMenuItemRepository(
+            {menu_item_id: _menu_item(id=menu_item_id, name="Iced Coffee")}
+        )
+        use_case = self._use_case(
+            InMemoryKitchenTicketRepository(
+                {TICKET_ID: _ticket()}, {ITEM_ID: _item(status=KitchenItemStatus.IN_PROGRESS)}
+            ),
+            order_repo,
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            menu_item_repo=menu_item_repo,
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            ChangeKitchenItemStatusRequestDTO(kitchen_item_id=ITEM_ID, status="ready"),
+        )
+
+        assert result.menu_item_name == "Iced Coffee"
+        assert result.quantity == 4
 
     async def test_raises_invalid_transition_for_an_out_of_order_status(self) -> None:
         use_case = self._use_case(

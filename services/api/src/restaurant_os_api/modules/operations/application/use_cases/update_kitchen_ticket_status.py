@@ -47,7 +47,9 @@ from restaurant_os_api.modules.operations.application.dto import (
     KitchenTicketDTO,
 )
 from restaurant_os_api.modules.operations.application.use_cases._kitchen_mapper import (
+    kitchen_item_to_dto,
     kitchen_ticket_to_dto,
+    resolve_kitchen_item_identity,
 )
 from restaurant_os_api.modules.operations.application.use_cases._recipe_deduction import (
     deduct_recipe_inventory_for_served_item,
@@ -176,9 +178,17 @@ class UpdateKitchenTicketStatusUseCase:
                     if changed:
                         await kitchen_ticket_repo.update_item(item)
 
+            # Fetched unconditionally (not just for READY/SERVED targets) so
+            # the returned DTO always carries menu item names/quantities,
+            # regardless of which transition was requested.
+            order_items_by_id = {
+                item.order_item_id: await order_repo.get_item_by_id(tenant_id, item.order_item_id)
+                for item in items
+            }
+
             if target in (KitchenTicketStatus.READY, KitchenTicketStatus.SERVED):
                 for item in items:
-                    order_item = await order_repo.get_item_by_id(tenant_id, item.order_item_id)
+                    order_item = order_items_by_id.get(item.order_item_id)
                     if order_item is None:
                         continue
                     if (
@@ -219,4 +229,20 @@ class UpdateKitchenTicketStatusUseCase:
                             tenant_id, OrderServed(order_id=order.id, occurred_at=now)
                         )
 
-        return kitchen_ticket_to_dto(ticket, items)
+            menu_item_ids = {
+                oi.menu_item_id for oi in order_items_by_id.values() if oi is not None
+            }
+            menu_items_by_id = {}
+            for menu_item_id in menu_item_ids:
+                menu_item = await menu_item_repo.get_by_id(tenant_id, menu_item_id)
+                if menu_item is not None:
+                    menu_items_by_id[menu_item_id] = menu_item
+
+            item_dtos = []
+            for item in items:
+                name, quantity = resolve_kitchen_item_identity(
+                    item, order_items_by_id=order_items_by_id, menu_items_by_id=menu_items_by_id
+                )
+                item_dtos.append(kitchen_item_to_dto(item, menu_item_name=name, quantity=quantity))
+
+        return kitchen_ticket_to_dto(ticket, item_dtos)

@@ -53,7 +53,7 @@ describe("KitchenPage permission gating", () => {
             status: "fired",
             createdAt: "2026-01-01T19:00:00Z",
             items: [
-              { id: "ki1", kitchenTicketId: "kt1", orderItemId: "oi1", status: "queued", createdAt: "2026-01-01T19:00:00Z" },
+              { id: "ki1", kitchenTicketId: "kt1", orderItemId: "oi1", menuItemName: "Grilled Salmon", quantity: 2, status: "queued", createdAt: "2026-01-01T19:00:00Z" },
             ],
           },
         ],
@@ -84,7 +84,7 @@ describe("KitchenPage permission gating", () => {
             status: "fired",
             createdAt: "2026-01-01T19:00:00Z",
             items: [
-              { id: "ki1", kitchenTicketId: "kt1", orderItemId: "oi1", status: "queued", createdAt: "2026-01-01T19:00:00Z" },
+              { id: "ki1", kitchenTicketId: "kt1", orderItemId: "oi1", menuItemName: "Grilled Salmon", quantity: 2, status: "queued", createdAt: "2026-01-01T19:00:00Z" },
             ],
           },
         ],

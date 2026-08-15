@@ -230,6 +230,37 @@ class TestGenerateBillUseCase:
         assert updated_order is not None
         assert updated_order.status == OrderStatus.BILLED
 
+    async def test_applies_two_simultaneous_active_taxes_eg_cgst_and_sgst(self) -> None:
+        # Indian GST-style setup: two active taxes at once (CGST + SGST,
+        # 2.5% each) must both post as separate tax lines against the
+        # same order, not just the single-tax case above.
+        cgst_id = "01ARZ3NDEKTSV4RRFFQ6TAXCG1"
+        sgst_id = "01ARZ3NDEKTSV4RRFFQ6TAXSG1"
+        order_repo = InMemoryOrderRepository({ORDER_ID: _order()})
+        use_case = self._use_case(
+            order_repo,
+            InMemoryBillRepository(),
+            InMemoryTaxRepository(
+                {
+                    cgst_id: _tax(id=cgst_id, name="CGST", rate=Decimal("0.025")),
+                    sgst_id: _tax(id=sgst_id, name="SGST", rate=Decimal("0.025")),
+                }
+            ),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID, "user-1", GenerateBillRequestDTO(order_id=ORDER_ID)
+        )
+
+        assert result.subtotal_amount == Decimal(100)
+        assert result.tax_amount == Decimal("5.0")
+        assert len(result.tax_lines) == 2
+        tax_ids = {line.tax_id for line in result.tax_lines}
+        assert tax_ids == {cgst_id, sgst_id}
+        assert all(line.tax_amount == Decimal("2.5") for line in result.tax_lines)
+
     async def test_raises_not_found_for_an_unknown_order(self) -> None:
         use_case = self._use_case(
             InMemoryOrderRepository(),

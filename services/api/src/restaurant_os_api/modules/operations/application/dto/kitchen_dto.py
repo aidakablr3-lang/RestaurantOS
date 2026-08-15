@@ -11,6 +11,8 @@ class KitchenItemDTO:
     id: str
     kitchen_ticket_id: str
     order_item_id: str
+    menu_item_name: str
+    quantity: int
     status: str
     created_at: datetime
 

@@ -25,6 +25,7 @@ from restaurant_os_api.modules.operations.application.dto import (
 )
 from restaurant_os_api.modules.operations.application.use_cases._kitchen_mapper import (
     kitchen_item_to_dto,
+    resolve_kitchen_item_identity,
 )
 from restaurant_os_api.modules.operations.domain.entities import KitchenItemStatus
 from restaurant_os_api.modules.operations.domain.exceptions import (
@@ -40,7 +41,7 @@ from restaurant_os_api.modules.operations.domain.ports import (
 from restaurant_os_api.modules.restaurant.application.branch_authorization import (
     resolve_and_authorize_branch,
 )
-from restaurant_os_api.modules.restaurant.domain.ports import BranchRepository
+from restaurant_os_api.modules.restaurant.domain.ports import BranchRepository, MenuItemRepository
 from restaurant_os_api.platform.database import UnitOfWork
 from restaurant_os_api.platform.tenancy import TenantContext
 
@@ -60,12 +61,14 @@ class UpdateKitchenItemStatusUseCase:
         kitchen_ticket_repository_factory: Callable[[AsyncSession], KitchenTicketRepository],
         order_repository_factory: Callable[[AsyncSession], OrderRepository],
         branch_repository_factory: Callable[[AsyncSession], BranchRepository],
+        menu_item_repository_factory: Callable[[AsyncSession], MenuItemRepository],
         resolve_user_permissions: ResolveUserPermissionsUseCase,
     ) -> None:
         self._session_factory = session_factory
         self._kitchen_ticket_repository_factory = kitchen_ticket_repository_factory
         self._order_repository_factory = order_repository_factory
         self._branch_repository_factory = branch_repository_factory
+        self._menu_item_repository_factory = menu_item_repository_factory
         self._resolve_user_permissions = resolve_user_permissions
 
     async def execute(
@@ -75,6 +78,7 @@ class UpdateKitchenItemStatusUseCase:
             kitchen_ticket_repo = self._kitchen_ticket_repository_factory(uow.session)
             order_repo = self._order_repository_factory(uow.session)
             branch_repo = self._branch_repository_factory(uow.session)
+            menu_item_repo = self._menu_item_repository_factory(uow.session)
 
             item = await kitchen_ticket_repo.get_item_by_id(tenant_id, request.kitchen_item_id)
             if item is None:
@@ -106,4 +110,15 @@ class UpdateKitchenItemStatusUseCase:
             getattr(item, method_name)()
             item = await kitchen_ticket_repo.update_item(item)
 
-        return kitchen_item_to_dto(item)
+            order_item = await order_repo.get_item_by_id(tenant_id, item.order_item_id)
+            order_items_by_id = {item.order_item_id: order_item}
+            menu_items_by_id = {}
+            if order_item is not None:
+                menu_item = await menu_item_repo.get_by_id(tenant_id, order_item.menu_item_id)
+                if menu_item is not None:
+                    menu_items_by_id[order_item.menu_item_id] = menu_item
+            name, quantity = resolve_kitchen_item_identity(
+                item, order_items_by_id=order_items_by_id, menu_items_by_id=menu_items_by_id
+            )
+
+        return kitchen_item_to_dto(item, menu_item_name=name, quantity=quantity)

@@ -13,6 +13,8 @@ export interface KitchenItem {
   id: string
   kitchenTicketId: string
   orderItemId: string
+  menuItemName: string
+  quantity: number
   status: KitchenItemStatus
   createdAt: string
 }

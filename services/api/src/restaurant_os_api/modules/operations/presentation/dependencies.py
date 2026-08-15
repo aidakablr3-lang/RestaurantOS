@@ -502,6 +502,8 @@ def get_list_kitchen_tickets_use_case(
     return ListKitchenTicketsUseCase(
         session_factory=session_factory,
         kitchen_ticket_repository_factory=SQLAlchemyKitchenTicketRepository,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
     )
 
 
@@ -542,6 +544,7 @@ def get_update_kitchen_item_status_use_case(
         kitchen_ticket_repository_factory=SQLAlchemyKitchenTicketRepository,
         order_repository_factory=SQLAlchemyOrderRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
         resolve_user_permissions=resolve_user_permissions,
     )
 
@@ -656,6 +659,7 @@ def get_record_payment_use_case(
         ledger_repository_factory=SQLAlchemyLedgerRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
         table_repository_factory=SQLAlchemyTableRepository,
+        restaurant_repository_factory=SQLAlchemyRestaurantRepository,
         resolve_user_permissions=resolve_user_permissions,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )

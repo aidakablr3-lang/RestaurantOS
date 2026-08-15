@@ -313,6 +313,8 @@ class TestOrderKitchenBillingPaymentLifecycle:
         # The ticket-level bump cascades down to its own items -- nobody
         # bumped this item individually, so it started out "queued".
         assert all(item["status"] == "in_progress" for item in start_resp.json()["data"]["items"])
+        assert start_resp.json()["data"]["items"][0]["menuItemName"] == "Burger"
+        assert start_resp.json()["data"]["items"][0]["quantity"] == 2
 
         ready_resp = client.post(
             f"/api/v1/kitchen-tickets/{ticket_id}/status",
@@ -742,6 +744,8 @@ class TestOrderKitchenBillingPaymentLifecycle:
         stations = sorted(t["station"] for t in tickets)
         assert stations == ["bar", "kitchen"]
         assert all(len(t["items"]) == 1 for t in tickets)
+        item_names_by_station = {t["station"]: t["items"][0]["menuItemName"] for t in tickets}
+        assert item_names_by_station == {"kitchen": "Burger", "bar": "Soda"}
 
     def test_serving_an_item_deducts_its_recipe_ingredients_from_inventory(
         self, client: TestClient, owner: dict
