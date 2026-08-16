@@ -9,9 +9,10 @@ response. Gated on ``require_platform_admin`` at the router level
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, Header, Path, Query, status
+from fastapi.responses import JSONResponse
 
 from restaurant_os_api.core.response import ApiResponse, PaginationMeta
 from restaurant_os_api.modules.identity.application.dto import (
@@ -25,6 +26,7 @@ from restaurant_os_api.modules.identity.presentation.dependencies import (
     ListTenantsUseCaseDep,
     OffboardTenantUseCaseDep,
     OnboardTenantUseCaseDep,
+    PlatformIdempotencyGuardDep,
     ReactivateTenantUseCaseDep,
     SuspendTenantUseCaseDep,
     UpdateTenantUseCaseDep,
@@ -35,6 +37,7 @@ from restaurant_os_api.modules.identity.presentation.schemas.tenant_schemas impo
     TenantResponseSchema,
     UpdateTenantRequestSchema,
 )
+from restaurant_os_api.platform.idempotency import fingerprint_request
 
 router = APIRouter(
     prefix="/api/v1/admin/tenants",
@@ -43,6 +46,7 @@ router = APIRouter(
 )
 
 TenantIdPath = Annotated[str, Path(min_length=26, max_length=26)]
+IdempotencyKeyHeader = Annotated[str | None, Header(alias="Idempotency-Key")]
 
 
 def _to_schema(dto: TenantDTO) -> TenantResponseSchema:
@@ -62,16 +66,31 @@ def _to_schema(dto: TenantDTO) -> TenantResponseSchema:
     "", response_model=ApiResponse[TenantResponseSchema], status_code=status.HTTP_201_CREATED
 )
 async def onboard_tenant(
-    body: OnboardTenantRequestSchema, use_case: OnboardTenantUseCaseDep
-) -> ApiResponse[TenantResponseSchema]:
-    result = await use_case.execute(
-        OnboardTenantRequestDTO(
-            legal_name=body.legal_name,
-            display_name=body.display_name,
-            default_currency_code=body.default_currency_code,
+    body: OnboardTenantRequestSchema,
+    use_case: OnboardTenantUseCaseDep,
+    idempotency_guard: PlatformIdempotencyGuardDep,
+    idempotency_key: IdempotencyKeyHeader = None,
+) -> JSONResponse:
+    async def execute() -> tuple[int, dict[str, Any]]:
+        result = await use_case.execute(
+            OnboardTenantRequestDTO(
+                legal_name=body.legal_name,
+                display_name=body.display_name,
+                default_currency_code=body.default_currency_code,
+            )
         )
-    )
-    return ApiResponse(data=_to_schema(result))
+        response = ApiResponse(data=_to_schema(result))
+        return status.HTTP_201_CREATED, response.model_dump(mode="json", by_alias=True)
+
+    if idempotency_key is None:
+        http_status, response_body = await execute()
+    else:
+        http_status, response_body = await idempotency_guard.run(
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint_request(body.model_dump(mode="json")),
+            execute=execute,
+        )
+    return JSONResponse(status_code=http_status, content=response_body)
 
 
 @router.get("", response_model=ApiResponse[list[TenantResponseSchema]])

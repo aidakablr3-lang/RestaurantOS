@@ -1285,6 +1285,33 @@
         "title": "ApiResponse[Union[CashDrawerResponseSchema, NoneType]]",
         "type": "object"
       },
+      "ApiResponse_UserResponseSchema_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UserResponseSchema"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[UserResponseSchema]",
+        "type": "object"
+      },
       "ApiResponse_UserRoleResponseSchema_": {
         "properties": {
           "data": {
@@ -2180,6 +2207,37 @@
         "title": "ApiResponse[list[TenantResponseSchema]]",
         "type": "object"
       },
+      "ApiResponse_list_UserResponseSchema__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/UserResponseSchema"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaginationMeta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ApiResponse[list[UserResponseSchema]]",
+        "type": "object"
+      },
       "ApplyBillAdjustmentRequestSchema": {
         "properties": {
           "adjustmentType": {
@@ -2905,6 +2963,14 @@
       },
       "CreateInventoryCategoryRequestSchema": {
         "properties": {
+          "categoryType": {
+            "enum": [
+              "food",
+              "beverage"
+            ],
+            "title": "Categorytype",
+            "type": "string"
+          },
           "name": {
             "maxLength": 255,
             "minLength": 1,
@@ -2913,7 +2979,8 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "categoryType"
         ],
         "title": "CreateInventoryCategoryRequestSchema",
         "type": "object"
@@ -3464,6 +3531,46 @@
         "title": "CreateTaxRequestSchema",
         "type": "object"
       },
+      "CreateUserRequestSchema": {
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "CreateUserRequestSchema",
+        "type": "object"
+      },
       "DiscountResponseSchema": {
         "properties": {
           "activeFrom": {
@@ -3584,6 +3691,11 @@
             "title": "Ordercount",
             "type": "integer"
           },
+          "outstandingAmount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Outstandingamount",
+            "type": "string"
+          },
           "reportDate": {
             "title": "Reportdate",
             "type": "string"
@@ -3636,6 +3748,7 @@
           "itemsSoldCount",
           "grossSalesAmount",
           "voidedSalesAmount",
+          "outstandingAmount",
           "totalCollectedAmount",
           "totalTipsAmount",
           "totalRefundedAmount",
@@ -3829,6 +3942,14 @@
       },
       "InventoryCategoryResponseSchema": {
         "properties": {
+          "categoryType": {
+            "enum": [
+              "food",
+              "beverage"
+            ],
+            "title": "Categorytype",
+            "type": "string"
+          },
           "createdAt": {
             "format": "date-time",
             "title": "Createdat",
@@ -3851,6 +3972,7 @@
           "id",
           "tenantId",
           "name",
+          "categoryType",
           "createdAt"
         ],
         "title": "InventoryCategoryResponseSchema",
@@ -3946,9 +4068,17 @@
             "title": "Kitchenticketid",
             "type": "string"
           },
+          "menuItemName": {
+            "title": "Menuitemname",
+            "type": "string"
+          },
           "orderItemId": {
             "title": "Orderitemid",
             "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
           },
           "status": {
             "title": "Status",
@@ -3959,6 +4089,8 @@
           "id",
           "kitchenTicketId",
           "orderItemId",
+          "menuItemName",
+          "quantity",
           "status",
           "createdAt"
         ],
@@ -6757,6 +6889,69 @@
         "title": "UpdateTenantRequestSchema",
         "type": "object"
       },
+      "UserResponseSchema": {
+        "properties": {
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "generatedPassword": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generatedpassword"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tenantId": {
+            "title": "Tenantid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "email",
+          "phone",
+          "status",
+          "createdAt"
+        ],
+        "title": "UserResponseSchema",
+        "type": "object"
+      },
       "UserRoleResponseSchema": {
         "properties": {
           "branchId": {
@@ -6816,13 +7011,6 @@
       },
       "ValidationError": {
         "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
-          },
-          "input": {
-            "title": "Input"
-          },
           "loc": {
             "items": {
               "anyOf": [
@@ -6964,6 +7152,22 @@
       "post": {
         "operationId": "onboard_tenant_api_v1_admin_tenants_post",
         "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
@@ -16183,6 +16387,145 @@
         "summary": "Get My Subscription",
         "tags": [
           "tenant-self-service"
+        ]
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "operationId": "list_users_api_v1_users_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_UserResponseSchema__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List Users",
+        "tags": [
+          "users"
+        ]
+      },
+      "post": {
+        "operationId": "create_user_api_v1_users_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_UserResponseSchema_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Create User",
+        "tags": [
+          "users"
         ]
       }
     }

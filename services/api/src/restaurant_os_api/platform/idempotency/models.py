@@ -35,3 +35,26 @@ class IdempotencyKeyModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin):
         TimestampType(timezone=True), server_default=func.now(), nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(TimestampType(timezone=True), nullable=False)
+
+
+class PlatformIdempotencyKeyModel(Base, ULIDPrimaryKeyMixin):
+    """Same shape as ``IdempotencyKeyModel``, deliberately without
+    ``TenantScopedMixin`` -- see ``PlatformIdempotencyGuard``'s own
+    docstring (``guard.py``) for why tenant-creation idempotency cannot
+    use the tenant-scoped table: there is no tenant row yet to satisfy
+    that column's ``NOT NULL`` foreign key. Global uniqueness on
+    ``idempotency_key`` alone is correct here precisely because this
+    table only ever backs platform-admin routes that are pre-tenant by
+    nature (today: just tenant onboarding)."""
+
+    __tablename__ = "platform_idempotency_keys"
+    __table_args__ = (ulid_check_constraint("id"),)
+
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    request_fingerprint: Mapped[str] = mapped_column(Text, nullable=False)
+    response_status: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    response_body: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        TimestampType(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(TimestampType(timezone=True), nullable=False)

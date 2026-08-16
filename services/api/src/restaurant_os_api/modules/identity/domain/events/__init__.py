@@ -12,6 +12,7 @@ from restaurant_os_api.modules.identity.domain.events.tenant_events import (
     TenantReactivated,
     TenantSuspended,
 )
+from restaurant_os_api.modules.identity.domain.events.user_events import UserCreated
 
 __all__ = [
     "PermissionGrantedToRole",
@@ -22,6 +23,7 @@ __all__ = [
     "TenantOffboarded",
     "TenantReactivated",
     "TenantSuspended",
+    "UserCreated",
     "UserRoleAssigned",
     "UserRoleRevoked",
 ]

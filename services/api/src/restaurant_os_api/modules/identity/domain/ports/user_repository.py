@@ -40,3 +40,16 @@ class UserRepository(Protocol):
         today, since Branch/Order don't exist yet (see
         ``GetTenantQuotaUsageUseCase``)."""
         ...
+
+    async def create(self, user: User) -> User:
+        """Insert a new user. Caller is responsible for checking
+        ``get_by_email`` first — this method does not itself guard
+        against a duplicate email, matching every other ``create()`` on
+        this module's repositories (``RoleRepository.create()``,
+        ``TenantRepository.create()``)."""
+        ...
+
+    async def list_for_tenant(self, tenant_id: str, *, offset: int, limit: int) -> tuple[list[User], int]:
+        """Page through a tenant's users, newest first, excluding
+        soft-deleted rows — same shape as ``RoleRepository.list_for_tenant``."""
+        ...

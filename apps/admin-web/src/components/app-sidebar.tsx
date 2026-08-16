@@ -10,6 +10,7 @@ import {
   PercentIcon,
   StoreIcon,
   TruckIcon,
+  UsersIcon,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -80,6 +81,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/suppliers",
     icon: TruckIcon,
     isVisible: (perms) => perms.hasTenantWide("purchasing.read"),
+  },
+  {
+    label: "Staff",
+    href: "/staff",
+    icon: UsersIcon,
+    isVisible: (perms) => perms.hasAnywhere("roles.assign"),
   },
 ]
 

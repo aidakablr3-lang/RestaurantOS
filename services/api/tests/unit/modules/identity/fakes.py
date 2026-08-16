@@ -94,6 +94,24 @@ class InMemoryUserRepository:
         user.permission_version += 1
         return user.permission_version
 
+    async def count_active_for_tenant(self, tenant_id: str) -> int:
+        return sum(
+            1
+            for u in self._users.values()
+            if u.tenant_id == tenant_id and u.status.value == "active"
+        )
+
+    async def create(self, user: User) -> User:
+        self._users[user.id] = user
+        return user
+
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[User], int]:
+        visible = [u for u in self._users.values() if u.tenant_id == tenant_id]
+        visible.sort(key=lambda u: u.created_at, reverse=True)
+        return visible[offset : offset + limit], len(visible)
+
 
 class InMemorySessionRepository:
     def __init__(self) -> None:

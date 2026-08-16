@@ -206,11 +206,16 @@ async def _clean_tables(engine: AsyncEngine) -> AsyncGenerator[None]:
 
     Sprint 7 (Day-to-Day Operations, migration 0007) added 26 more
     tables, listed here in the same "extend, don't rebuild" spirit.
+
+    ``platform_idempotency_keys`` (migration 0013) has no ``tenant_id``
+    either (see ``PlatformIdempotencyGuard``'s own docstring for why),
+    same truncation rationale as ``qr_resolution_rate_limits`` above.
     """
     yield
     async with engine.begin() as conn:
         await conn.exec_driver_sql(
-            "TRUNCATE TABLE qr_resolution_rate_limits, idempotency_keys, outbox_events, "
+            "TRUNCATE TABLE qr_resolution_rate_limits, idempotency_keys, "
+            "platform_idempotency_keys, outbox_events, "
             "reservations, "
             "menu_item_modifier_groups, "
             "menu_item_availabilities, menu_item_branch_prices, modifiers, modifier_groups, "

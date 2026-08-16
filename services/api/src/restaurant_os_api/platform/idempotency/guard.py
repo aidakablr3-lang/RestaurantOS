@@ -43,7 +43,10 @@ from restaurant_os_api.platform.idempotency.exceptions import (
     IdempotencyKeyConflictError,
     IdempotentRequestInProgressError,
 )
-from restaurant_os_api.platform.idempotency.models import IdempotencyKeyModel
+from restaurant_os_api.platform.idempotency.models import (
+    IdempotencyKeyModel,
+    PlatformIdempotencyKeyModel,
+)
 from restaurant_os_api.platform.tenancy import TenantContext
 
 _DEFAULT_TTL = timedelta(hours=24)
@@ -140,5 +143,104 @@ class IdempotencyGuard:
                 delete(IdempotencyKeyModel).where(
                     IdempotencyKeyModel.tenant_id == tenant_id,
                     IdempotencyKeyModel.idempotency_key == idempotency_key,
+                )
+            )
+
+
+class PlatformIdempotencyGuard:
+    """``IdempotencyGuard``'s counterpart for platform-admin routes that
+    run *before* any tenant exists -- today, only tenant onboarding.
+
+    ``IdempotencyGuard`` cannot be reused there: ``IdempotencyKeyModel.
+    tenant_id`` is a hard ``NOT NULL`` foreign key to ``tenants.id``
+    (``TenantScopedMixin``), so a claim row can never be inserted for a
+    tenant that does not exist yet -- and tenant creation is exactly the
+    request that needs the idempotency check *before* the tenant is
+    created. This class is the same claim/execute/record protocol
+    against ``platform_idempotency_keys`` instead (no ``tenant_id``,
+    globally unique on ``idempotency_key`` alone), and uses
+    ``UnitOfWork`` with no ``TenantContext`` -- the same "no tenant
+    known yet" mode ``UnitOfWork``'s own docstring already documents for
+    the login use case, appropriate here for the identical reason: there
+    is no tenant to set ``app.tenant_id`` to, and ``platform_idempotency_
+    keys`` carries no RLS policy to enforce it against regardless.
+    """
+
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        *,
+        ttl: timedelta = _DEFAULT_TTL,
+    ) -> None:
+        self._session_factory = session_factory
+        self._ttl = ttl
+
+    async def run(
+        self,
+        *,
+        idempotency_key: str,
+        request_fingerprint: str,
+        execute: Callable[[], Awaitable[tuple[int, dict[str, Any]]]],
+    ) -> tuple[int, dict[str, Any]]:
+        claimed = await self._try_claim(idempotency_key, request_fingerprint)
+        if not claimed:
+            return await self._resolve_existing(idempotency_key, request_fingerprint)
+
+        try:
+            status, body = await execute()
+        except Exception:
+            await self._release_claim(idempotency_key)
+            raise
+
+        await self._record_response(idempotency_key, status, body)
+        return status, body
+
+    async def _try_claim(self, idempotency_key: str, request_fingerprint: str) -> bool:
+        try:
+            async with UnitOfWork(self._session_factory) as uow:
+                uow.session.add(
+                    PlatformIdempotencyKeyModel(
+                        id=generate_ulid(),
+                        idempotency_key=idempotency_key,
+                        request_fingerprint=request_fingerprint,
+                        expires_at=datetime.now(UTC) + self._ttl,
+                    )
+                )
+            return True
+        except IntegrityError:
+            return False
+
+    async def _resolve_existing(
+        self, idempotency_key: str, request_fingerprint: str
+    ) -> tuple[int, dict[str, Any]]:
+        async with UnitOfWork(self._session_factory) as uow:
+            stmt = select(PlatformIdempotencyKeyModel).where(
+                PlatformIdempotencyKeyModel.idempotency_key == idempotency_key
+            )
+            existing = (await uow.session.execute(stmt)).scalar_one_or_none()
+
+        if existing is None:
+            raise IdempotentRequestInProgressError(idempotency_key)
+        if existing.request_fingerprint != request_fingerprint:
+            raise IdempotencyKeyConflictError(idempotency_key)
+        if existing.response_status is None:
+            raise IdempotentRequestInProgressError(idempotency_key)
+        return existing.response_status, existing.response_body or {}
+
+    async def _record_response(
+        self, idempotency_key: str, status: int, body: dict[str, Any]
+    ) -> None:
+        async with UnitOfWork(self._session_factory) as uow:
+            await uow.session.execute(
+                update(PlatformIdempotencyKeyModel)
+                .where(PlatformIdempotencyKeyModel.idempotency_key == idempotency_key)
+                .values(response_status=status, response_body=body)
+            )
+
+    async def _release_claim(self, idempotency_key: str) -> None:
+        async with UnitOfWork(self._session_factory) as uow:
+            await uow.session.execute(
+                delete(PlatformIdempotencyKeyModel).where(
+                    PlatformIdempotencyKeyModel.idempotency_key == idempotency_key
                 )
             )

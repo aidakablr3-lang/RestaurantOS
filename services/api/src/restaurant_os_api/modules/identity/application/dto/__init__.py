@@ -34,11 +34,17 @@ from restaurant_os_api.modules.identity.application.dto.tenant_dto import (
     TenantListResultDTO,
     UpdateTenantRequestDTO,
 )
+from restaurant_os_api.modules.identity.application.dto.user_dto import (
+    CreateUserRequestDTO,
+    UserDTO,
+    UserListResultDTO,
+)
 
 __all__ = [
     "AssignUserRoleRequestDTO",
     "AuthenticatedPrincipalDTO",
     "CreateRoleRequestDTO",
+    "CreateUserRequestDTO",
     "FeatureFlagStatusDTO",
     "ListTenantsRequestDTO",
     "LoginRequestDTO",
@@ -59,5 +65,7 @@ __all__ = [
     "TokenPairDTO",
     "UpdateSettingRequestDTO",
     "UpdateTenantRequestDTO",
+    "UserDTO",
+    "UserListResultDTO",
     "UserRoleDTO",
 ]

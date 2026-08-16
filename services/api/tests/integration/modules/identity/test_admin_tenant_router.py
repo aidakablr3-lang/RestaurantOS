@@ -228,6 +228,89 @@ class TestOnboardTenant:
         assert response.json()["error"]["code"] == "INSUFFICIENT_PRIVILEGES"
 
 
+class TestOnboardTenantIdempotency:
+    """Gap 3 from the zero-to-live onboarding rehearsal (2026-08-16): a
+    retried/double-submitted create-tenant request could create a
+    duplicate tenant, since this was the one mutating admin endpoint not
+    wired to any idempotency guard. Covers the same retry/conflict
+    behavior test_platform_idempotency.py proves at the guard level, now
+    through the real HTTP header."""
+
+    def test_a_repeated_key_and_body_replays_the_same_tenant_without_duplicating(
+        self, client: TestClient, platform_admin_token: str
+    ) -> None:
+        payload = {
+            "legalName": "Idempotent Diner LLC",
+            "displayName": "Idempotent Diner",
+            "defaultCurrencyCode": "USD",
+        }
+        headers = {**_auth_headers(platform_admin_token), "Idempotency-Key": generate_ulid()}
+
+        first = client.post("/api/v1/admin/tenants", headers=headers, json=payload)
+        second = client.post("/api/v1/admin/tenants", headers=headers, json=payload)
+
+        assert first.status_code == 201, first.text
+        assert second.status_code == 201, second.text
+        assert first.json()["data"]["id"] == second.json()["data"]["id"]
+
+        listed = client.get(
+            "/api/v1/admin/tenants?status=active", headers=_auth_headers(platform_admin_token)
+        ).json()["data"]
+        matches = [t for t in listed if t["legalName"] == "Idempotent Diner LLC"]
+        assert len(matches) == 1, "a replayed request must not create a second tenant"
+
+    def test_the_same_key_with_a_different_body_is_rejected(
+        self, client: TestClient, platform_admin_token: str
+    ) -> None:
+        key = generate_ulid()
+        headers = {**_auth_headers(platform_admin_token), "Idempotency-Key": key}
+
+        first = client.post(
+            "/api/v1/admin/tenants",
+            headers=headers,
+            json={
+                "legalName": "Conflict A LLC",
+                "displayName": "Conflict A",
+                "defaultCurrencyCode": "USD",
+            },
+        )
+        assert first.status_code == 201
+
+        second = client.post(
+            "/api/v1/admin/tenants",
+            headers=headers,
+            json={
+                "legalName": "Conflict B LLC",
+                "displayName": "Conflict B",
+                "defaultCurrencyCode": "USD",
+            },
+        )
+        assert second.status_code == 409
+        assert second.json()["error"]["code"] == "IDEMPOTENCY_KEY_CONFLICT"
+
+    def test_without_a_key_each_request_creates_its_own_tenant(
+        self, client: TestClient, platform_admin_token: str
+    ) -> None:
+        """Existing, unchanged behavior for callers that don't opt in --
+        the header is optional (guest_order_router.py's own precedent),
+        so no key must mean no idempotency check at all."""
+        payload = {
+            "legalName": "No Key Each Time LLC",
+            "displayName": "No Key Each Time",
+            "defaultCurrencyCode": "USD",
+        }
+        first = client.post(
+            "/api/v1/admin/tenants", headers=_auth_headers(platform_admin_token), json=payload
+        )
+        second = client.post(
+            "/api/v1/admin/tenants", headers=_auth_headers(platform_admin_token), json=payload
+        )
+
+        assert first.status_code == 201
+        assert second.status_code == 409, "same legal name without a key is still a real conflict"
+        assert second.json()["error"]["code"] == "TENANT_LEGAL_NAME_CONFLICT"
+
+
 class TestListAndGetTenant:
     def test_list_returns_pagination_metadata(
         self, client: TestClient, platform_admin_token: str

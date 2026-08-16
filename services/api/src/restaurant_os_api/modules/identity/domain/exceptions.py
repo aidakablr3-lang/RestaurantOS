@@ -65,6 +65,14 @@ class UserNotFoundError(IdentityDomainError):
         self.identifier = identifier
 
 
+class UserEmailConflictError(IdentityDomainError):
+    error_code = "USER_EMAIL_CONFLICT"
+
+    def __init__(self, email: str) -> None:
+        super().__init__(f"A user with email '{email}' already exists in this tenant.")
+        self.email = email
+
+
 class UserNotActiveError(IdentityDomainError):
     error_code = "USER_NOT_ACTIVE"
 

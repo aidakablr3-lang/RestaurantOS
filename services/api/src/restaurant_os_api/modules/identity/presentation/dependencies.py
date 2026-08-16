@@ -31,6 +31,7 @@ from restaurant_os_api.modules.identity.application.services import TenantProvis
 from restaurant_os_api.modules.identity.application.use_cases import (
     AssignUserRoleUseCase,
     CreateRoleUseCase,
+    CreateUserUseCase,
     GetRoleUseCase,
     GetSubscriptionStatusUseCase,
     GetTenantQuotaUsageUseCase,
@@ -40,6 +41,7 @@ from restaurant_os_api.modules.identity.application.use_cases import (
     ListPermissionsUseCase,
     ListRolesUseCase,
     ListTenantsUseCase,
+    ListUsersUseCase,
     LoginUserUseCase,
     LogoutUserUseCase,
     OffboardTenantUseCase,
@@ -76,6 +78,7 @@ from restaurant_os_api.modules.identity.infrastructure.security import (
     Argon2PasswordHasher,
     JWTTokenService,
 )
+from restaurant_os_api.platform.idempotency import PlatformIdempotencyGuard
 from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchemyOutboxWriter
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -434,6 +437,27 @@ def get_revoke_user_role_use_case(
     )
 
 
+def get_create_user_use_case(
+    session_factory: SessionFactoryDep,
+    password_hasher: PasswordHasherDep,
+) -> CreateUserUseCase:
+    return CreateUserUseCase(
+        session_factory=session_factory,
+        user_repository_factory=SQLAlchemyUserRepository,
+        password_hasher=password_hasher,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+def get_list_users_use_case(session_factory: SessionFactoryDep) -> ListUsersUseCase:
+    return ListUsersUseCase(
+        session_factory=session_factory, user_repository_factory=SQLAlchemyUserRepository
+    )
+
+
+CreateUserUseCaseDep = Annotated[CreateUserUseCase, Depends(get_create_user_use_case)]
+ListUsersUseCaseDep = Annotated[ListUsersUseCase, Depends(get_list_users_use_case)]
+
 CreateRoleUseCaseDep = Annotated[CreateRoleUseCase, Depends(get_create_role_use_case)]
 GetRoleUseCaseDep = Annotated[GetRoleUseCase, Depends(get_get_role_use_case)]
 ListRolesUseCaseDep = Annotated[ListRolesUseCase, Depends(get_list_roles_use_case)]
@@ -590,4 +614,13 @@ UpdateTenantSettingsUseCaseDep = Annotated[
 ]
 ListFeatureFlagsUseCaseDep = Annotated[
     ListFeatureFlagsUseCase, Depends(get_list_feature_flags_use_case)
+]
+
+
+def get_platform_idempotency_guard(session_factory: SessionFactoryDep) -> PlatformIdempotencyGuard:
+    return PlatformIdempotencyGuard(session_factory)
+
+
+PlatformIdempotencyGuardDep = Annotated[
+    PlatformIdempotencyGuard, Depends(get_platform_idempotency_guard)
 ]

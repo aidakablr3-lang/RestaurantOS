@@ -307,6 +307,39 @@ class SQLAlchemyUserRepository:
         )
         return (await self._session.execute(stmt)).scalar_one()
 
+    async def create(self, user: User) -> User:
+        model = UserModel(
+            id=user.id,
+            tenant_id=user.tenant_id,
+            email=user.email,
+            phone=user.phone,
+            password_hash=user.password_hash,
+            pin_hash=user.pin_hash,
+            permission_version=user.permission_version,
+            status=user.status.value,
+            is_platform_admin=user.is_platform_admin,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _user_from_model(model)
+
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[User], int]:
+        visible = (UserModel.tenant_id == tenant_id, UserModel.deleted_at.is_(None))
+        count_stmt = select(func.count()).select_from(UserModel).where(*visible)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+
+        page_stmt = (
+            select(UserModel)
+            .where(*visible)
+            .order_by(UserModel.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        models = (await self._session.execute(page_stmt)).scalars().all()
+        return [_user_from_model(m) for m in models], total
+
 
 class SQLAlchemySessionRepository:
     """Implements ``SessionRepository``."""

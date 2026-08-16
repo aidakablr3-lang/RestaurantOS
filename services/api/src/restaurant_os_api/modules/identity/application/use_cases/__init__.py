@@ -4,6 +4,9 @@ from restaurant_os_api.modules.identity.application.use_cases.assign_user_role i
 from restaurant_os_api.modules.identity.application.use_cases.create_role import (
     CreateRoleUseCase,
 )
+from restaurant_os_api.modules.identity.application.use_cases.create_user import (
+    CreateUserUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.get_role import GetRoleUseCase
 from restaurant_os_api.modules.identity.application.use_cases.get_subscription_status import (
     GetSubscriptionStatusUseCase,
@@ -25,6 +28,7 @@ from restaurant_os_api.modules.identity.application.use_cases.list_roles import 
 from restaurant_os_api.modules.identity.application.use_cases.list_tenants import (
     ListTenantsUseCase,
 )
+from restaurant_os_api.modules.identity.application.use_cases.list_users import ListUsersUseCase
 from restaurant_os_api.modules.identity.application.use_cases.login_user import (
     LoginUserUseCase,
 )
@@ -68,6 +72,7 @@ from restaurant_os_api.modules.identity.application.use_cases.verify_access_toke
 __all__ = [
     "AssignUserRoleUseCase",
     "CreateRoleUseCase",
+    "CreateUserUseCase",
     "GetRoleUseCase",
     "GetSubscriptionStatusUseCase",
     "GetTenantQuotaUsageUseCase",
@@ -77,6 +82,7 @@ __all__ = [
     "ListPermissionsUseCase",
     "ListRolesUseCase",
     "ListTenantsUseCase",
+    "ListUsersUseCase",
     "LoginUserUseCase",
     "LogoutUserUseCase",
     "OffboardTenantUseCase",

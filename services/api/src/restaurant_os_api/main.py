@@ -24,6 +24,9 @@ from restaurant_os_api.modules.identity.presentation.api.v1.rbac_router import (
 from restaurant_os_api.modules.identity.presentation.api.v1.self_service_tenant_router import (
     router as self_service_tenant_router,
 )
+from restaurant_os_api.modules.identity.presentation.api.v1.users_router import (
+    router as users_router,
+)
 from restaurant_os_api.modules.operations.presentation.api.v1.bill_router import (
     router as bill_router,
 )
@@ -162,6 +165,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_tenant_router)
     app.include_router(self_service_tenant_router)
     app.include_router(rbac_router)
+    app.include_router(users_router)
     app.include_router(restaurant_router)
     app.include_router(branch_router)
     app.include_router(table_zone_router)
