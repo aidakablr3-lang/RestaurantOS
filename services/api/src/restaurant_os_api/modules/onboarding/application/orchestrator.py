@@ -67,39 +67,27 @@ step ``failed`` with the reason/exception persisted, and
 ``reblock_transitive_dependents`` (the reconciler's own counterpart to
 ``recompute_ready_steps``) walks the graph forward demoting any
 ``ready`` dependent back to ``blocked``. The run itself is never marked
-``abandoned`` by a step failure -- it stays ``in_progress`` and
-resumable, exactly the "not wedged" requirement; only reaching
-``verified`` on all 14 steps completes it.
+``abandoned`` and never deleted by a step failure -- not even
+``provision_tenant``'s: nothing else can have executed before the
+graph's root fails, so there is nothing to clean up, and the run
+persisting with ``tenant_id`` still null and the failure reason on
+record is exactly what diagnosing the failure needs. The run stays
+``in_progress`` and resumable, exactly the "not wedged" requirement;
+only reaching ``verified`` on all 14 steps completes it.
 
-**The one deliberate exception: ``provision_tenant`` failing deletes
-the run.** Every other step's failure leaves a real, inspectable,
-resumable run behind, because prior steps already committed real
-tenant state worth preserving. ``provision_tenant`` is the graph's
-root -- nothing else can have executed before it fails, so there is no
-prior state to preserve, and no way to "resume" a run whose tenant was
-never created (retrying is indistinguishable from starting over).
-Deleting the ``onboarding_runs`` row cascades to its
-``onboarding_step_states``/``onboarding_audit_log`` rows via migration
-0014's own ``ondelete="CASCADE"`` FKs, leaving zero rows across all
-three tables in one call -- not full cross-transaction atomicity (each
-piece still commits in its own short ``UnitOfWork``), but the
-observable end state after the compensating delete completes is
-exactly as if the run attempt never began.
-
-``execute_step`` accounts for this explicitly (it would otherwise try
-to reload a run that no longer exists and hit ``_load``'s own
-"not found" assertion). ``resume_run`` does not: a crash during
-``provision_tenant``'s own very first attempt, followed by a resume
-whose re-drive of that same attempt *also* fails, hits that same
-assertion inside ``resume_run``'s executing-steps loop. Disclosed
-here rather than silently left as a landmine -- narrow (only reachable
-when the crashed step is specifically ``provision_tenant``, which can
-only ever be the sole ``executing`` step, being the graph's root) and
-not exercised by any test this build was asked for; fixing it needs a
-real design decision (a dedicated "run no longer exists" outcome
-``resume_run`` can return, since its signature promises a real
-``RunSnapshotDTO``) rather than a mechanical patch, so it's left for
-whoever picks this up next rather than guessed at here.
+**Retry.** ``execute_step`` accepts a step in either ``ready`` or
+``failed`` status -- a failed step is not a dead end. A retry attempt
+is driven through the exact same collect -> autofill -> execute ->
+verify path as a first attempt, with its own idempotency key (payload-
+dependent, so a genuinely different retry payload -- a corrected name,
+a fixed price -- gets a fresh attempt rather than replaying the failed
+one's cached result; an unchanged payload after an ``execute()``-raised
+failure also gets a fresh attempt, since the idempotency guard releases
+its claim on an exception rather than caching it -- see
+``IdempotencyGuard``'s own docstring). On success, ``_succeed_step``'s
+own ``recompute_ready_steps`` call unblocks any dependent left
+``blocked`` by the earlier failure exactly as it would on a first
+success -- no separate "un-reblock" path is needed.
 """
 
 from __future__ import annotations
@@ -163,7 +151,7 @@ class StepNotReadyError(Exception):
     def __init__(self, step_id: StepId, actual_status: StepStatus) -> None:
         self.step_id = step_id
         self.actual_status = actual_status
-        super().__init__(f"step {step_id} is '{actual_status}', not 'ready'")
+        super().__init__(f"step {step_id} is '{actual_status}', not 'ready' or 'failed'")
 
 
 class OnboardingOrchestrator:
@@ -259,9 +247,14 @@ class OnboardingOrchestrator:
     async def execute_step(
         self, run_id: str, step_id: StepId, raw_input: dict[str, Any]
     ) -> StepExecutionResultDTO:
+        """A step in ``ready`` gets its first attempt; a step in
+        ``failed`` gets a retry -- both go through the identical
+        collect -> autofill -> execute -> verify path below. Any other
+        status (``blocked``, ``executing``, ``verified``, ...) is
+        rejected -- see this module's own docstring's "Retry" section."""
         run, states = await self._load(run_id)
         state = states.get(step_id)
-        if state is None or state.status != StepStatus.READY:
+        if state is None or state.status not in (StepStatus.READY, StepStatus.FAILED):
             actual = state.status if state is not None else StepStatus.BLOCKED
             raise StepNotReadyError(step_id, actual)
 
@@ -271,15 +264,6 @@ class OnboardingOrchestrator:
         validated_input = step.collect_schema.model_validate(collected)
 
         result_state = await self._run_step(run, state, validated_input)
-        if result_state.step_id == StepId.PROVISION_TENANT and result_state.status == StepStatus.FAILED:
-            # _fail_step already deleted the run in this one case (see
-            # this module's own docstring) -- nothing left to reload.
-            return StepExecutionResultDTO(
-                step_id=step_id,
-                status=result_state.status,
-                verify_result=_parse_verify_result(result_state),
-                context=OnboardingRunContext(),
-            )
         _run2, states2 = await self._load(run_id)
         ctx2 = self._reconstruct_context(states2)
         return StepExecutionResultDTO(
@@ -471,13 +455,6 @@ class OnboardingOrchestrator:
         )
         await self._update_state(state)
 
-        if state.step_id == StepId.PROVISION_TENANT:
-            # No prior step could have executed before the graph's own
-            # root -- nothing else here is worth preserving. See this
-            # module's own docstring.
-            await self._delete_run(run.id)
-            return state
-
         states = await self._states_by_id(run.id)
         statuses = {sid: s.status for sid, s in states.items()}
         reblocked = reblock_transitive_dependents(
@@ -531,11 +508,6 @@ class OnboardingOrchestrator:
         async with UnitOfWork(self._session_factory) as uow:
             repo = self._run_repository_factory(uow.session)
             await repo.update(run)
-
-    async def _delete_run(self, run_id: str) -> None:
-        async with UnitOfWork(self._session_factory) as uow:
-            repo = self._run_repository_factory(uow.session)
-            await repo.delete(run_id)
 
     async def _create_states(self, states: list[OnboardingStepState]) -> None:
         async with UnitOfWork(self._session_factory) as uow:

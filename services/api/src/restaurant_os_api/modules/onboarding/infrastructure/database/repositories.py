@@ -104,12 +104,6 @@ class SQLAlchemyOnboardingRunRepository:
         await self._session.flush()
         return _run_to_entity(model)
 
-    async def delete(self, run_id: str) -> None:
-        model = await self._session.get(OnboardingRunModel, run_id)
-        if model is not None:
-            await self._session.delete(model)
-            await self._session.flush()
-
 
 class SQLAlchemyOnboardingStepStateRepository:
     def __init__(self, session: AsyncSession) -> None:
