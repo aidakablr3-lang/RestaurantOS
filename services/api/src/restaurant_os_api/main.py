@@ -21,6 +21,9 @@ from restaurant_os_api.modules.identity.presentation.api.v1.auth_router import (
 from restaurant_os_api.modules.identity.presentation.api.v1.rbac_router import (
     router as rbac_router,
 )
+from restaurant_os_api.modules.identity.presentation.api.v1.owner_activation_router import (
+    router as owner_activation_router,
+)
 from restaurant_os_api.modules.identity.presentation.api.v1.self_service_tenant_router import (
     router as self_service_tenant_router,
 )
@@ -114,6 +117,9 @@ _UNAUTHENTICATED_OPERATIONS: frozenset[tuple[str, str]] = frozenset(
     {
         ("/api/v1/auth/login", "post"),
         ("/api/v1/auth/refresh", "post"),
+        # Phase 1 design doc SSA.4: the token itself is the credential --
+        # same reasoning as the auth routes above, not a new pattern.
+        ("/api/v1/owner-activation", "post"),
         ("/api/v1/auth/logout", "post"),
         ("/api/v1/qr/{token}", "get"),
         ("/api/v1/qr/{token}/menu", "get"),
@@ -162,6 +168,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     app.include_router(auth_router)
+    app.include_router(owner_activation_router)
     app.include_router(admin_tenant_router)
     app.include_router(self_service_tenant_router)
     app.include_router(rbac_router)

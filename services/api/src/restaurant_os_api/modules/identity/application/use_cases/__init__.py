@@ -1,3 +1,6 @@
+from restaurant_os_api.modules.identity.application.use_cases.activate_owner import (
+    ActivateOwnerUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.assign_user_role import (
     AssignUserRoleUseCase,
 )
@@ -7,7 +10,13 @@ from restaurant_os_api.modules.identity.application.use_cases.create_role import
 from restaurant_os_api.modules.identity.application.use_cases.create_user import (
     CreateUserUseCase,
 )
+from restaurant_os_api.modules.identity.application.use_cases.get_owner_activation_token_status import (
+    GetOwnerActivationTokenStatusUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.get_role import GetRoleUseCase
+from restaurant_os_api.modules.identity.application.use_cases.get_role_by_name import (
+    GetRoleByNameUseCase,
+)
 from restaurant_os_api.modules.identity.application.use_cases.get_subscription_status import (
     GetSubscriptionStatusUseCase,
 )
@@ -18,6 +27,7 @@ from restaurant_os_api.modules.identity.application.use_cases.get_tenant_quota_u
 from restaurant_os_api.modules.identity.application.use_cases.get_tenant_settings import (
     GetTenantSettingsUseCase,
 )
+from restaurant_os_api.modules.identity.application.use_cases.get_user import GetUserUseCase
 from restaurant_os_api.modules.identity.application.use_cases.list_feature_flags import (
     ListFeatureFlagsUseCase,
 )
@@ -70,14 +80,18 @@ from restaurant_os_api.modules.identity.application.use_cases.verify_access_toke
 )
 
 __all__ = [
+    "ActivateOwnerUseCase",
     "AssignUserRoleUseCase",
     "CreateRoleUseCase",
     "CreateUserUseCase",
+    "GetOwnerActivationTokenStatusUseCase",
+    "GetRoleByNameUseCase",
     "GetRoleUseCase",
     "GetSubscriptionStatusUseCase",
     "GetTenantQuotaUsageUseCase",
     "GetTenantSettingsUseCase",
     "GetTenantUseCase",
+    "GetUserUseCase",
     "ListFeatureFlagsUseCase",
     "ListPermissionsUseCase",
     "ListRolesUseCase",

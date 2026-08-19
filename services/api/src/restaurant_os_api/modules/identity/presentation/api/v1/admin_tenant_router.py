@@ -59,6 +59,9 @@ def _to_schema(dto: TenantDTO) -> TenantResponseSchema:
         default_currency_code=dto.default_currency_code,
         metadata=dto.metadata,
         created_at=dto.created_at,
+        owner_id=dto.owner_id,
+        owner_email=dto.owner_email,
+        owner_activation_token=dto.owner_activation_token,
     )
 
 
@@ -77,6 +80,8 @@ async def onboard_tenant(
                 legal_name=body.legal_name,
                 display_name=body.display_name,
                 default_currency_code=body.default_currency_code,
+                owner_email=body.owner_email,
+                owner_phone=body.owner_phone,
             )
         )
         response = ApiResponse(data=_to_schema(result))

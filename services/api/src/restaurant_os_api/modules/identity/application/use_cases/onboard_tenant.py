@@ -7,6 +7,8 @@ service (see its docstring for why).
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from restaurant_os_api.modules.identity.application.dto import OnboardTenantRequestDTO, TenantDTO
 from restaurant_os_api.modules.identity.application.services import TenantProvisioningService
 from restaurant_os_api.modules.identity.application.use_cases._tenant_mapper import tenant_to_dto
@@ -17,9 +19,16 @@ class OnboardTenantUseCase:
         self._provisioning_service = provisioning_service
 
     async def execute(self, request: OnboardTenantRequestDTO) -> TenantDTO:
-        tenant = await self._provisioning_service.provision(
+        tenant, owner, raw_activation_token = await self._provisioning_service.provision(
             legal_name=request.legal_name,
             display_name=request.display_name,
             default_currency_code=request.default_currency_code,
+            owner_email=request.owner_email,
+            owner_phone=request.owner_phone,
         )
-        return tenant_to_dto(tenant)
+        return replace(
+            tenant_to_dto(tenant),
+            owner_id=owner.id,
+            owner_email=owner.email,
+            owner_activation_token=raw_activation_token,
+        )

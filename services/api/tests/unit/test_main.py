@@ -121,6 +121,7 @@ class TestOpenApiSecurityScheme:
             ("/api/v1/qr/{token}/orders/{order_id}/items", "post"),
             ("/api/v1/qr/{token}/orders/{order_id}/submit", "post"),
             ("/api/v1/qr/{token}/orders/{order_id}", "get"),
+            ("/api/v1/owner-activation", "post"),
         }
 
         checked = 0
@@ -156,4 +157,10 @@ class TestOpenApiSecurityScheme:
         # The payment/table-lifecycle P0 correction (2026-08-12) removed
         # 1: POST /payments/{id}/refund -- RestaurantOS v1 has no refund
         # workflow (see docs/AI_HANDOFF.md).
-        assert checked == 124
+        # Gap 1 (user-creation API, 2026-08-16) added 2 more, authenticated:
+        # POST and GET /api/v1/users -- found already missing from this
+        # count when Phase 1 touched it; corrected here rather than left
+        # silently stale.
+        # Phase 1 (Setup Copilot, design doc SSA.4) added 1 more, public:
+        # POST /api/v1/owner-activation.
+        assert checked == 127

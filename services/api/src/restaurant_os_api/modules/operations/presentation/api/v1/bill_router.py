@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Path, status
+from fastapi import APIRouter, Header, Path, status
 from fastapi.responses import JSONResponse
 
 from restaurant_os_api.core.response import ApiResponse
@@ -25,6 +25,7 @@ from restaurant_os_api.modules.operations.presentation.dependencies import (
     CreateTaxUseCaseDep,
     GenerateBillUseCaseDep,
     GetBillUseCaseDep,
+    IdempotencyGuardDep,
     ListTaxesUseCaseDep,
     RequireBillingManageAtAnyScopeDep,
     RequireBillingManageTenantWideDep,
@@ -38,11 +39,13 @@ from restaurant_os_api.modules.operations.presentation.schemas.bill_schemas impo
     OrderTaxLineResponseSchema,
     TaxResponseSchema,
 )
+from restaurant_os_api.platform.idempotency import fingerprint_request
 
 router = APIRouter(tags=["billing"])
 
 OrderIdPath = Annotated[str, Path(min_length=26, max_length=26)]
 BillIdPath = Annotated[str, Path(min_length=26, max_length=26)]
+IdempotencyKeyHeader = Annotated[str | None, Header(alias="Idempotency-Key")]
 
 
 def _bill_to_schema(dto: BillDTO) -> BillResponseSchema:
@@ -97,18 +100,33 @@ async def create_tax(
     body: CreateTaxRequestSchema,
     principal: RequireBillingManageTenantWideDep,
     use_case: CreateTaxUseCaseDep,
-) -> ApiResponse[TaxResponseSchema]:
-    tax = await use_case.execute(principal.tenant_id, body.name, str(body.rate))
-    return ApiResponse(
-        data=TaxResponseSchema(
-            id=tax.id,
-            tenant_id=tax.tenant_id,
-            name=tax.name,
-            rate=tax.rate,
-            is_active=tax.is_active,
-            created_at=tax.created_at,
+    idempotency_guard: IdempotencyGuardDep,
+    idempotency_key: IdempotencyKeyHeader = None,
+) -> JSONResponse:
+    async def execute() -> tuple[int, dict[str, Any]]:
+        tax = await use_case.execute(principal.tenant_id, body.name, str(body.rate))
+        response = ApiResponse(
+            data=TaxResponseSchema(
+                id=tax.id,
+                tenant_id=tax.tenant_id,
+                name=tax.name,
+                rate=tax.rate,
+                is_active=tax.is_active,
+                created_at=tax.created_at,
+            )
         )
-    )
+        return status.HTTP_201_CREATED, response.model_dump(mode="json", by_alias=True)
+
+    if idempotency_key is None:
+        http_status, response_body = await execute()
+    else:
+        http_status, response_body = await idempotency_guard.run(
+            tenant_id=principal.tenant_id,
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint_request(body.model_dump(mode="json")),
+            execute=execute,
+        )
+    return JSONResponse(status_code=http_status, content=response_body)
 
 
 @router.get(

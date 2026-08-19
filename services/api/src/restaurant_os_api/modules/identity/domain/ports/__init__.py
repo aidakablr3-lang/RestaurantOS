@@ -1,6 +1,9 @@
 from restaurant_os_api.modules.identity.domain.ports.feature_flag_repository import (
     FeatureFlagRepository,
 )
+from restaurant_os_api.modules.identity.domain.ports.owner_activation_token_repository import (
+    OwnerActivationTokenRepository,
+)
 from restaurant_os_api.modules.identity.domain.ports.permission_repository import (
     PermissionRepository,
 )
@@ -34,6 +37,7 @@ from restaurant_os_api.modules.identity.domain.ports.user_role_repository import
 
 __all__ = [
     "FeatureFlagRepository",
+    "OwnerActivationTokenRepository",
     "PermissionRepository",
     "RolePermissionRepository",
     "RoleRepository",

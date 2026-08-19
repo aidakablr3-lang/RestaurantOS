@@ -18,6 +18,8 @@ class OnboardTenantRequestSchema(CamelModel):
     legal_name: str = Field(..., min_length=1, max_length=255)
     display_name: str = Field(..., min_length=1, max_length=255)
     default_currency_code: str = Field(..., min_length=3, max_length=3)
+    owner_email: str = Field(..., min_length=3, max_length=320)
+    owner_phone: str | None = None
 
 
 class UpdateTenantRequestSchema(CamelModel):
@@ -34,6 +36,11 @@ class TenantResponseSchema(CamelModel):
     default_currency_code: str
     metadata: dict[str, Any]
     created_at: datetime
+    # Only present on the onboard response -- see TenantDTO's own
+    # docstring. owner_activation_token is shown exactly once.
+    owner_id: str | None = None
+    owner_email: str | None = None
+    owner_activation_token: str | None = None
 
 
 class SubscriptionResponseSchema(CamelModel):

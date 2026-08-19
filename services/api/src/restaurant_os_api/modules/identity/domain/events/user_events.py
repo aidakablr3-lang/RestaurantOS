@@ -18,7 +18,11 @@ class UserCreated:
     user_id: str
     tenant_id: str
     email: str | None
-    created_by_user_id: str
+    # None for the one caller with no delegating actor: atomic first-Owner
+    # provisioning (TenantProvisioningService.provision(), Phase 1 design
+    # doc SSA.4) is a system operation, not a human- or API-caller-initiated
+    # grant -- there is no user to attribute it to.
+    created_by_user_id: str | None
     occurred_at: datetime
 
     event_type: ClassVar[str] = "UserCreated"

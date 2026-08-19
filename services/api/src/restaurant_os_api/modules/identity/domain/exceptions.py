@@ -97,6 +97,23 @@ class InvalidCredentialsError(IdentityDomainError):
         super().__init__("Invalid email or password.")
 
 
+class InvalidOwnerActivationTokenError(IdentityDomainError):
+    """Raised for any owner-activation failure: the token hash matches no
+    row, matches an expired row, or matches an already-used row.
+
+    Deliberately does not distinguish which of the three happened, the
+    same discipline ``InvalidCredentialsError`` applies to login — this
+    endpoint is unauthenticated and the token *is* the credential, so a
+    differentiated response would let a scanning client learn whether a
+    guessed token ever existed, purely expired, or was already consumed
+    (Phase 1 design doc SSA.4's explicit amendment)."""
+
+    error_code = "INVALID_OWNER_ACTIVATION_TOKEN"
+
+    def __init__(self) -> None:
+        super().__init__("This activation link is invalid or has expired.")
+
+
 class InvalidRefreshTokenError(IdentityDomainError):
     error_code = "INVALID_REFRESH_TOKEN"
 

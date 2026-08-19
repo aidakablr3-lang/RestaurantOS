@@ -24,9 +24,10 @@ brand-new tenant has none yet. That bootstrap case still goes through
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, Query, status
+from fastapi.responses import JSONResponse
 
 from restaurant_os_api.core.response import ApiResponse, PaginationMeta
 from restaurant_os_api.modules.identity.application.dto import (
@@ -36,6 +37,7 @@ from restaurant_os_api.modules.identity.application.dto import (
 from restaurant_os_api.modules.identity.application.dto.user_dto import UserDTO
 from restaurant_os_api.modules.identity.presentation.dependencies import (
     CreateUserUseCaseDep,
+    IdempotencyGuardDep,
     ListUsersUseCaseDep,
     require_permission_at_any_scope,
 )
@@ -43,12 +45,14 @@ from restaurant_os_api.modules.identity.presentation.schemas.user_schemas import
     CreateUserRequestSchema,
     UserResponseSchema,
 )
+from restaurant_os_api.platform.idempotency import fingerprint_request
 
 router = APIRouter(tags=["users"])
 
 RequireRolesAssignAtAnyScopeDep = Annotated[
     AuthenticatedPrincipalDTO, Depends(require_permission_at_any_scope("roles.assign"))
 ]
+IdempotencyKeyHeader = Annotated[str | None, Header(alias="Idempotency-Key")]
 
 
 def _user_to_schema(dto: UserDTO) -> UserResponseSchema:
@@ -72,17 +76,32 @@ async def create_user(
     body: CreateUserRequestSchema,
     principal: RequireRolesAssignAtAnyScopeDep,
     use_case: CreateUserUseCaseDep,
-) -> ApiResponse[UserResponseSchema]:
-    result = await use_case.execute(
-        principal.tenant_id,
-        CreateUserRequestDTO(
-            creator_user_id=principal.user_id,
-            email=body.email,
-            phone=body.phone,
-            password=body.password,
-        ),
-    )
-    return ApiResponse(data=_user_to_schema(result))
+    idempotency_guard: IdempotencyGuardDep,
+    idempotency_key: IdempotencyKeyHeader = None,
+) -> JSONResponse:
+    async def execute() -> tuple[int, dict[str, Any]]:
+        result = await use_case.execute(
+            principal.tenant_id,
+            CreateUserRequestDTO(
+                creator_user_id=principal.user_id,
+                email=body.email,
+                phone=body.phone,
+                password=body.password,
+            ),
+        )
+        response = ApiResponse(data=_user_to_schema(result))
+        return status.HTTP_201_CREATED, response.model_dump(mode="json", by_alias=True)
+
+    if idempotency_key is None:
+        http_status, response_body = await execute()
+    else:
+        http_status, response_body = await idempotency_guard.run(
+            tenant_id=principal.tenant_id,
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint_request(body.model_dump(mode="json")),
+            execute=execute,
+        )
+    return JSONResponse(status_code=http_status, content=response_body)
 
 
 @router.get("/api/v1/users", response_model=ApiResponse[list[UserResponseSchema]])

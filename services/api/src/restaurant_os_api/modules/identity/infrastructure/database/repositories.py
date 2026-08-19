@@ -19,6 +19,7 @@ from sqlalchemy.sql.elements import ColumnElement
 from restaurant_os_api.core.ids import generate_ulid
 from restaurant_os_api.modules.identity.domain.entities import (
     FeatureFlag,
+    OwnerActivationToken,
     Permission,
     Role,
     RolePermission,
@@ -37,6 +38,7 @@ from restaurant_os_api.modules.identity.domain.entities import (
 )
 from restaurant_os_api.modules.identity.infrastructure.database.models import (
     FeatureFlagModel,
+    OwnerActivationTokenModel,
     PermissionModel,
     RoleModel,
     RolePermissionModel,
@@ -307,6 +309,14 @@ class SQLAlchemyUserRepository:
         )
         return (await self._session.execute(stmt)).scalar_one()
 
+    async def activate(self, tenant_id: str, user_id: str, *, password_hash: str) -> None:
+        stmt = (
+            update(UserModel)
+            .where(UserModel.id == user_id, UserModel.tenant_id == tenant_id)
+            .values(password_hash=password_hash, status="active")
+        )
+        await self._session.execute(stmt)
+
     async def create(self, user: User) -> User:
         model = UserModel(
             id=user.id,
@@ -395,6 +405,75 @@ class SQLAlchemySessionRepository:
             .values(revoked_at=datetime.now(UTC))
         )
         await self._session.execute(stmt)
+
+
+def _owner_activation_token_from_model(model: OwnerActivationTokenModel) -> OwnerActivationToken:
+    return OwnerActivationToken(
+        id=model.id,
+        tenant_id=model.tenant_id,
+        user_id=model.user_id,
+        token_hash=model.token_hash,
+        issued_at=model.issued_at,
+        expires_at=model.expires_at,
+        used_at=model.used_at,
+    )
+
+
+class SQLAlchemyOwnerActivationTokenRepository:
+    """Implements ``OwnerActivationTokenRepository``.
+
+    ``get_by_token_hash`` deliberately queries with no ``tenant_id``
+    filter, unlike every other repository method in this module — see
+    the port's own docstring and migration 0014's module docstring for
+    why: this table carries no RLS policy, and the caller (an
+    unauthenticated activation request) has no tenant to filter by in
+    the first place.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(self, token: OwnerActivationToken) -> OwnerActivationToken:
+        model = OwnerActivationTokenModel(
+            id=token.id,
+            tenant_id=token.tenant_id,
+            user_id=token.user_id,
+            token_hash=token.token_hash,
+            issued_at=token.issued_at,
+            expires_at=token.expires_at,
+            used_at=token.used_at,
+        )
+        self._session.add(model)
+        await self._session.flush()
+        return _owner_activation_token_from_model(model)
+
+    async def get_by_token_hash(self, token_hash: str) -> OwnerActivationToken | None:
+        stmt = select(OwnerActivationTokenModel).where(
+            OwnerActivationTokenModel.token_hash == token_hash
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _owner_activation_token_from_model(model) if model is not None else None
+
+    async def mark_used(self, token_id: str, *, used_at: datetime) -> None:
+        stmt = (
+            update(OwnerActivationTokenModel)
+            .where(OwnerActivationTokenModel.id == token_id)
+            .values(used_at=used_at)
+        )
+        await self._session.execute(stmt)
+
+    async def get_latest_for_user(self, tenant_id: str, user_id: str) -> OwnerActivationToken | None:
+        stmt = (
+            select(OwnerActivationTokenModel)
+            .where(
+                OwnerActivationTokenModel.tenant_id == tenant_id,
+                OwnerActivationTokenModel.user_id == user_id,
+            )
+            .order_by(OwnerActivationTokenModel.issued_at.desc())
+            .limit(1)
+        )
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _owner_activation_token_from_model(model) if model is not None else None
 
 
 class SQLAlchemySubscriptionRepository:

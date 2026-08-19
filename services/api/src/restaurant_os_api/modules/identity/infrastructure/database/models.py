@@ -135,6 +135,39 @@ class SessionModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin)
     )
 
 
+class OwnerActivationTokenModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin):
+    """Phase 1 design doc SSA.4 / migration 0014.
+
+    Only a hash of the activation token is ever stored, the same
+    ``sessions.refresh_token_hash`` discipline. No ``TimestampMixin``:
+    ``issued_at``/``expires_at``/``used_at`` are this table's complete
+    lifecycle — there is no separate ``updated_at`` concept for a row
+    that is written once and marked used at most once. No RLS on this
+    table (migration 0014's own docstring has the full reasoning) —
+    ``tenant_id`` is still a real, indexed, `NOT NULL`` FK column here
+    (application-layer scoping and referential integrity still apply),
+    it just isn't backed by a `CREATE POLICY` the way every other
+    ``TenantScopedMixin`` table's is.
+    """
+
+    __tablename__ = "owner_activation_tokens"
+    __table_args__ = (
+        ulid_check_constraint("id"),
+        Index("ix_owner_activation_tokens_token_hash", "token_hash", unique=True),
+        Index("ix_owner_activation_tokens_user_id", "user_id"),
+    )
+
+    user_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(TimestampType(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(TimestampType(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(
+        TimestampType(timezone=True), nullable=True, default=None
+    )
+
+
 class SubscriptionModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin):
     """Sprint 4.1 (Tenant Platform). One current subscription per tenant —
     a plan change updates this row in place; full billing history is out

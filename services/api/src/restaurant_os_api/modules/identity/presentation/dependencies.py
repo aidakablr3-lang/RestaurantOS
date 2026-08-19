@@ -29,6 +29,7 @@ from restaurant_os_api.modules.identity.application.interfaces import (
 )
 from restaurant_os_api.modules.identity.application.services import TenantProvisioningService
 from restaurant_os_api.modules.identity.application.use_cases import (
+    ActivateOwnerUseCase,
     AssignUserRoleUseCase,
     CreateRoleUseCase,
     CreateUserUseCase,
@@ -63,6 +64,7 @@ from restaurant_os_api.modules.identity.domain.exceptions import (
 )
 from restaurant_os_api.modules.identity.infrastructure.database.repositories import (
     SQLAlchemyFeatureFlagRepository,
+    SQLAlchemyOwnerActivationTokenRepository,
     SQLAlchemyPermissionRepository,
     SQLAlchemyRolePermissionRepository,
     SQLAlchemyRoleRepository,
@@ -78,7 +80,8 @@ from restaurant_os_api.modules.identity.infrastructure.security import (
     Argon2PasswordHasher,
     JWTTokenService,
 )
-from restaurant_os_api.platform.idempotency import PlatformIdempotencyGuard
+from restaurant_os_api.platform.idempotency import IdempotencyGuard, PlatformIdempotencyGuard
+from restaurant_os_api.platform.rate_limiting import OwnerActivationRateLimiter
 from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchemyOutboxWriter
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -458,6 +461,34 @@ def get_list_users_use_case(session_factory: SessionFactoryDep) -> ListUsersUseC
 CreateUserUseCaseDep = Annotated[CreateUserUseCase, Depends(get_create_user_use_case)]
 ListUsersUseCaseDep = Annotated[ListUsersUseCase, Depends(get_list_users_use_case)]
 
+
+def get_activate_owner_use_case(
+    session_factory: SessionFactoryDep,
+    password_hasher: PasswordHasherDep,
+    token_service: TokenServiceDep,
+) -> ActivateOwnerUseCase:
+    return ActivateOwnerUseCase(
+        session_factory=session_factory,
+        owner_activation_token_repository_factory=SQLAlchemyOwnerActivationTokenRepository,
+        user_repository_factory=SQLAlchemyUserRepository,
+        password_hasher=password_hasher,
+        token_service=token_service,
+    )
+
+
+ActivateOwnerUseCaseDep = Annotated[ActivateOwnerUseCase, Depends(get_activate_owner_use_case)]
+
+
+def get_owner_activation_rate_limiter(
+    session_factory: SessionFactoryDep,
+) -> OwnerActivationRateLimiter:
+    return OwnerActivationRateLimiter(session_factory)
+
+
+OwnerActivationRateLimiterDep = Annotated[
+    OwnerActivationRateLimiter, Depends(get_owner_activation_rate_limiter)
+]
+
 CreateRoleUseCaseDep = Annotated[CreateRoleUseCase, Depends(get_create_role_use_case)]
 GetRoleUseCaseDep = Annotated[GetRoleUseCase, Depends(get_get_role_use_case)]
 ListRolesUseCaseDep = Annotated[ListRolesUseCase, Depends(get_list_roles_use_case)]
@@ -476,6 +507,7 @@ RevokeUserRoleUseCaseDep = Annotated[RevokeUserRoleUseCase, Depends(get_revoke_u
 
 def get_tenant_provisioning_service(
     session_factory: SessionFactoryDep,
+    token_service: TokenServiceDep,
 ) -> TenantProvisioningService:
     return TenantProvisioningService(
         session_factory=session_factory,
@@ -485,6 +517,10 @@ def get_tenant_provisioning_service(
         directory_repository_factory=SQLAlchemyTenantDirectoryRepository,
         role_repository_factory=SQLAlchemyRoleRepository,
         role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+        user_repository_factory=SQLAlchemyUserRepository,
+        user_role_repository_factory=SQLAlchemyUserRoleRepository,
+        owner_activation_token_repository_factory=SQLAlchemyOwnerActivationTokenRepository,
+        token_service=token_service,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
 
@@ -624,3 +660,10 @@ def get_platform_idempotency_guard(session_factory: SessionFactoryDep) -> Platfo
 PlatformIdempotencyGuardDep = Annotated[
     PlatformIdempotencyGuard, Depends(get_platform_idempotency_guard)
 ]
+
+
+def get_idempotency_guard(session_factory: SessionFactoryDep) -> IdempotencyGuard:
+    return IdempotencyGuard(session_factory)
+
+
+IdempotencyGuardDep = Annotated[IdempotencyGuard, Depends(get_idempotency_guard)]

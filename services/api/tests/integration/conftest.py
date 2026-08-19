@@ -210,12 +210,21 @@ async def _clean_tables(engine: AsyncEngine) -> AsyncGenerator[None]:
     ``platform_idempotency_keys`` (migration 0013) has no ``tenant_id``
     either (see ``PlatformIdempotencyGuard``'s own docstring for why),
     same truncation rationale as ``qr_resolution_rate_limits`` above.
+
+    ``onboarding_runs``/``onboarding_step_states``/``onboarding_audit_log``/
+    ``owner_activation_tokens`` (migration 0014) are listed explicitly
+    even though ``CASCADE`` would sweep them up transitively via their
+    FKs into ``tenants``/``users``/``onboarding_runs`` -- explicit,
+    matching this list's own established convention, rather than relying
+    on cascade behavior a future reader would have to work out.
     """
     yield
     async with engine.begin() as conn:
         await conn.exec_driver_sql(
             "TRUNCATE TABLE qr_resolution_rate_limits, idempotency_keys, "
-            "platform_idempotency_keys, outbox_events, "
+            "platform_idempotency_keys, "
+            "onboarding_step_states, onboarding_audit_log, owner_activation_tokens, "
+            "onboarding_runs, outbox_events, "
             "reservations, "
             "menu_item_modifier_groups, "
             "menu_item_availabilities, menu_item_branch_prices, modifiers, modifier_groups, "

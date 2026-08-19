@@ -10,12 +10,14 @@ under test cannot tell the difference — and neither `sqlalchemy` nor
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from restaurant_os_api.modules.identity.application.interfaces import (
     AccessTokenClaims,
     TokenDecodeError,
 )
 from restaurant_os_api.modules.identity.domain.entities import (
+    OwnerActivationToken,
     Permission,
     Role,
     RolePermission,
@@ -112,6 +114,13 @@ class InMemoryUserRepository:
         visible.sort(key=lambda u: u.created_at, reverse=True)
         return visible[offset : offset + limit], len(visible)
 
+    async def activate(self, tenant_id: str, user_id: str, *, password_hash: str) -> None:
+        from restaurant_os_api.modules.identity.domain.entities import UserStatus
+
+        user = self._users[user_id]
+        user.password_hash = password_hash
+        user.status = UserStatus.ACTIVE
+
 
 class InMemorySessionRepository:
     def __init__(self) -> None:
@@ -141,6 +150,32 @@ class InMemorySessionRepository:
         for session in self.sessions.values():
             if session.user_id == user_id and session.revoked_at is None:
                 session.revoked_at = now
+
+
+class InMemoryOwnerActivationTokenRepository:
+    def __init__(self) -> None:
+        self.tokens: dict[str, OwnerActivationToken] = {}
+
+    async def create(self, token: OwnerActivationToken) -> OwnerActivationToken:
+        self.tokens[token.id] = token
+        return token
+
+    async def get_by_token_hash(self, token_hash: str) -> OwnerActivationToken | None:
+        for token in self.tokens.values():
+            if token.token_hash == token_hash:
+                return token
+        return None
+
+    async def mark_used(self, token_id: str, *, used_at: datetime) -> None:
+        self.tokens[token_id].used_at = used_at
+
+    async def get_latest_for_user(self, tenant_id: str, user_id: str) -> OwnerActivationToken | None:
+        candidates = [
+            t for t in self.tokens.values() if t.tenant_id == tenant_id and t.user_id == user_id
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda t: t.issued_at)
 
 
 class FakePasswordHasher:

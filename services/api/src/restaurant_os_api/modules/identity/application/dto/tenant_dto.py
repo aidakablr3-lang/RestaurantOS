@@ -17,6 +17,8 @@ class OnboardTenantRequestDTO:
     legal_name: str
     display_name: str
     default_currency_code: str
+    owner_email: str
+    owner_phone: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +45,16 @@ class TenantDTO:
     default_currency_code: str
     metadata: dict[str, Any]
     created_at: datetime
+    # Only populated on the response to an *onboard* call (Phase 1 design
+    # doc SSA.4's atomic first-Owner provisioning) -- every other tenant
+    # lifecycle use case sharing this DTO (get/list/update/suspend/
+    # reactivate/offboard) leaves these at their default. Mirrors
+    # UserDTO.generated_password's own "shown exactly once" convention --
+    # owner_activation_token is the raw, one-time token; only its hash is
+    # ever persisted.
+    owner_id: str | None = None
+    owner_email: str | None = None
+    owner_activation_token: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

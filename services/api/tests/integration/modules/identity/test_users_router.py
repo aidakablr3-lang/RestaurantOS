@@ -257,3 +257,48 @@ class TestListUsers:
         assert response.status_code == 200
         emails = {u["email"] for u in response.json()["data"]}
         assert "owner-b@example.com" not in emails
+
+
+class TestCreateUserIdempotency:
+    async def test_same_key_and_payload_returns_the_original_user_with_no_duplicate(
+        self, client: TestClient, session_factory
+    ) -> None:
+        tenant_id = generate_ulid()
+        owner_id = await _seed_user(session_factory, tenant_id=tenant_id, email="idem-owner@example.com")
+        await _grant_tenant_owner(session_factory, tenant_id=tenant_id, user_id=owner_id)
+        owner_token = _login(client, tenant_id=tenant_id, email="idem-owner@example.com")
+        headers = {**_auth_headers(owner_token), "Idempotency-Key": "create-user-key-1"}
+        payload = {"email": "idem-waiter@example.com"}
+
+        first = client.post("/api/v1/users", headers=headers, json=payload)
+        second = client.post("/api/v1/users", headers=headers, json=payload)
+
+        assert first.status_code == 201, first.text
+        assert second.status_code == 201, second.text
+        assert first.json()["data"]["id"] == second.json()["data"]["id"]
+
+        list_response = client.get("/api/v1/users", headers=_auth_headers(owner_token))
+        matching = [
+            u for u in list_response.json()["data"] if u["email"] == "idem-waiter@example.com"
+        ]
+        assert len(matching) == 1
+
+    async def test_same_key_with_a_different_payload_is_a_conflict(
+        self, client: TestClient, session_factory
+    ) -> None:
+        tenant_id = generate_ulid()
+        owner_id = await _seed_user(session_factory, tenant_id=tenant_id, email="idem-owner2@example.com")
+        await _grant_tenant_owner(session_factory, tenant_id=tenant_id, user_id=owner_id)
+        owner_token = _login(client, tenant_id=tenant_id, email="idem-owner2@example.com")
+        headers = {**_auth_headers(owner_token), "Idempotency-Key": "create-user-key-2"}
+
+        first = client.post(
+            "/api/v1/users", headers=headers, json={"email": "idem-first@example.com"}
+        )
+        assert first.status_code == 201, first.text
+
+        second = client.post(
+            "/api/v1/users", headers=headers, json={"email": "idem-second@example.com"}
+        )
+        assert second.status_code == 409
+        assert second.json()["error"]["code"] == "IDEMPOTENCY_KEY_CONFLICT"

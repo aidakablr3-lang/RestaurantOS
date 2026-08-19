@@ -947,3 +947,38 @@ class TestOrderKitchenBillingPaymentLifecycle:
             headers=_auth_headers(other_token),
         )
         assert response.status_code == 404
+
+
+class TestCreateTaxIdempotency:
+    def test_same_key_and_payload_returns_the_original_tax_with_no_duplicate(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = {**_auth_headers(owner["token"]), "Idempotency-Key": "create-tax-key-1"}
+        payload = {"name": "Idempotency VAT", "rate": "0.10"}
+
+        first = client.post("/api/v1/taxes", headers=headers, json=payload)
+        second = client.post("/api/v1/taxes", headers=headers, json=payload)
+
+        assert first.status_code == 201, first.text
+        assert second.status_code == 201, second.text
+        assert first.json()["data"]["id"] == second.json()["data"]["id"]
+
+        list_response = client.get("/api/v1/taxes", headers=_auth_headers(owner["token"]))
+        matching = [t for t in list_response.json()["data"] if t["name"] == "Idempotency VAT"]
+        assert len(matching) == 1
+
+    def test_same_key_with_a_different_payload_is_a_conflict(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = {**_auth_headers(owner["token"]), "Idempotency-Key": "create-tax-key-2"}
+
+        first = client.post(
+            "/api/v1/taxes", headers=headers, json={"name": "First Tax", "rate": "0.05"}
+        )
+        assert first.status_code == 201, first.text
+
+        second = client.post(
+            "/api/v1/taxes", headers=headers, json={"name": "Second Tax", "rate": "0.08"}
+        )
+        assert second.status_code == 409
+        assert second.json()["error"]["code"] == "IDEMPOTENCY_KEY_CONFLICT"

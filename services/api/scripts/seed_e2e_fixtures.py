@@ -32,13 +32,19 @@ from restaurant_os_api.modules.identity.application.services import TenantProvis
 from restaurant_os_api.modules.identity.infrastructure.database.models import UserModel
 from restaurant_os_api.modules.identity.infrastructure.database.repositories import (
     SQLAlchemyFeatureFlagRepository,
+    SQLAlchemyOwnerActivationTokenRepository,
     SQLAlchemyRolePermissionRepository,
     SQLAlchemyRoleRepository,
     SQLAlchemySubscriptionRepository,
     SQLAlchemyTenantDirectoryRepository,
     SQLAlchemyTenantRepository,
+    SQLAlchemyUserRepository,
+    SQLAlchemyUserRoleRepository,
 )
-from restaurant_os_api.modules.identity.infrastructure.security import Argon2PasswordHasher
+from restaurant_os_api.modules.identity.infrastructure.security import (
+    Argon2PasswordHasher,
+    JWTTokenService,
+)
 from restaurant_os_api.platform.database import UnitOfWork
 from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchemyOutboxWriter
 from restaurant_os_api.platform.tenancy import TenantContext
@@ -47,6 +53,12 @@ E2E_LEGAL_NAME = "RestaurantOS E2E Fixtures LLC"
 E2E_DISPLAY_NAME = "E2E Fixtures"
 E2E_ADMIN_EMAIL = "e2e-admin@restaurantos.dev"
 E2E_ADMIN_PASSWORD = "E2EAdmin!2026"
+# Phase 1 (design doc SSA.4): provision() now creates an Owner
+# atomically alongside the tenant. This fixture's real admin user is
+# still inserted directly below (is_platform_admin, not an Owner grant
+# -- Sprint 4.1 Decision C, unchanged) -- this email only satisfies
+# provision()'s now-required argument and is never used to log in.
+E2E_OWNER_EMAIL = "e2e-owner-placeholder@restaurantos.dev"
 
 
 async def main() -> None:
@@ -70,12 +82,22 @@ async def main() -> None:
             directory_repository_factory=SQLAlchemyTenantDirectoryRepository,
             role_repository_factory=SQLAlchemyRoleRepository,
             role_permission_repository_factory=SQLAlchemyRolePermissionRepository,
+            user_repository_factory=SQLAlchemyUserRepository,
+            user_role_repository_factory=SQLAlchemyUserRoleRepository,
+            owner_activation_token_repository_factory=SQLAlchemyOwnerActivationTokenRepository,
+            token_service=JWTTokenService(
+                private_key=settings.jwt.private_key,
+                public_key=settings.jwt.public_key,
+                issuer=settings.jwt.issuer,
+                access_ttl_seconds=settings.jwt.access_ttl_seconds,
+            ),
             outbox_writer_factory=SQLAlchemyOutboxWriter,
         )
-        tenant = await provisioning_service.provision(
+        tenant, _owner, _raw_activation_token = await provisioning_service.provision(
             legal_name=E2E_LEGAL_NAME,
             display_name=E2E_DISPLAY_NAME,
             default_currency_code="USD",
+            owner_email=E2E_OWNER_EMAIL,
         )
         tenant_id = tenant.id
         print(f"Created E2E tenant: {tenant_id}")

@@ -53,3 +53,11 @@ class UserRepository(Protocol):
         """Page through a tenant's users, newest first, excluding
         soft-deleted rows — same shape as ``RoleRepository.list_for_tenant``."""
         ...
+
+    async def activate(self, tenant_id: str, user_id: str, *, password_hash: str) -> None:
+        """Set ``password_hash`` and flip ``status`` ``INVITED -> ACTIVE``
+        in one statement. Sole caller: ``ActivateOwnerUseCase`` (Phase 1
+        design doc SSA.4) — a narrow, purpose-specific update, matching
+        this port's existing ``bump_permission_version`` shape rather
+        than a generic ``update(user)``."""
+        ...

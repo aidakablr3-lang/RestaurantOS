@@ -155,6 +155,7 @@ class TestOnboardTenant:
                 "legalName": "Acme Restaurants LLC",
                 "displayName": "Acme Restaurants",
                 "defaultCurrencyCode": "USD",
+                "ownerEmail": "acme-owner@example.com",
             },
         )
 
@@ -165,6 +166,12 @@ class TestOnboardTenant:
         assert body["status"] == "active"  # provisioning activates in the same transaction
         assert body["defaultCurrencyCode"] == "USD"
         assert body["id"]
+        # Phase 1 design doc SSA.4: provision() now creates the Owner
+        # atomically -- the onboard response is the only place the raw
+        # activation token is ever shown.
+        assert body["ownerEmail"] == "acme-owner@example.com"
+        assert body["ownerId"]
+        assert body["ownerActivationToken"]
 
     def test_rejects_a_duplicate_legal_name(
         self, client: TestClient, platform_admin_token: str
@@ -173,6 +180,7 @@ class TestOnboardTenant:
             "legalName": "Duplicate Diner LLC",
             "displayName": "Duplicate Diner",
             "defaultCurrencyCode": "USD",
+            "ownerEmail": "duplicate-diner-owner@example.com",
         }
         first = client.post(
             "/api/v1/admin/tenants", headers=_auth_headers(platform_admin_token), json=payload
@@ -195,6 +203,7 @@ class TestOnboardTenant:
                 "legalName": "Bad Currency LLC",
                 "displayName": "Bad Currency",
                 "defaultCurrencyCode": "US",
+                "ownerEmail": "bad-currency-owner@example.com",
             },
         )
         assert response.status_code == 422
@@ -206,6 +215,7 @@ class TestOnboardTenant:
                 "legalName": "No Auth LLC",
                 "displayName": "No Auth",
                 "defaultCurrencyCode": "USD",
+                "ownerEmail": "no-auth-owner@example.com",
             },
         )
         assert response.status_code == 401
@@ -222,6 +232,7 @@ class TestOnboardTenant:
                 "legalName": "Sneaky LLC",
                 "displayName": "Sneaky",
                 "defaultCurrencyCode": "USD",
+                "ownerEmail": "sneaky-owner@example.com",
             },
         )
         assert response.status_code == 403
@@ -243,6 +254,7 @@ class TestOnboardTenantIdempotency:
             "legalName": "Idempotent Diner LLC",
             "displayName": "Idempotent Diner",
             "defaultCurrencyCode": "USD",
+            "ownerEmail": "idempotent-diner-owner@example.com",
         }
         headers = {**_auth_headers(platform_admin_token), "Idempotency-Key": generate_ulid()}
 
@@ -272,6 +284,7 @@ class TestOnboardTenantIdempotency:
                 "legalName": "Conflict A LLC",
                 "displayName": "Conflict A",
                 "defaultCurrencyCode": "USD",
+                "ownerEmail": "conflict-a-owner@example.com",
             },
         )
         assert first.status_code == 201
@@ -283,6 +296,7 @@ class TestOnboardTenantIdempotency:
                 "legalName": "Conflict B LLC",
                 "displayName": "Conflict B",
                 "defaultCurrencyCode": "USD",
+                "ownerEmail": "conflict-b-owner@example.com",
             },
         )
         assert second.status_code == 409
@@ -298,6 +312,7 @@ class TestOnboardTenantIdempotency:
             "legalName": "No Key Each Time LLC",
             "displayName": "No Key Each Time",
             "defaultCurrencyCode": "USD",
+            "ownerEmail": "no-key-each-time-owner@example.com",
         }
         first = client.post(
             "/api/v1/admin/tenants", headers=_auth_headers(platform_admin_token), json=payload
@@ -323,6 +338,7 @@ class TestListAndGetTenant:
                     "legalName": f"List Test {i} LLC",
                     "displayName": f"List Test {i}",
                     "defaultCurrencyCode": "USD",
+                    "ownerEmail": f"list-test-{i}-owner@example.com",
                 },
             )
 
@@ -346,6 +362,7 @@ class TestListAndGetTenant:
                 "legalName": "Filter Me LLC",
                 "displayName": "Filter Me",
                 "defaultCurrencyCode": "USD",
+                "ownerEmail": "filter-me-owner@example.com",
             },
         ).json()["data"]
         client.post(
@@ -372,6 +389,7 @@ class TestListAndGetTenant:
                 "legalName": "Get Me LLC",
                 "displayName": "Get Me",
                 "defaultCurrencyCode": "USD",
+                "ownerEmail": "get-me-owner@example.com",
             },
         ).json()["data"]
 
@@ -412,6 +430,7 @@ class TestUpdateTenant:
                 "legalName": "Update Me LLC",
                 "displayName": "Update Me",
                 "defaultCurrencyCode": "USD",
+                "ownerEmail": "update-me-owner@example.com",
             },
         ).json()["data"]
 
@@ -449,6 +468,7 @@ class TestSuspendReactivateOffboard:
                 "legalName": "Lifecycle Test LLC",
                 "displayName": "Lifecycle Test",
                 "defaultCurrencyCode": "USD",
+                "ownerEmail": "lifecycle-test-owner@example.com",
             },
         ).json()["data"]
 

@@ -8,6 +8,9 @@ from restaurant_os_api.modules.identity.application.dto.auth_dto import (
 from restaurant_os_api.modules.identity.application.dto.feature_flag_dto import (
     FeatureFlagStatusDTO,
 )
+from restaurant_os_api.modules.identity.application.dto.owner_activation_dto import (
+    ActivateOwnerRequestDTO,
+)
 from restaurant_os_api.modules.identity.application.dto.rbac_dto import (
     AssignUserRoleRequestDTO,
     CreateRoleRequestDTO,
@@ -41,6 +44,7 @@ from restaurant_os_api.modules.identity.application.dto.user_dto import (
 )
 
 __all__ = [
+    "ActivateOwnerRequestDTO",
     "AssignUserRoleRequestDTO",
     "AuthenticatedPrincipalDTO",
     "CreateRoleRequestDTO",

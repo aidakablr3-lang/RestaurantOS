@@ -1,17 +1,26 @@
-"""Standalone, manually-run backfill for tenants that predate the RBAC
-Foundation (Sprint 5 Step 2, Commit 7): grant one specific, named user
-the "Tenant Owner" role for one specific, named tenant.
+"""Standalone, manually-run operator recovery tool: grant one specific,
+named user the "Tenant Owner" role for one specific, named tenant that
+currently has zero `roles.assign` holders.
 
-**Why this exists.** `TenantProvisioningService.provision()` now seeds
-the SS6.3 default role catalogue for every *new* tenant, but it creates
-no `UserRole` grant -- provisioning happens before any user exists
-(`OnboardTenantUseCase` takes no user information). Every tenant
-provisioned *before* this change also has zero `Role`/`UserRole` rows.
-RBAC_Foundation_Architecture.md SS15 states plainly that which existing
-user should become a pre-existing tenant's "Tenant Owner" is **not
-mechanically derivable** from anything in today's schema -- there is no
-"owner" flag distinct from `is_platform_admin`. This script does not
-try to guess. It requires both ids as explicit arguments, every time.
+**Retitled, Phase 1 (design doc SSA.4).** `TenantProvisioningService
+.provision()` now creates every *new* tenant's first Owner atomically,
+in the same transaction as the tenant itself -- no tenant provisioned
+through that path is ever left without one, even momentarily. This
+script is no longer primarily "for tenants that predate the RBAC
+Foundation" (though it still handles that case too, for any tenant
+provisioned before this change). Its real, ongoing purpose is broader:
+**break-glass recovery for any tenant, old or new, that has degraded
+back to zero `roles.assign` holders** -- an Owner deactivated, a grant
+revoked by mistake, or any other cause. Phase 1's atomicity fix
+guarantees the invariant only at creation time, not for all time; this
+script is what closes the gap for everything after that.
+
+**Why this exists.** RBAC_Foundation_Architecture.md SS15 states
+plainly that which existing user should become a zero-owner tenant's
+"Tenant Owner" is **not mechanically derivable** from anything in
+today's schema -- there is no "owner" flag distinct from
+`is_platform_admin`. This script does not try to guess. It requires
+both ids as explicit arguments, every time.
 
 **What this script deliberately does NOT do:**
   - It never selects a "default" or "first" user for a tenant.
@@ -19,11 +28,20 @@ try to guess. It requires both ids as explicit arguments, every time.
     hook, or app-startup call to this script anywhere in this codebase.
   - By default (no `--apply`) it only prints what it *would* do and
     changes nothing. You must pass `--apply` to write.
+  - **It refuses to run at all -- even without `--apply` -- against a
+    tenant that already has a Tenant Owner held by a different user.**
+    Before Phase 1, every tenant this script could plausibly be pointed
+    at was zero-role by construction, so no such check existed. After
+    Phase 1, most tenants it could be pointed at already have an owner,
+    and running it against one by mistake (wrong `--tenant-id`, a stale
+    runbook) should be a loud, immediate refusal, not a silent second
+    grant. If that user's access genuinely needs fixing, use the RBAC
+    API (`POST /api/v1/rbac/user-roles`), not this script.
 
 **Authorization note.** This grant bypasses `RoleGrantPolicy` on
 purpose: the policy exists to stop an *already-privileged* user from
-escalating themselves or others, but a tenant with zero roles has no
-`roles.assign` holder to run the check against in the first place --
+escalating themselves or others, but a tenant with zero `roles.assign`
+holders has no holder to run the check against in the first place --
 that's exactly the bootstrapping gap this script closes. Treat running
 it as an operational/administrative action, not an API call; it should
 be run by someone who already has out-of-band authority to make this
@@ -50,6 +68,7 @@ import argparse
 import asyncio
 from datetime import UTC, datetime
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from restaurant_os_api.core.config import get_settings
@@ -131,6 +150,30 @@ async def main() -> None:
             already_owner = await user_role_repo.exists(
                 args.tenant_id, args.user_id, owner_role.id, branch_id=None
             )
+
+            # Refuse loudly -- even in dry-run -- if a *different* user
+            # already holds Tenant Owner. See module docstring: after
+            # Phase 1, most tenants already have one, and running this
+            # against the wrong tenant should never silently add a
+            # second grant.
+            existing_holder_id = (
+                await uow.session.execute(
+                    text(
+                        "SELECT user_id FROM user_roles WHERE tenant_id = :tenant_id "
+                        "AND role_id = :role_id AND branch_id IS NULL "
+                        "AND deleted_at IS NULL LIMIT 1"
+                    ),
+                    {"tenant_id": args.tenant_id, "role_id": owner_role.id},
+                )
+            ).scalar_one_or_none()
+            if existing_holder_id is not None and existing_holder_id != args.user_id:
+                raise SystemExit(
+                    f"Tenant {args.tenant_id} already has a Tenant Owner grant "
+                    f"(user {existing_holder_id}). Refusing to run -- this script is for "
+                    "tenants with zero roles.assign holders only. If that user's access "
+                    "needs fixing, use the RBAC API (POST /api/v1/rbac/user-roles), not "
+                    "this script."
+                )
 
         print(f"Tenant:            {tenant.id} ({tenant.legal_name})")
         print(f"User:              {user.id} ({user.email})")

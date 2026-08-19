@@ -1,4 +1,7 @@
 from restaurant_os_api.modules.identity.domain.entities.feature_flag import FeatureFlag
+from restaurant_os_api.modules.identity.domain.entities.owner_activation_token import (
+    OwnerActivationToken,
+)
 from restaurant_os_api.modules.identity.domain.entities.permission import Permission
 from restaurant_os_api.modules.identity.domain.entities.role import Role, RoleScope
 from restaurant_os_api.modules.identity.domain.entities.role_permission import RolePermission
@@ -21,6 +24,7 @@ from restaurant_os_api.modules.identity.domain.entities.user_role import UserRol
 
 __all__ = [
     "FeatureFlag",
+    "OwnerActivationToken",
     "Permission",
     "Role",
     "RolePermission",

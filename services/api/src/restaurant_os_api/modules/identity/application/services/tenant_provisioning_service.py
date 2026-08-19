@@ -25,8 +25,10 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from restaurant_os_api.core.ids import generate_ulid
+from restaurant_os_api.modules.identity.application.interfaces import TokenService
 from restaurant_os_api.modules.identity.domain.entities import (
     FeatureFlag,
+    OwnerActivationToken,
     Role,
     RoleScope,
     Subscription,
@@ -35,16 +37,23 @@ from restaurant_os_api.modules.identity.domain.entities import (
     TenantDirectoryEntry,
     TenantStatus,
     TenantTier,
+    User,
+    UserRole,
+    UserStatus,
 )
 from restaurant_os_api.modules.identity.domain.events import RoleCreated, TenantCreated
+from restaurant_os_api.modules.identity.domain.events.user_events import UserCreated
 from restaurant_os_api.modules.identity.domain.exceptions import TenantLegalNameConflictError
 from restaurant_os_api.modules.identity.domain.ports import (
     FeatureFlagRepository,
+    OwnerActivationTokenRepository,
     RolePermissionRepository,
     RoleRepository,
     SubscriptionRepository,
     TenantDirectoryRepository,
     TenantRepository,
+    UserRepository,
+    UserRoleRepository,
 )
 from restaurant_os_api.platform.database import UnitOfWork
 from restaurant_os_api.platform.outbox import OutboxWriter
@@ -64,16 +73,30 @@ _DEFAULT_TRIAL_DAYS = 14
 _DEFAULT_PLAN_CODE = "starter"
 _DEFAULT_SHARD_KEY = "shard-01"
 _DEFAULT_CONNECTION_REF = "primary"
+# One week to click the activation link -- long enough to cover a
+# realistic onboarding-team handover delay, short enough that a leaked
+# link (email forwarded, screenshot shared) doesn't stay live for months.
+_OWNER_ACTIVATION_TTL_HOURS = 168
 
 # RBAC Foundation Architecture SS6.3: the 7 default role -> permission
 # mappings, seeded fresh for every new tenant. This seeds the Role and
-# RolePermission catalogue rows only -- deliberately no UserRole grant,
-# because no user exists yet at this point in provisioning (`provision()`
-# takes no user information at all; see `OnboardTenantUseCase`). The
-# first UserRole grant for a tenant (its actual Tenant Owner) is created
-# out-of-band, either by an already-Owner user through the RBAC API
-# (Commit 6) or, for tenants that predate this change, by the standalone
-# `scripts/backfill_tenant_owner.py` script.
+# RolePermission catalogue rows only -- `seed_default_roles` itself takes
+# no user information and grants nothing.
+#
+# UPDATED, Phase 1 design doc SSA.4: `provision()` below now creates the
+# tenant's first Owner user AND its "Tenant Owner" UserRole grant
+# atomically, in the same transaction as this seed call -- no tenant
+# provisioned through this path is ever left without an owner, even
+# momentarily. This is a widening of an already-accepted precedent:
+# `provision()` bypasses `RoleGrantPolicy` for this one grant, the exact
+# same bypass `scripts/backfill_tenant_owner.py` already uses and
+# justifies ("a tenant with zero roles has no roles.assign holder to run
+# the check against in the first place"). That script remains the
+# recovery path for tenants provisioned *before* this change, and for
+# any tenant (old or new) that later degrades back to zero `roles.assign`
+# holders -- this atomicity fix guarantees the invariant only at
+# creation time, not for all time (see the script's own updated
+# docstring).
 #
 # A conflict check against existing roles (like CreateRoleUseCase does)
 # is not needed here: `tenant_id` was just minted a few lines above in
@@ -323,6 +346,12 @@ class TenantProvisioningService:
         directory_repository_factory: Callable[[AsyncSession], TenantDirectoryRepository],
         role_repository_factory: Callable[[AsyncSession], RoleRepository],
         role_permission_repository_factory: Callable[[AsyncSession], RolePermissionRepository],
+        user_repository_factory: Callable[[AsyncSession], UserRepository],
+        user_role_repository_factory: Callable[[AsyncSession], UserRoleRepository],
+        owner_activation_token_repository_factory: Callable[
+            [AsyncSession], OwnerActivationTokenRepository
+        ],
+        token_service: TokenService,
         outbox_writer_factory: Callable[[AsyncSession], OutboxWriter],
     ) -> None:
         self._session_factory = session_factory
@@ -332,11 +361,26 @@ class TenantProvisioningService:
         self._directory_repository_factory = directory_repository_factory
         self._role_repository_factory = role_repository_factory
         self._role_permission_repository_factory = role_permission_repository_factory
+        self._user_repository_factory = user_repository_factory
+        self._user_role_repository_factory = user_role_repository_factory
+        self._owner_activation_token_repository_factory = owner_activation_token_repository_factory
+        self._token_service = token_service
         self._outbox_writer_factory = outbox_writer_factory
 
     async def provision(
-        self, *, legal_name: str, display_name: str, default_currency_code: str
-    ) -> Tenant:
+        self,
+        *,
+        legal_name: str,
+        display_name: str,
+        default_currency_code: str,
+        owner_email: str,
+        owner_phone: str | None = None,
+    ) -> tuple[Tenant, User, str]:
+        # The third element of the return tuple is the raw one-time
+        # activation token -- the only place it ever exists outside the
+        # eventual client. Never logged, never stored: only its hash is
+        # persisted (OwnerActivationToken.token_hash), the same
+        # ``sessions.refresh_token_hash`` discipline.
         # The new tenant's id is minted up front — every RLS-protected
         # insert below (subscription, feature flag) needs
         # `SET LOCAL app.tenant_id` set to *this* value from the start
@@ -405,12 +449,73 @@ class TenantProvisioningService:
                     )
                 )
 
-            await seed_default_roles(
+            roles_by_name = await seed_default_roles(
                 role_repo=role_repo,
                 role_permission_repo=role_permission_repo,
                 outbox=outbox,
                 tenant_id=tenant_id,
                 now=now,
+            )
+            owner_role = roles_by_name["Tenant Owner"]
+
+            user_repo = self._user_repository_factory(uow.session)
+            user_role_repo = self._user_role_repository_factory(uow.session)
+            token_repo = self._owner_activation_token_repository_factory(uow.session)
+
+            owner = User(
+                id=generate_ulid(),
+                tenant_id=tenant_id,
+                email=owner_email,
+                phone=owner_phone,
+                password_hash=None,
+                pin_hash=None,
+                permission_version=1,
+                status=UserStatus.INVITED,
+                created_at=now,
+                is_platform_admin=False,
+            )
+            owner = await user_repo.create(owner)
+
+            # RoleGrantPolicy.ensure_can_grant is deliberately NOT called
+            # here -- see the module-level comment above
+            # `_DEFAULT_ROLE_CATALOGUE` for the full reasoning. This is a
+            # system operation with no delegating actor, not a human or
+            # API caller granting a role -- `granted_by_user_id=None` is
+            # the domain entity's own documented shape for exactly this.
+            await user_role_repo.create(
+                UserRole(
+                    id=generate_ulid(),
+                    tenant_id=tenant_id,
+                    user_id=owner.id,
+                    role_id=owner_role.id,
+                    branch_id=None,
+                    granted_at=now,
+                    granted_by_user_id=None,
+                )
+            )
+
+            raw_activation_token = self._token_service.generate_refresh_token()
+            await token_repo.create(
+                OwnerActivationToken(
+                    id=generate_ulid(),
+                    tenant_id=tenant_id,
+                    user_id=owner.id,
+                    token_hash=self._token_service.hash_refresh_token(raw_activation_token),
+                    issued_at=now,
+                    expires_at=now + timedelta(hours=_OWNER_ACTIVATION_TTL_HOURS),
+                    used_at=None,
+                )
+            )
+
+            await outbox.publish(
+                tenant_id,
+                UserCreated(
+                    user_id=owner.id,
+                    tenant_id=tenant_id,
+                    email=owner.email,
+                    created_by_user_id=None,
+                    occurred_at=now,
+                ),
             )
 
             tenant.activate()
@@ -428,4 +533,4 @@ class TenantProvisioningService:
                 ),
             )
 
-        return tenant
+        return tenant, owner, raw_activation_token
