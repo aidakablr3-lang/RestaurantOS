@@ -48,6 +48,9 @@ from restaurant_os_api.modules.operations.application.use_cases.get_bill import 
 from restaurant_os_api.modules.operations.application.use_cases.get_end_of_day_report import (
     GetEndOfDayReportUseCase,
 )
+from restaurant_os_api.modules.operations.application.use_cases.get_inventory_category import (
+    GetInventoryCategoryUseCase,
+)
 from restaurant_os_api.modules.operations.application.use_cases.get_inventory_item import (
     GetInventoryItemUseCase,
 )
@@ -154,6 +157,7 @@ __all__ = [
     "GenerateBillUseCase",
     "GetBillUseCase",
     "GetEndOfDayReportUseCase",
+    "GetInventoryCategoryUseCase",
     "GetInventoryItemUseCase",
     "GetMenuItemRecipeUseCase",
     "GetOpenCashDrawerUseCase",
