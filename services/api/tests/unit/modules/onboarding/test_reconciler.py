@@ -10,7 +10,10 @@ from __future__ import annotations
 
 from restaurant_os_api.modules.onboarding.application.registry import OnboardingStepRegistry
 from restaurant_os_api.modules.onboarding.domain.enums import StepId, StepStatus
-from restaurant_os_api.modules.onboarding.domain.reconciler import recompute_ready_steps
+from restaurant_os_api.modules.onboarding.domain.reconciler import (
+    reblock_transitive_dependents,
+    recompute_ready_steps,
+)
 from tests.unit.modules.onboarding.fakes import build_fake_registry_steps
 
 
@@ -116,3 +119,119 @@ def test_recompute_against_a_real_registrys_requires_graph() -> None:
     assert updated[StepId.CONFIGURE_TAX] == StepStatus.READY
     # create_branch still needs create_restaurant verified, not just ready.
     assert updated[StepId.CREATE_BRANCH] == StepStatus.BLOCKED
+
+
+# --- reblock_transitive_dependents -- §E step 6 ----------------------
+
+
+def test_reblocks_a_direct_ready_dependent_of_a_failed_step() -> None:
+    step_states = {
+        StepId.CREATE_RESTAURANT: StepStatus.FAILED,
+        StepId.CREATE_BRANCH: StepStatus.READY,
+    }
+    # direct_dependents_graph: maps a step to the steps that directly
+    # require it -- the inverse of requires_graph.
+    direct_dependents_graph = {StepId.CREATE_RESTAURANT: (StepId.CREATE_BRANCH,)}
+
+    updated = reblock_transitive_dependents(
+        step_states, StepId.CREATE_RESTAURANT, direct_dependents_graph
+    )
+
+    assert updated[StepId.CREATE_BRANCH] == StepStatus.BLOCKED
+
+
+def test_reblocks_a_transitive_ready_dependent_two_hops_away() -> None:
+    step_states = {
+        StepId.CREATE_RESTAURANT: StepStatus.FAILED,
+        StepId.CREATE_BRANCH: StepStatus.BLOCKED,
+        StepId.CREATE_TABLE_ZONE: StepStatus.READY,
+    }
+    direct_dependents_graph = {
+        StepId.CREATE_RESTAURANT: (StepId.CREATE_BRANCH,),
+        StepId.CREATE_BRANCH: (StepId.CREATE_TABLE_ZONE,),
+    }
+
+    updated = reblock_transitive_dependents(
+        step_states, StepId.CREATE_RESTAURANT, direct_dependents_graph
+    )
+
+    assert updated[StepId.CREATE_TABLE_ZONE] == StepStatus.BLOCKED
+
+
+def test_leaves_an_already_blocked_dependent_untouched() -> None:
+    step_states = {
+        StepId.CREATE_RESTAURANT: StepStatus.FAILED,
+        StepId.CREATE_BRANCH: StepStatus.BLOCKED,
+    }
+    direct_dependents_graph = {StepId.CREATE_RESTAURANT: (StepId.CREATE_BRANCH,)}
+
+    updated = reblock_transitive_dependents(
+        step_states, StepId.CREATE_RESTAURANT, direct_dependents_graph
+    )
+
+    assert updated[StepId.CREATE_BRANCH] == StepStatus.BLOCKED
+
+
+def test_leaves_an_unrelated_ready_step_untouched() -> None:
+    step_states = {
+        StepId.CREATE_RESTAURANT: StepStatus.FAILED,
+        StepId.CONFIGURE_TAX: StepStatus.READY,
+    }
+    graph: dict[StepId, tuple[StepId, ...]] = {}
+
+    updated = reblock_transitive_dependents(step_states, StepId.CREATE_RESTAURANT, graph)
+
+    assert updated[StepId.CONFIGURE_TAX] == StepStatus.READY
+
+
+def test_leaves_a_verified_dependent_untouched() -> None:
+    """Not reachable through the normal first-attempt flow (a verified
+    step's own dependency can't have failed without it failing too) --
+    still asserted explicitly since the function makes no assumption
+    about which case it's called for (see its own docstring)."""
+    step_states = {
+        StepId.CREATE_RESTAURANT: StepStatus.FAILED,
+        StepId.CREATE_BRANCH: StepStatus.VERIFIED,
+    }
+    direct_dependents_graph = {StepId.CREATE_RESTAURANT: (StepId.CREATE_BRANCH,)}
+
+    updated = reblock_transitive_dependents(
+        step_states, StepId.CREATE_RESTAURANT, direct_dependents_graph
+    )
+
+    assert updated[StepId.CREATE_BRANCH] == StepStatus.VERIFIED
+
+
+def test_does_not_mutate_the_input_mapping_on_reblock() -> None:
+    step_states = {
+        StepId.CREATE_RESTAURANT: StepStatus.FAILED,
+        StepId.CREATE_BRANCH: StepStatus.READY,
+    }
+    original = dict(step_states)
+    graph = {StepId.CREATE_RESTAURANT: (StepId.CREATE_BRANCH,)}
+
+    reblock_transitive_dependents(step_states, StepId.CREATE_RESTAURANT, graph)
+
+    assert step_states == original
+
+
+def test_reblock_against_the_real_registrys_direct_dependents_graph() -> None:
+    registry = OnboardingStepRegistry(build_fake_registry_steps())
+    direct_dependents_graph = {
+        step_id: registry.direct_dependents(step_id) for step_id in registry.all_step_ids()
+    }
+    step_states = {step_id: StepStatus.BLOCKED for step_id in StepId}
+    step_states[StepId.PROVISION_TENANT] = StepStatus.VERIFIED
+    step_states[StepId.CREATE_RESTAURANT] = StepStatus.FAILED
+    # Simulate create_branch having been marked ready by an earlier
+    # reconciler pass before create_restaurant's own later re-attempt
+    # (a "redo") failed.
+    step_states[StepId.CREATE_BRANCH] = StepStatus.READY
+
+    updated = reblock_transitive_dependents(
+        step_states, StepId.CREATE_RESTAURANT, direct_dependents_graph
+    )
+
+    assert updated[StepId.CREATE_BRANCH] == StepStatus.BLOCKED
+    # configure_tax depends only on provision_tenant, unaffected.
+    assert updated[StepId.CONFIGURE_TAX] == StepStatus.BLOCKED

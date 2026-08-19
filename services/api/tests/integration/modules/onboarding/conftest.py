@@ -28,11 +28,13 @@ through real use cases.
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 import pytest_asyncio
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -75,6 +77,8 @@ from restaurant_os_api.modules.identity.infrastructure.security import (
     Argon2PasswordHasher,
     JWTTokenService,
 )
+from restaurant_os_api.modules.onboarding.application.orchestrator import OnboardingOrchestrator
+from restaurant_os_api.modules.onboarding.application.registry import OnboardingStepRegistry
 from restaurant_os_api.modules.onboarding.application.steps.add_inventory_step import (
     AddInventoryStep,
     AddInventoryStepInput,
@@ -125,7 +129,17 @@ from restaurant_os_api.modules.onboarding.application.steps.provision_tenant_ste
     ProvisionTenantStep,
     ProvisionTenantStepInput,
 )
+from restaurant_os_api.modules.onboarding.domain.entities import (
+    OnboardingAuditLogEntry,
+)
+from restaurant_os_api.modules.onboarding.domain.enums import StepId
+from restaurant_os_api.modules.onboarding.domain.ports import OnboardingAuditLogRepository
 from restaurant_os_api.modules.onboarding.domain.step_contract import OnboardingRunContext
+from restaurant_os_api.modules.onboarding.infrastructure.database.repositories import (
+    SQLAlchemyOnboardingAuditLogRepository,
+    SQLAlchemyOnboardingRunRepository,
+    SQLAlchemyOnboardingStepStateRepository,
+)
 from restaurant_os_api.modules.operations.application.use_cases.create_inventory_category import (
     CreateInventoryCategoryUseCase,
 )
@@ -201,7 +215,10 @@ from restaurant_os_api.modules.restaurant.infrastructure.database.repositories i
     SQLAlchemyTableRepository,
     SQLAlchemyTableZoneRepository,
 )
+from restaurant_os_api.platform.database import UnitOfWork
+from restaurant_os_api.platform.idempotency import IdempotencyGuard, PlatformIdempotencyGuard
 from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchemyOutboxWriter
+from restaurant_os_api.platform.tenancy import TenantContext
 
 # --- Cross-cutting singletons, same shape as test_owner_provisioning.py ---
 
@@ -662,3 +679,156 @@ async def catalog_with_inventory_ctx(
         menu_items_ctx,
     )
     return menu_items_ctx.model_copy(update={"inventory_item_id": item.id})
+
+
+# --- OnboardingOrchestrator wiring -- §E step 6 ---------------------------
+
+
+def build_real_registry(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> OnboardingStepRegistry:
+    """The same real, all-14-step registry ``test_registry_wiring.py``
+    builds -- moved here so the orchestrator tests can share it rather
+    than duplicating the wiring a second time."""
+    steps: dict[StepId, Any] = {
+        StepId.PROVISION_TENANT: make_provision_tenant_step(session_factory),
+        StepId.CREATE_RESTAURANT: make_create_restaurant_step(session_factory),
+        StepId.CREATE_BRANCH: make_create_branch_step(session_factory),
+        StepId.CONFIGURE_TAX: make_configure_tax_step(session_factory),
+        StepId.CREATE_TABLE_ZONE: make_create_table_zone_step(session_factory),
+        StepId.CREATE_TABLE: make_create_table_step(session_factory),
+        StepId.GENERATE_QR_CODES: make_generate_qr_codes_step(session_factory),
+        StepId.CREATE_MANAGER: make_create_manager_step(session_factory),
+        StepId.CREATE_WAITERS: make_create_waiters_step(session_factory),
+        StepId.CREATE_KITCHEN_STAFF: make_create_kitchen_staff_step(session_factory),
+        StepId.CREATE_MENU_CATEGORY: make_create_menu_category_step(session_factory),
+        StepId.CREATE_MENU_ITEMS: make_create_menu_items_step(session_factory),
+        StepId.ADD_INVENTORY: make_add_inventory_step(session_factory),
+        StepId.ADD_RECIPES: make_add_recipes_step(session_factory),
+    }
+    return OnboardingStepRegistry(steps)
+
+
+async def seed_platform_user(session_factory: async_sessionmaker[AsyncSession]) -> str:
+    """Inserts a throwaway tenant + user via raw SQL and returns the
+    user's id, for use as ``onboarding_runs.created_by_user_id`` --
+    exactly the "platform admin in their own tenant, initiating a new
+    tenant's onboarding" shape ``test_admin_tenant_router.py``'s own
+    ``platform_admin_token`` fixture already establishes for the
+    equivalent ``POST /admin/tenants`` action. No login/RBAC is needed
+    here (the orchestrator itself does no permission check), so this
+    skips straight to the raw insert that fixture's own ``_seed_user``
+    helper does."""
+    tenant_id = generate_ulid()
+    user_id = generate_ulid()
+    async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
+        await uow.session.execute(
+            text(
+                "INSERT INTO tenants (id, legal_name, display_name, tenant_tier, status, "
+                "default_currency_code) VALUES (:id, :name, :name, 'shared', 'active', 'USD')"
+            ),
+            {"id": tenant_id, "name": f"Platform admin tenant {tenant_id}"},
+        )
+        await uow.session.execute(
+            text(
+                "INSERT INTO users (id, tenant_id, email, permission_version, status, "
+                "is_platform_admin) VALUES (:id, :tenant_id, :email, 1, 'active', true)"
+            ),
+            {"id": user_id, "tenant_id": tenant_id, "email": unique_email("platform-admin")},
+        )
+    return user_id
+
+
+def make_orchestrator(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    registry: OnboardingStepRegistry | None = None,
+    audit_log_repository_factory: Callable[[AsyncSession], OnboardingAuditLogRepository]
+    | None = None,
+) -> OnboardingOrchestrator:
+    """Real repositories, real ``IdempotencyGuard``/``PlatformIdempotencyGuard``
+    -- no fakes, matching this module's own established convention.
+    ``audit_log_repository_factory``, when given, overrides the default
+    real one -- the one seam the "mid-execute crash" integration test
+    needs, since the audit-log write immediately following a guarded
+    ``execute()`` call is the first *unguarded* write in
+    ``OnboardingOrchestrator._run_step`` (see that module's own
+    docstring), making it the earliest realistic point to simulate a
+    process crash without reaching into the orchestrator's internals."""
+    resolved_registry = registry if registry is not None else build_real_registry(session_factory)
+    return OnboardingOrchestrator(
+        session_factory=session_factory,
+        registry=resolved_registry,
+        run_repository_factory=SQLAlchemyOnboardingRunRepository,
+        step_state_repository_factory=SQLAlchemyOnboardingStepStateRepository,
+        audit_log_repository_factory=(
+            audit_log_repository_factory
+            if audit_log_repository_factory is not None
+            else SQLAlchemyOnboardingAuditLogRepository
+        ),
+        idempotency_guard=IdempotencyGuard(session_factory),
+        platform_idempotency_guard=PlatformIdempotencyGuard(session_factory),
+    )
+
+
+class CrashOnExecuteAuditRepository:
+    """Wraps the real audit-log repository, raising on the ``execute``
+    audit entry for one specific step -- simulates a process crash in
+    the unguarded window right after a step's real ``execute()`` (and
+    the idempotency guard's own response record) already committed, but
+    before ``onboarding_step_states.output`` is persisted. See
+    ``make_orchestrator``'s own docstring."""
+
+    def __init__(self, session: AsyncSession, *, crash_step_id: StepId) -> None:
+        self._inner = SQLAlchemyOnboardingAuditLogRepository(session)
+        self._crash_step_id = crash_step_id
+
+    async def create(self, entry: OnboardingAuditLogEntry) -> OnboardingAuditLogEntry:
+        if entry.step_id == self._crash_step_id and entry.action == "execute":
+            raise RuntimeError(f"simulated crash mid-execute for {self._crash_step_id}")
+        return await self._inner.create(entry)
+
+    async def list_for_run(self, run_id: str) -> list[OnboardingAuditLogEntry]:
+        return await self._inner.list_for_run(run_id)
+
+
+class DeleteAfterExecuteBranchStep:
+    """Wraps the real ``CreateBranchStep``, hard-deleting the branch row
+    it just created (real SQL, real commit) immediately after
+    ``execute()`` returns -- so the orchestrator's own very next call,
+    ``verify()``, fails for a genuine reason (the record really is gone),
+    exactly the "row deleted out from under it" case
+    ``CreateBranchStep.verify()`` is already unit/integration-tested
+    against directly (``test_restaurant_steps.py``). This only
+    reproduces that same scenario through the orchestrator's own
+    single execute-then-verify call, which offers no other seam to
+    inject the deletion between the two."""
+
+    def __init__(
+        self, inner: CreateBranchStep, session_factory: async_sessionmaker[AsyncSession]
+    ) -> None:
+        self.id = inner.id
+        self.title = inner.title
+        self.requires = inner.requires
+        self.collect_schema = inner.collect_schema
+        self.autonomous = inner.autonomous
+        self._inner = inner
+        self._session_factory = session_factory
+
+    def autofill(self, ctx: OnboardingRunContext) -> dict[str, Any]:
+        return self._inner.autofill(ctx)
+
+    async def execute(self, input: Any, ctx: OnboardingRunContext) -> Any:
+        output = await self._inner.execute(input, ctx)
+        assert ctx.tenant_id is not None
+        async with UnitOfWork(self._session_factory, TenantContext(ctx.tenant_id)) as uow:
+            await uow.session.execute(
+                text("DELETE FROM branches WHERE id = :id"), {"id": output.id}
+            )
+        return output
+
+    async def verify(self, ctx: OnboardingRunContext) -> Any:
+        return await self._inner.verify(ctx)
+
+    async def undo(self, ctx: OnboardingRunContext) -> None:
+        return await self._inner.undo(ctx)
