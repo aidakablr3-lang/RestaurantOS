@@ -35,15 +35,20 @@ export function uniqueTenantName(prefix: string): string {
  * Details, Edit, Suspend, Reactivate) that need a fresh tenant to act
  * on, rather than depending on whatever tenants a previous run left
  * behind. Returns the created tenant's display name, unique per call,
- * used to find it again in the list/details UI. Leaves the browser on
- * the new tenant's details page. */
+ * used to find it again in the list/details UI. Dismisses the one-time
+ * owner-activation-token dialog (Phase 1 design doc SSA.4) the form now
+ * shows on success, then leaves the browser on the new tenant's details
+ * page -- same end state as before that dialog existed. */
 export async function createTenantViaUi(page: Page, namePrefix: string): Promise<string> {
   const displayName = uniqueTenantName(namePrefix)
   await page.goto("/tenants/new")
   await page.getByLabel("Legal name").fill(`${displayName} LLC`)
   await page.getByLabel("Display name").fill(displayName)
   await page.getByLabel("Default currency").fill("USD")
+  await page.getByLabel("Owner email").fill(`${uniqueTenantName("owner").replace(/\s+/g, "-").toLowerCase()}@example.com`)
   await page.getByRole("button", { name: "Create tenant" }).click()
+  await page.getByRole("dialog", { name: "Tenant created" }).waitFor()
+  await page.getByRole("button", { name: "Done" }).click()
   await page.waitForURL(/\/tenants\/[0-9A-Z]+$/)
   return displayName
 }

@@ -46,12 +46,20 @@ export interface Tenant {
   defaultCurrencyCode: string
   metadata: Record<string, unknown>
   createdAt: string
+  // Only present on the onboard response -- the owner activation token
+  // is shown exactly once and never retrievable again (see
+  // TenantResponseSchema's own docstring on the backend).
+  ownerId?: string
+  ownerEmail?: string
+  ownerActivationToken?: string
 }
 
 export interface OnboardTenantRequest {
   legalName: string
   displayName: string
   defaultCurrencyCode: string
+  ownerEmail: string
+  ownerPhone?: string
 }
 
 export interface UpdateTenantRequest {

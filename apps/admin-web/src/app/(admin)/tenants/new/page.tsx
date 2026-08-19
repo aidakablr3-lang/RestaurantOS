@@ -1,13 +1,23 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { CheckIcon, CopyIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -22,25 +32,85 @@ import { useCreateTenant } from "@/hooks/use-tenants"
 import { ApiError } from "@/lib/api-client"
 import { type CreateTenantFormValues, createTenantSchema } from "@/lib/schemas/tenant"
 
+function OwnerActivationDialog({
+  created,
+  onClose,
+}: {
+  created: { tenantId: string; ownerEmail: string; token: string } | null
+  onClose: () => void
+}) {
+  const [copied, setCopied] = React.useState(false)
+
+  async function copyToken() {
+    await navigator.clipboard.writeText(created?.token ?? "")
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <Dialog open={created !== null} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Tenant created</DialogTitle>
+          <DialogDescription>
+            Share this activation token with {created?.ownerEmail} over a channel you trust. It is
+            shown only once here and cannot be retrieved again -- if it&apos;s lost, the owner
+            can&apos;t activate their account through this token.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3">
+          <code className="flex-1 overflow-x-auto text-sm">{created?.token}</code>
+          <Button type="button" size="icon" variant="outline" onClick={copyToken}>
+            {copied ? <CheckIcon className="text-green-600" /> : <CopyIcon />}
+          </Button>
+        </div>
+        <DialogFooter>
+          <Button type="button" onClick={onClose}>
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function CreateTenantPage() {
   const router = useRouter()
   const createTenant = useCreateTenant()
+  const [created, setCreated] = React.useState<{
+    tenantId: string
+    ownerEmail: string
+    token: string
+  } | null>(null)
 
   const form = useForm<CreateTenantFormValues>({
     resolver: zodResolver(createTenantSchema),
-    defaultValues: { legalName: "", displayName: "", defaultCurrencyCode: "" },
+    defaultValues: { legalName: "", displayName: "", defaultCurrencyCode: "", ownerEmail: "" },
   })
 
   async function onSubmit(values: CreateTenantFormValues) {
     try {
       const { data } = await createTenant.mutateAsync(values)
       toast.success("Tenant created.")
-      router.push(`/tenants/${data.id}`)
+      if (data.ownerActivationToken) {
+        setCreated({
+          tenantId: data.id,
+          ownerEmail: values.ownerEmail,
+          token: data.ownerActivationToken,
+        })
+      } else {
+        router.push(`/tenants/${data.id}`)
+      }
     } catch (error) {
       toast.error(
         error instanceof ApiError ? error.message : "Failed to create tenant."
       )
     }
+  }
+
+  function closeActivationDialog() {
+    if (created) router.push(`/tenants/${created.tenantId}`)
+    setCreated(null)
   }
 
   return (
@@ -115,6 +185,23 @@ export default function CreateTenantPage() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="ownerEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Owner email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="owner@acme.com" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      The tenant&apos;s first Owner account -- invited, not yet active until they
+                      use the activation token shown after creation.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="mt-2 flex gap-2">
                 <Button type="submit" disabled={createTenant.isPending}>
                   {createTenant.isPending ? "Creating…" : "Create tenant"}
@@ -132,6 +219,8 @@ export default function CreateTenantPage() {
           </Form>
         </CardContent>
       </Card>
+
+      <OwnerActivationDialog created={created} onClose={closeActivationDialog} />
     </div>
   )
 }

@@ -1,6 +1,27 @@
 {
   "components": {
     "schemas": {
+      "ActivateOwnerRequestSchema": {
+        "properties": {
+          "newPassword": {
+            "maxLength": 255,
+            "minLength": 8,
+            "title": "Newpassword",
+            "type": "string"
+          },
+          "token": {
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "newPassword"
+        ],
+        "title": "ActivateOwnerRequestSchema",
+        "type": "object"
+      },
       "AddOrderItemRequestSchema": {
         "properties": {
           "menuItemId": {
@@ -4584,12 +4605,30 @@
             "minLength": 1,
             "title": "Legalname",
             "type": "string"
+          },
+          "ownerEmail": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Owneremail",
+            "type": "string"
+          },
+          "ownerPhone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownerphone"
           }
         },
         "required": [
           "legalName",
           "displayName",
-          "defaultCurrencyCode"
+          "defaultCurrencyCode",
+          "ownerEmail"
         ],
         "title": "OnboardTenantRequestSchema",
         "type": "object"
@@ -6398,6 +6437,39 @@
             "additionalProperties": true,
             "title": "Metadata",
             "type": "object"
+          },
+          "ownerActivationToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owneractivationtoken"
+          },
+          "ownerEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owneremail"
+          },
+          "ownerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownerid"
           },
           "status": {
             "title": "Status",
@@ -13487,6 +13559,48 @@
         ]
       }
     },
+    "/api/v1/owner-activation": {
+      "post": {
+        "operationId": "activate_owner_api_v1_owner_activation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateOwnerRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_NoneType_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [],
+        "summary": "Activate Owner",
+        "tags": [
+          "owner-activation"
+        ]
+      }
+    },
     "/api/v1/purchase-orders/{purchase_order_id}/cancel": {
       "post": {
         "operationId": "cancel_purchase_order_api_v1_purchase_orders__purchase_order_id__cancel_post",
@@ -16000,6 +16114,22 @@
         "parameters": [
           {
             "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
             "name": "authorization",
             "required": false,
             "schema": {
@@ -16469,6 +16599,22 @@
       "post": {
         "operationId": "create_user_api_v1_users_post",
         "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",

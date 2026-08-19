@@ -12,6 +12,10 @@ export const createTenantSchema = z.object({
   defaultCurrencyCode: z
     .string()
     .regex(/^[A-Z]{3}$/, "Enter a 3-letter ISO 4217 currency code (e.g. USD)."),
+  ownerEmail: z
+    .string()
+    .min(1, "Owner email is required.")
+    .email("Enter a valid email address."),
 })
 
 export type CreateTenantFormValues = z.infer<typeof createTenantSchema>
