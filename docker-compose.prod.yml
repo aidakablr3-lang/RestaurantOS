@@ -1,24 +1,28 @@
-# Production orchestration for a single-VPS hotel pilot deployment.
+# Production orchestration -- single-VPS deployment
+# (api.prashanthai.com / admin.prashanthai.com).
 #
-# Companion to docker-compose.yml (dev). Runs Postgres + the API as
-# immutable containers behind whatever reverse proxy terminates HTTPS on
-# the host (Caddy is recommended -- see
-# infrastructure/reverse-proxy/Caddyfile.example and
-# docs/RestaurantOS_Production_Deployment_Guide.md).
+# Companion to docker-compose.yml (dev). Four services, all reached from
+# outside the host only through Caddy on 80/443 -- postgres, api, and
+# admin-web publish no host ports at all; they are reachable solely on
+# Compose's own default project network, by service name
+# (postgres/api/admin-web). This is a stricter posture than an earlier
+# draft of this file, which bound postgres/api to 127.0.0.1 -- reachable
+# from the host's own network stack, if nothing else. Reachable from
+# *outside the host* was already false either way; this version is also
+# unreachable from the host's own loopback, which nothing here needs.
 #
-# apps/admin-web is deliberately NOT containerized here, consistent with
-# docker-compose.yml's own dev-time choice: `next build && next start`
-# under a process supervisor (systemd unit example:
-# infrastructure/systemd/restaurantos-web.service.example) is simpler
-# than adding a second image to build/version/redeploy for a one-VPS
-# pilot, and Next.js's own production server is already a single
-# long-running Node process -- there is nothing Docker adds here that a
-# supervisor doesn't already give you at this scale.
+# admin-web is containerized here (a change from the project's dev-time
+# precedent of running Next.js directly via a process supervisor) because
+# this deploy puts Caddy itself in Docker too -- once Caddy is a container
+# on the same network, reverse-proxying to a sibling container by service
+# name is simpler than reverse-proxying from a container back out to a
+# systemd-managed host process. See docs/DEPLOYMENT.md.
 #
-# Requires a real .env file (NOT committed -- see .env.example) with at
-# minimum: DATABASE_PASSWORD, JWT_PRIVATE_KEY, JWT_PUBLIC_KEY,
-# CORS_ALLOWED_ORIGINS. See the deployment guide's "Environment
-# Variables" section for the full table and where each value comes from.
+# Requires a real .env file at the repo root (NOT committed -- see
+# .env.production.example) with at minimum: DATABASE_PASSWORD,
+# JWT_PRIVATE_KEY, JWT_PUBLIC_KEY, CORS_ALLOWED_ORIGINS,
+# NEXT_PUBLIC_API_BASE_URL, CADDY_ACME_EMAIL. scripts/deploy/ generates
+# and writes this file on the box -- see docs/DEPLOYMENT.md.
 
 services:
   postgres:
@@ -30,13 +34,11 @@ services:
       POSTGRES_DB: ${DATABASE_NAME:-restaurantos}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # Not published to the host's public interface on purpose -- only
-    # the api service (same Docker network) and this host's own backup
-    # cron job (via `docker exec`, see the deployment guide's "Backup"
-    # section) need to reach it. Bind to loopback only if you need
-    # host-side psql access for troubleshooting.
-    ports:
-      - "127.0.0.1:5432:5432"
+    # No `ports:` -- never exposed to the internet, not even to this
+    # host's own loopback. Reachable only by the api service (same
+    # Compose network) and by scripts/deploy/backup.sh /
+    # scripts/deploy/restore.sh, both of which reach it via
+    # `docker compose exec`, never a published port.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-restaurantos}"]
       interval: 10s
@@ -54,14 +56,48 @@ services:
     environment:
       APP_ENV: production
       DATABASE_URL: postgresql+asyncpg://${DATABASE_USER:-restaurantos}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME:-restaurantos}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS must be set to the real pilot frontend origin}
-      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?JWT_PRIVATE_KEY must be set -- see docs/RestaurantOS_Production_Deployment_Guide.md}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS must be set to https://admin.prashanthai.com}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?JWT_PRIVATE_KEY must be set}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?JWT_PUBLIC_KEY must be set}
-    # Bound to loopback -- the reverse proxy (Caddy, on the host or its
-    # own container sharing this network) is the only thing that should
-    # ever reach this port directly.
+    # No `ports:` -- reached only by caddy, over the internal Compose
+    # network at api:8000. Migrations run automatically on container
+    # start (see the production Dockerfile's own CMD); scripts/deploy/
+    # also runs them explicitly and verifies success before the stack is
+    # brought up further, for a clear first-deploy failure point.
+    # No `healthcheck:` block needed here -- the image's own HEALTHCHECK
+    # (infrastructure/docker/api-prod/Dockerfile) already covers it.
+
+  admin-web:
+    build:
+      context: ./apps/admin-web
+      dockerfile: ../../infrastructure/docker/admin-web-prod/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL must be set to https://api.prashanthai.com}
+    restart: unless-stopped
+    depends_on:
+      - api
+    # No `ports:` -- reached only by caddy, at admin-web:3000.
+    # NEXT_PUBLIC_API_BASE_URL is a *build* arg (above), not a runtime
+    # environment variable -- see the admin-web-prod Dockerfile's own
+    # comment on why. Changing it requires `--build`, not just a restart.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - admin-web
+    environment:
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:?CADDY_ACME_EMAIL must be set in .env -- see infrastructure/reverse-proxy/Caddyfile}
     ports:
-      - "127.0.0.1:8000:8000"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/reverse-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

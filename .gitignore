@@ -21,6 +21,7 @@ build/
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # Locally-generated dev JWT keypair (see
 # infrastructure/docker/dev-jwt/generate-dev-keys.sh) -- never commit

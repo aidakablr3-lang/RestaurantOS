@@ -1,0 +1,33 @@
+# Production Caddy config for RestaurantOS -- api.prashanthai.com /
+# admin.prashanthai.com, single VPS.
+#
+# Runs as the `caddy` service in docker-compose.prod.yml (not on the bare
+# host -- see docker-compose.prod.yml's own comment for why this deploy
+# containerizes Caddy). Automatic Let's Encrypt HTTPS: Caddy issues and
+# renews certificates on its own, no certbot, no renewal cron. Both
+# upstreams are reached by Compose service name (admin-web:3000,
+# api:8000), not 127.0.0.1 -- Caddy is a sibling container on the same
+# Compose network, not a host-level process.
+#
+# CADDY_ACME_EMAIL is read from the environment (set in the repo-root
+# .env, passed through by docker-compose.prod.yml) -- Let's Encrypt uses
+# it only for expiry/problem notices, never published. Generated/filled
+# in by scripts/deploy/02_generate_secrets.sh; see docs/DEPLOYMENT.md for
+# what to supply.
+{
+	email {$CADDY_ACME_EMAIL}
+}
+
+# Staff/admin app + guest QR ordering (apps/admin-web, same Next.js app --
+# the guest-facing (guest) route group lives in this same deployment).
+admin.prashanthai.com {
+	reverse_proxy admin-web:3000
+}
+
+# API (services/api). Guests' phones hit this origin directly (guest
+# ordering calls it as an API, not through admin-web's own origin), so it
+# needs no separate hardening beyond what CORS_ALLOWED_ORIGINS already
+# enforces on the API side.
+api.prashanthai.com {
+	reverse_proxy api:8000
+}

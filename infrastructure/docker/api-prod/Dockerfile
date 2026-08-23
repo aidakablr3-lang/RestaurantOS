@@ -38,6 +38,14 @@ WORKDIR /app
 COPY --from=builder /build/dist/*.whl /tmp/
 COPY alembic ./alembic
 COPY alembic.ini ./
+# The operator scripts (create_user.py, bootstrap_platform_admin.py,
+# backfill_tenant_owner.py, purge_tenant.py, ...) are not part of the
+# wheel (only `src/` is packaged) but need to run somewhere that can
+# reach `postgres:5432` -- with Postgres publishing no host port at all
+# (docker-compose.prod.yml), that means inside this image, not on the
+# host. Each imports `restaurant_os_api` as an installed package, so
+# their location on disk doesn't matter beyond being present here.
+COPY scripts ./scripts
 RUN pip install --no-cache-dir /tmp/*.whl && rm -rf /tmp/*.whl
 
 USER restaurantos
