@@ -71,7 +71,9 @@ def client(session_factory, token_service: JWTTokenService) -> Iterator[TestClie
     app.dependency_overrides.clear()
 
 
-async def _provision(session_factory, token_service: JWTTokenService, *, legal_name: str, email: str):
+async def _provision(
+    session_factory, token_service: JWTTokenService, *, legal_name: str, email: str
+):
     service = TenantProvisioningService(
         session_factory=session_factory,
         tenant_repository_factory=SQLAlchemyTenantRepository,
@@ -87,15 +89,21 @@ async def _provision(session_factory, token_service: JWTTokenService, *, legal_n
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
     return await service.provision(
-        legal_name=legal_name, display_name=legal_name, default_currency_code="USD", owner_email=email
+        legal_name=legal_name,
+        display_name=legal_name,
+        default_currency_code="USD",
+        owner_email=email,
     )
 
 
 async def test_a_valid_token_activates_and_the_new_password_logs_in(
     client: TestClient, session_factory, token_service: JWTTokenService
 ) -> None:
-    tenant, owner, raw_token = await _provision(
-        session_factory, token_service, legal_name="Activation Flow LLC", email="activation-owner@example.com"
+    tenant, _owner, raw_token = await _provision(
+        session_factory,
+        token_service,
+        legal_name="Activation Flow LLC",
+        email="activation-owner@example.com",
     )
 
     response = client.post(
@@ -118,10 +126,16 @@ async def test_unknown_expired_and_consumed_tokens_are_byte_identical(
     client: TestClient, session_factory, token_service: JWTTokenService
 ) -> None:
     _tenant, _owner, valid_but_will_expire = await _provision(
-        session_factory, token_service, legal_name="Expiry Test LLC", email="expiry-owner@example.com"
+        session_factory,
+        token_service,
+        legal_name="Expiry Test LLC",
+        email="expiry-owner@example.com",
     )
     _tenant2, _owner2, will_be_consumed = await _provision(
-        session_factory, token_service, legal_name="Consumed Test LLC", email="consumed-owner@example.com"
+        session_factory,
+        token_service,
+        legal_name="Consumed Test LLC",
+        email="consumed-owner@example.com",
     )
 
     # Force the first token into the past directly -- no HTTP path
@@ -142,7 +156,8 @@ async def test_unknown_expired_and_consumed_tokens_are_byte_identical(
     assert first_use.status_code == 200, first_use.text
 
     unknown_response = client.post(
-        "/api/v1/owner-activation", json={"token": "never-issued-token", "newPassword": "irrelevant1"}
+        "/api/v1/owner-activation",
+        json={"token": "never-issued-token", "newPassword": "irrelevant1"},
     )
     expired_response = client.post(
         "/api/v1/owner-activation",

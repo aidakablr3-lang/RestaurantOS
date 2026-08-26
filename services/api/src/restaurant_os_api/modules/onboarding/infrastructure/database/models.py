@@ -98,9 +98,7 @@ class OnboardingAuditLogModel(Base, ULIDPrimaryKeyMixin):
     )
     step_id: Mapped[str | None] = mapped_column(Text)
     actor_type: Mapped[str] = mapped_column(Text, nullable=False)
-    actor_id: Mapped[str | None] = mapped_column(
-        Text, ForeignKey("users.id", ondelete="SET NULL")
-    )
+    actor_id: Mapped[str | None] = mapped_column(Text, ForeignKey("users.id", ondelete="SET NULL"))
     action: Mapped[str] = mapped_column(Text, nullable=False)
     request: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     response: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)

@@ -50,9 +50,7 @@ class OnboardingStepRegistry:
         """Every step whose ``requires`` names ``step_id`` directly —
         not transitively."""
         return tuple(
-            candidate_id
-            for candidate_id, step in self._steps.items()
-            if step_id in step.requires
+            candidate_id for candidate_id, step in self._steps.items() if step_id in step.requires
         )
 
     def topological_order(self) -> tuple[StepId, ...]:

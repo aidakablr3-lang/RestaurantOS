@@ -169,7 +169,9 @@ class InMemoryOwnerActivationTokenRepository:
     async def mark_used(self, token_id: str, *, used_at: datetime) -> None:
         self.tokens[token_id].used_at = used_at
 
-    async def get_latest_for_user(self, tenant_id: str, user_id: str) -> OwnerActivationToken | None:
+    async def get_latest_for_user(
+        self, tenant_id: str, user_id: str
+    ) -> OwnerActivationToken | None:
         candidates = [
             t for t in self.tokens.values() if t.tenant_id == tenant_id and t.user_id == user_id
         ]

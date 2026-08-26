@@ -97,9 +97,7 @@ async def _discover_tenant_scoped_tables(session: AsyncSession) -> list[str]:
     return [row[0] for row in result.all()]
 
 
-async def _row_counts(
-    session: AsyncSession, tenant_id: str, tables: list[str]
-) -> dict[str, int]:
+async def _row_counts(session: AsyncSession, tenant_id: str, tables: list[str]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for table in tables:
         result = await session.execute(

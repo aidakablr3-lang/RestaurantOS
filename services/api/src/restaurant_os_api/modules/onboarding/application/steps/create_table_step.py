@@ -65,9 +65,11 @@ class CreateTableStep:
     async def execute(
         self, input: CreateTableStepInput, ctx: OnboardingRunContext
     ) -> tuple[TableDTO, ...]:
-        assert ctx.tenant_id is not None and ctx.branch_id is not None and ctx.table_zone_id is not None, (
-            "create_table requires create_table_zone first"
-        )
+        assert (
+            ctx.tenant_id is not None
+            and ctx.branch_id is not None
+            and ctx.table_zone_id is not None
+        ), "create_table requires create_table_zone first"
         created: list[TableDTO] = []
         for spec in input.tables:
             table = await self._create_table_use_case.execute(
@@ -102,6 +104,5 @@ class CreateTableStep:
 
     async def undo(self, ctx: OnboardingRunContext) -> None:
         raise NotImplementedError(
-            "CreateTableStep.undo() is not implemented in Phase 1 -- no caller abandons "
-            "a run yet."
+            "CreateTableStep.undo() is not implemented in Phase 1 -- no caller abandons a run yet."
         )

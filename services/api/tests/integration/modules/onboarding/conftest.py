@@ -267,7 +267,9 @@ def make_resolve_user_permissions_use_case(
     )
 
 
-def make_provisioning_service(session_factory: async_sessionmaker[AsyncSession]) -> TenantProvisioningService:
+def make_provisioning_service(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> TenantProvisioningService:
     return TenantProvisioningService(
         session_factory=session_factory,
         tenant_repository_factory=SQLAlchemyTenantRepository,
@@ -284,7 +286,9 @@ def make_provisioning_service(session_factory: async_sessionmaker[AsyncSession])
     )
 
 
-def make_provision_tenant_step(session_factory: async_sessionmaker[AsyncSession]) -> ProvisionTenantStep:
+def make_provision_tenant_step(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> ProvisionTenantStep:
     return ProvisionTenantStep(
         provisioning_service=make_provisioning_service(session_factory),
         get_tenant_use_case=GetTenantUseCase(
@@ -301,7 +305,9 @@ def make_provision_tenant_step(session_factory: async_sessionmaker[AsyncSession]
     )
 
 
-def make_create_restaurant_step(session_factory: async_sessionmaker[AsyncSession]) -> CreateRestaurantStep:
+def make_create_restaurant_step(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> CreateRestaurantStep:
     return CreateRestaurantStep(
         create_restaurant_use_case=CreateRestaurantUseCase(
             session_factory=session_factory,
@@ -333,7 +339,9 @@ def make_create_branch_step(session_factory: async_sessionmaker[AsyncSession]) -
     )
 
 
-def make_create_table_zone_step(session_factory: async_sessionmaker[AsyncSession]) -> CreateTableZoneStep:
+def make_create_table_zone_step(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> CreateTableZoneStep:
     return CreateTableZoneStep(
         create_table_zone_use_case=CreateTableZoneUseCase(
             session_factory=session_factory,
@@ -363,7 +371,9 @@ def make_create_table_step(session_factory: async_sessionmaker[AsyncSession]) ->
     )
 
 
-def make_generate_qr_codes_step(session_factory: async_sessionmaker[AsyncSession]) -> GenerateQrCodesStep:
+def make_generate_qr_codes_step(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> GenerateQrCodesStep:
     resolve_permissions = make_resolve_user_permissions_use_case(session_factory)
     return GenerateQrCodesStep(
         create_qr_code_use_case=CreateQRCodeUseCase(
@@ -481,7 +491,9 @@ def make_create_kitchen_staff_step(
     )
 
 
-def make_create_menu_category_step(session_factory: async_sessionmaker[AsyncSession]) -> CreateMenuCategoryStep:
+def make_create_menu_category_step(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> CreateMenuCategoryStep:
     return CreateMenuCategoryStep(
         create_menu_category_use_case=CreateMenuCategoryUseCase(
             session_factory=session_factory,
@@ -496,7 +508,9 @@ def make_create_menu_category_step(session_factory: async_sessionmaker[AsyncSess
     )
 
 
-def make_create_menu_items_step(session_factory: async_sessionmaker[AsyncSession]) -> CreateMenuItemsStep:
+def make_create_menu_items_step(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> CreateMenuItemsStep:
     return CreateMenuItemsStep(
         create_menu_item_use_case=CreateMenuItemUseCase(
             session_factory=session_factory,

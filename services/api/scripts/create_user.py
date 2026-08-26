@@ -108,7 +108,9 @@ async def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--tenant-id", required=True, help="ULID of the tenant this user belongs to.")
+    parser.add_argument(
+        "--tenant-id", required=True, help="ULID of the tenant this user belongs to."
+    )
     parser.add_argument("--email", required=True, help="Login email, unique within the tenant.")
     parser.add_argument("--phone", default=None, help="Optional phone number.")
     parser.add_argument(
@@ -162,17 +164,23 @@ async def main() -> None:
 
         existing_user = await user_repo.get_by_email(args.tenant_id, args.email)
         if existing_user is not None:
-            print(f"User already exists: {existing_user.id} ({existing_user.email}, "
-                  f"status={existing_user.status.value})")
-            print("Nothing to do -- this script does not update an existing user's "
-                  "password or role. Re-run against a different email, or handle the "
-                  "update separately.")
+            print(
+                f"User already exists: {existing_user.id} ({existing_user.email}, "
+                f"status={existing_user.status.value})"
+            )
+            print(
+                "Nothing to do -- this script does not update an existing user's "
+                "password or role. Re-run against a different email, or handle the "
+                "update separately."
+            )
             return
 
         role = await role_repo.get_by_name(args.tenant_id, args.role_name)
         if role is None:
             _, total_roles = await role_repo.list_for_tenant(args.tenant_id, offset=0, limit=100)
-            available, _ = await role_repo.list_for_tenant(args.tenant_id, offset=0, limit=total_roles or 1)
+            available, _ = await role_repo.list_for_tenant(
+                args.tenant_id, offset=0, limit=total_roles or 1
+            )
             names = ", ".join(sorted(r.name for r in available)) or "(none)"
             raise SystemExit(
                 f"No role named '{args.role_name}' exists for tenant {args.tenant_id}. "
@@ -241,8 +249,10 @@ async def main() -> None:
         print(f"\nCreated user_id={user_id}, granted '{role.name}' ({scope}).")
         if not args.password:
             print(f"\nGenerated password (shown once, not stored or logged): {password}")
-        print("\nHand these to the client over a channel you trust -- do not paste the "
-              "password back into this terminal's scrollback history or any chat log.")
+        print(
+            "\nHand these to the client over a channel you trust -- do not paste the "
+            "password back into this terminal's scrollback history or any chat log."
+        )
 
     await engine.dispose()
 

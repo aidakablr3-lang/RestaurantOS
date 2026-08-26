@@ -245,7 +245,9 @@ def upgrade() -> None:
             f"id ~ '{_ULID_REGEX}'", name=conv("ck_owner_activation_tokens_id_is_valid_ulid")
         ),
     )
-    op.create_index("ix_owner_activation_tokens_tenant_id", "owner_activation_tokens", ["tenant_id"])
+    op.create_index(
+        "ix_owner_activation_tokens_tenant_id", "owner_activation_tokens", ["tenant_id"]
+    )
     op.create_index("ix_owner_activation_tokens_user_id", "owner_activation_tokens", ["user_id"])
     op.create_index(
         "ix_owner_activation_tokens_token_hash",
@@ -282,9 +284,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP TRIGGER IF EXISTS trg_onboarding_runs_tenant_id_immutable ON onboarding_runs"
-    )
+    op.execute("DROP TRIGGER IF EXISTS trg_onboarding_runs_tenant_id_immutable ON onboarding_runs")
     op.execute("DROP FUNCTION IF EXISTS onboarding_runs_tenant_id_immutable()")
 
     op.drop_table("owner_activation_tokens")

@@ -70,11 +70,12 @@ class CreateBranchStep:
         except BranchNotFoundError:
             return VerifyFailure(reason=f"branch {ctx.branch_id} not found on read-back")
         if branch.status != "active":
-            return VerifyFailure(reason=f"branch {ctx.branch_id} is '{branch.status}', not 'active'")
+            return VerifyFailure(
+                reason=f"branch {ctx.branch_id} is '{branch.status}', not 'active'"
+            )
         return VerifySuccess(evidence=f"GET branch {branch.id} -> status={branch.status}")
 
     async def undo(self, ctx: OnboardingRunContext) -> None:
         raise NotImplementedError(
-            "CreateBranchStep.undo() is not implemented in Phase 1 -- no caller abandons "
-            "a run yet."
+            "CreateBranchStep.undo() is not implemented in Phase 1 -- no caller abandons a run yet."
         )

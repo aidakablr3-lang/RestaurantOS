@@ -73,7 +73,9 @@ class GenerateQrCodesStep:
         )
         codes: list[QRCodeDTO] = []
         for table_id in ctx.table_ids:
-            code = await self._create_qr_code_use_case.execute(ctx.tenant_id, ctx.owner_id, table_id)
+            code = await self._create_qr_code_use_case.execute(
+                ctx.tenant_id, ctx.owner_id, table_id
+            )
             codes.append(code)
         return tuple(codes)
 
@@ -95,9 +97,7 @@ class GenerateQrCodesStep:
 
         missing = [tid for tid, count in active_counts.items() if count != 1]
         if missing:
-            return VerifyFailure(
-                reason=f"tables without exactly one active QR code: {missing}"
-            )
+            return VerifyFailure(reason=f"tables without exactly one active QR code: {missing}")
 
         return VerifySuccess(
             evidence=f"LIST QR codes for {len(active_counts)} table(s) -> each has exactly 1 active"

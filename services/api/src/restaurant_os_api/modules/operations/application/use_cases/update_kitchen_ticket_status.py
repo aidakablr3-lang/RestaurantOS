@@ -229,9 +229,7 @@ class UpdateKitchenTicketStatusUseCase:
                             tenant_id, OrderServed(order_id=order.id, occurred_at=now)
                         )
 
-            menu_item_ids = {
-                oi.menu_item_id for oi in order_items_by_id.values() if oi is not None
-            }
+            menu_item_ids = {oi.menu_item_id for oi in order_items_by_id.values() if oi is not None}
             menu_items_by_id = {}
             for menu_item_id in menu_item_ids:
                 menu_item = await menu_item_repo.get_by_id(tenant_id, menu_item_id)

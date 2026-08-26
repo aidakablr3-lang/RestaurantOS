@@ -14,7 +14,9 @@ from tests.unit.modules.identity.use_cases.conftest import TENANT_ID, USER_ID
 async def test_returns_the_user_when_found(
     session_factory, user_repository, active_user: User
 ) -> None:
-    use_case = GetUserUseCase(session_factory=session_factory, user_repository_factory=lambda _s: user_repository)
+    use_case = GetUserUseCase(
+        session_factory=session_factory, user_repository_factory=lambda _s: user_repository
+    )
 
     result = await use_case.execute(TENANT_ID, USER_ID)
 
@@ -24,7 +26,9 @@ async def test_returns_the_user_when_found(
 
 
 async def test_raises_when_the_user_does_not_exist(session_factory, user_repository) -> None:
-    use_case = GetUserUseCase(session_factory=session_factory, user_repository_factory=lambda _s: user_repository)
+    use_case = GetUserUseCase(
+        session_factory=session_factory, user_repository_factory=lambda _s: user_repository
+    )
 
     with pytest.raises(UserNotFoundError):
         await use_case.execute(TENANT_ID, "01ARZ3NDEKTSV4RRFFQ6UNKNWN")
@@ -33,7 +37,9 @@ async def test_raises_when_the_user_does_not_exist(session_factory, user_reposit
 async def test_raises_when_the_user_belongs_to_a_different_tenant(
     session_factory, user_repository
 ) -> None:
-    use_case = GetUserUseCase(session_factory=session_factory, user_repository_factory=lambda _s: user_repository)
+    use_case = GetUserUseCase(
+        session_factory=session_factory, user_repository_factory=lambda _s: user_repository
+    )
 
     with pytest.raises(UserNotFoundError):
         await use_case.execute("01ARZ3NDEKTSV4RRFFQ6OTHERT", USER_ID)

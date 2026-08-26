@@ -44,9 +44,7 @@ class _Fixture:
             token_service=self.token_service,
         )
 
-    async def seed_token(
-        self, *, expires_at: datetime, used_at: datetime | None = None
-    ) -> None:
+    async def seed_token(self, *, expires_at: datetime, used_at: datetime | None = None) -> None:
         await self.token_repo.create(
             OwnerActivationToken(
                 id="01ARZ3NDEKTSV4RRFFQ6TOKEN0",
@@ -109,7 +107,9 @@ async def test_an_expired_token_is_rejected(fixture: _Fixture, session_factory) 
     use_case = fixture.use_case(session_factory)
 
     with pytest.raises(InvalidOwnerActivationTokenError):
-        await use_case.execute(ActivateOwnerRequestDTO(token=RAW_TOKEN, new_password="new password 1"))
+        await use_case.execute(
+            ActivateOwnerRequestDTO(token=RAW_TOKEN, new_password="new password 1")
+        )
 
 
 async def test_an_already_consumed_token_is_rejected(fixture: _Fixture, session_factory) -> None:
@@ -119,7 +119,9 @@ async def test_an_already_consumed_token_is_rejected(fixture: _Fixture, session_
     use_case = fixture.use_case(session_factory)
 
     with pytest.raises(InvalidOwnerActivationTokenError):
-        await use_case.execute(ActivateOwnerRequestDTO(token=RAW_TOKEN, new_password="new password 1"))
+        await use_case.execute(
+            ActivateOwnerRequestDTO(token=RAW_TOKEN, new_password="new password 1")
+        )
 
 
 async def test_the_three_rejection_reasons_raise_the_identical_exception_type_and_message(
@@ -139,7 +141,9 @@ async def test_the_three_rejection_reasons_raise_the_identical_exception_type_an
 
     await fixture.seed_token(expires_at=datetime.now(UTC) - timedelta(hours=1))
     with pytest.raises(InvalidOwnerActivationTokenError) as exc_info:
-        await use_case.execute(ActivateOwnerRequestDTO(token=RAW_TOKEN, new_password="new password 1"))
+        await use_case.execute(
+            ActivateOwnerRequestDTO(token=RAW_TOKEN, new_password="new password 1")
+        )
     errors.append(exc_info.value)
 
     messages = {str(e) for e in errors}

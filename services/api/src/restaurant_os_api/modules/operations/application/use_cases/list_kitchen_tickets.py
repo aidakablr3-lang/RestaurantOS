@@ -16,7 +16,10 @@ from restaurant_os_api.modules.operations.application.use_cases._kitchen_mapper 
     kitchen_ticket_to_dto,
     resolve_kitchen_item_identity,
 )
-from restaurant_os_api.modules.operations.domain.ports import KitchenTicketRepository, OrderRepository
+from restaurant_os_api.modules.operations.domain.ports import (
+    KitchenTicketRepository,
+    OrderRepository,
+)
 from restaurant_os_api.modules.restaurant.domain.ports import MenuItemRepository
 from restaurant_os_api.platform.database import UnitOfWork
 from restaurant_os_api.platform.tenancy import TenantContext

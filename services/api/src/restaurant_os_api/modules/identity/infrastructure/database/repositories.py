@@ -462,7 +462,9 @@ class SQLAlchemyOwnerActivationTokenRepository:
         )
         await self._session.execute(stmt)
 
-    async def get_latest_for_user(self, tenant_id: str, user_id: str) -> OwnerActivationToken | None:
+    async def get_latest_for_user(
+        self, tenant_id: str, user_id: str
+    ) -> OwnerActivationToken | None:
         stmt = (
             select(OwnerActivationTokenModel)
             .where(

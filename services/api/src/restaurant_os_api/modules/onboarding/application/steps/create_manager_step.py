@@ -99,9 +99,9 @@ class CreateManagerStep:
     async def execute(
         self, input: CreateManagerStepInput, ctx: OnboardingRunContext
     ) -> CreateManagerStepOutput:
-        assert ctx.tenant_id is not None and ctx.owner_id is not None and ctx.branch_id is not None, (
-            "create_manager requires create_branch first"
-        )
+        assert (
+            ctx.tenant_id is not None and ctx.owner_id is not None and ctx.branch_id is not None
+        ), "create_manager requires create_branch first"
         role = await self._get_role_by_name_use_case.execute(ctx.tenant_id, _ROLE_NAME)
         user = await self._create_user_use_case.execute(
             ctx.tenant_id,

@@ -139,9 +139,7 @@ class SQLAlchemyOnboardingStepStateRepository:
         return _step_state_to_entity(model) if model is not None else None
 
     async def list_for_run(self, run_id: str) -> list[OnboardingStepState]:
-        stmt = select(OnboardingStepStateModel).where(
-            OnboardingStepStateModel.run_id == run_id
-        )
+        stmt = select(OnboardingStepStateModel).where(OnboardingStepStateModel.run_id == run_id)
         models = (await self._session.execute(stmt)).scalars().all()
         return [_step_state_to_entity(m) for m in models]
 

@@ -27,7 +27,9 @@ class OwnerActivationTokenRepository(Protocol):
 
     async def mark_used(self, token_id: str, *, used_at: datetime) -> None: ...
 
-    async def get_latest_for_user(self, tenant_id: str, user_id: str) -> OwnerActivationToken | None:
+    async def get_latest_for_user(
+        self, tenant_id: str, user_id: str
+    ) -> OwnerActivationToken | None:
         """The most recently issued token for one user, tenant-scoped.
 
         Phase 1 design doc §A.4: backs ``GetOwnerActivationTokenStatusUseCase``,

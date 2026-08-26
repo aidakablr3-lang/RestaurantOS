@@ -161,9 +161,13 @@ async def main() -> None:
 
     if existing_admin is not None:
         admin_id, admin_email, admin_tenant_id = existing_admin
-        print(f"A platform admin already exists: id={admin_id} email={admin_email} tenant_id={admin_tenant_id}")
-        print("Nothing to do -- this script only ever creates the first platform admin. "
-              "Use services/api/scripts/create_user.py for every account after that.")
+        print(
+            f"A platform admin already exists: id={admin_id} email={admin_email} tenant_id={admin_tenant_id}"
+        )
+        print(
+            "Nothing to do -- this script only ever creates the first platform admin. "
+            "Use services/api/scripts/create_user.py for every account after that."
+        )
         await engine.dispose()
         return
 
@@ -244,13 +248,17 @@ async def main() -> None:
     if not args.password:
         print(f"\nGenerated password (shown once, not stored or logged): {password}")
     print(f"\ntenantId for login: {tenant_id}")
-    print("POST /api/v1/auth/login requires tenantId in the body (auth_schemas.py) -- "
-          "this platform admin belongs to the Platform Ops tenant above like any other "
-          "user, it just also carries is_platform_admin=true.")
-    print("\nHand the email/password/tenantId to whoever will use them, over a channel "
-          "you trust -- do not paste them back into this terminal's scrollback history or "
-          "any chat log. Log in, then call POST /api/v1/admin/tenants with the resulting "
-          "bearer token to create the first real hotel/restaurant tenant.")
+    print(
+        "POST /api/v1/auth/login requires tenantId in the body (auth_schemas.py) -- "
+        "this platform admin belongs to the Platform Ops tenant above like any other "
+        "user, it just also carries is_platform_admin=true."
+    )
+    print(
+        "\nHand the email/password/tenantId to whoever will use them, over a channel "
+        "you trust -- do not paste them back into this terminal's scrollback history or "
+        "any chat log. Log in, then call POST /api/v1/admin/tenants with the resulting "
+        "bearer token to create the first real hotel/restaurant tenant."
+    )
 
 
 if __name__ == "__main__":

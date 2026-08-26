@@ -80,6 +80,5 @@ class ConfigureTaxStep:
 
     async def undo(self, ctx: OnboardingRunContext) -> None:
         raise NotImplementedError(
-            "ConfigureTaxStep.undo() is not implemented in Phase 1 -- no caller abandons "
-            "a run yet."
+            "ConfigureTaxStep.undo() is not implemented in Phase 1 -- no caller abandons a run yet."
         )

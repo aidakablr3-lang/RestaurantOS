@@ -15,7 +15,11 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    create_async_engine,
+)
 from sqlalchemy.pool import NullPool
 
 from restaurant_os_api.modules.identity.application.services import TenantProvisioningService
@@ -159,7 +163,7 @@ async def test_a_failure_after_the_user_insert_rolls_back_the_whole_transaction(
         def __init__(self, session: AsyncSession) -> None:
             self._real = SQLAlchemyUserRoleRepository(session)
 
-        async def create(self, user_role):  # noqa: ANN001
+        async def create(self, user_role):
             raise RuntimeError("deliberate failure for the atomicity test")
 
     def _exploding_user_role_repository_factory(session: AsyncSession):

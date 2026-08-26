@@ -92,9 +92,9 @@ class CreateWaitersStep:
     async def execute(
         self, input: CreateWaitersStepInput, ctx: OnboardingRunContext
     ) -> tuple[CreateWaiterResult, ...]:
-        assert ctx.tenant_id is not None and ctx.owner_id is not None and ctx.branch_id is not None, (
-            "create_waiters requires create_branch first"
-        )
+        assert (
+            ctx.tenant_id is not None and ctx.owner_id is not None and ctx.branch_id is not None
+        ), "create_waiters requires create_branch first"
         role = await self._get_role_by_name_use_case.execute(ctx.tenant_id, _ROLE_NAME)
         results: list[CreateWaiterResult] = []
         for spec in input.waiters:
@@ -134,7 +134,9 @@ class CreateWaitersStep:
             except UserNotFoundError:
                 return VerifyFailure(reason=f"waiter user {user_id} not found on read-back")
             if waiter.status != "active":
-                return VerifyFailure(reason=f"waiter user {user_id} is '{waiter.status}', not 'active'")
+                return VerifyFailure(
+                    reason=f"waiter user {user_id} is '{waiter.status}', not 'active'"
+                )
 
             # NOTE: this asserts permission *effect*, not role identity --
             # it proves the user holds order.manage at this branch, not

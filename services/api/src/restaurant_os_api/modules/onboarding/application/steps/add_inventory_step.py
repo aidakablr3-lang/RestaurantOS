@@ -114,9 +114,9 @@ class AddInventoryStep:
     async def execute(
         self, input: AddInventoryStepInput, ctx: OnboardingRunContext
     ) -> InventoryItemDTO:
-        assert ctx.tenant_id is not None and ctx.owner_id is not None and ctx.branch_id is not None, (
-            "add_inventory requires create_branch first"
-        )
+        assert (
+            ctx.tenant_id is not None and ctx.owner_id is not None and ctx.branch_id is not None
+        ), "add_inventory requires create_branch first"
         category = await self._create_inventory_category_use_case.execute(
             ctx.tenant_id,
             ctx.owner_id,
@@ -181,6 +181,5 @@ class AddInventoryStep:
 
     async def undo(self, ctx: OnboardingRunContext) -> None:
         raise NotImplementedError(
-            "AddInventoryStep.undo() is not implemented in Phase 1 -- no caller abandons "
-            "a run yet."
+            "AddInventoryStep.undo() is not implemented in Phase 1 -- no caller abandons a run yet."
         )

@@ -49,7 +49,9 @@ class UserRepository(Protocol):
         ``TenantRepository.create()``)."""
         ...
 
-    async def list_for_tenant(self, tenant_id: str, *, offset: int, limit: int) -> tuple[list[User], int]:
+    async def list_for_tenant(
+        self, tenant_id: str, *, offset: int, limit: int
+    ) -> tuple[list[User], int]:
         """Page through a tenant's users, newest first, excluding
         soft-deleted rows — same shape as ``RoleRepository.list_for_tenant``."""
         ...

@@ -32,7 +32,9 @@ def _waiter_role() -> Role:
 
 async def test_returns_the_role_when_a_matching_name_exists(session_factory) -> None:
     role_repo = InMemoryRoleRepository({WAITER_ROLE_ID: _waiter_role()})
-    use_case = GetRoleByNameUseCase(session_factory=session_factory, role_repository_factory=lambda _s: role_repo)
+    use_case = GetRoleByNameUseCase(
+        session_factory=session_factory, role_repository_factory=lambda _s: role_repo
+    )
 
     result = await use_case.execute(TENANT_ID, "Waiter")
 
@@ -42,7 +44,9 @@ async def test_returns_the_role_when_a_matching_name_exists(session_factory) -> 
 
 async def test_raises_when_no_role_has_that_name(session_factory) -> None:
     role_repo = InMemoryRoleRepository({WAITER_ROLE_ID: _waiter_role()})
-    use_case = GetRoleByNameUseCase(session_factory=session_factory, role_repository_factory=lambda _s: role_repo)
+    use_case = GetRoleByNameUseCase(
+        session_factory=session_factory, role_repository_factory=lambda _s: role_repo
+    )
 
     with pytest.raises(RoleNotFoundError):
         await use_case.execute(TENANT_ID, "Nonexistent Role")
@@ -52,7 +56,9 @@ async def test_raises_when_the_role_belongs_to_a_different_tenant(session_factor
     role = _waiter_role()
     role.tenant_id = "01ARZ3NDEKTSV4RRFFQ6OTHERT"
     role_repo = InMemoryRoleRepository({WAITER_ROLE_ID: role})
-    use_case = GetRoleByNameUseCase(session_factory=session_factory, role_repository_factory=lambda _s: role_repo)
+    use_case = GetRoleByNameUseCase(
+        session_factory=session_factory, role_repository_factory=lambda _s: role_repo
+    )
 
     with pytest.raises(RoleNotFoundError):
         await use_case.execute(TENANT_ID, "Waiter")

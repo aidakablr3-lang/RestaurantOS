@@ -45,7 +45,9 @@ def _category(**overrides) -> InventoryCategory:
     return InventoryCategory(**defaults)
 
 
-def _use_case(category_repo, resolved: ResolvedPermissions | None = None) -> GetInventoryCategoryUseCase:
+def _use_case(
+    category_repo, resolved: ResolvedPermissions | None = None
+) -> GetInventoryCategoryUseCase:
     return GetInventoryCategoryUseCase(
         session_factory=_session_factory(),
         inventory_category_repository_factory=lambda _s: category_repo,

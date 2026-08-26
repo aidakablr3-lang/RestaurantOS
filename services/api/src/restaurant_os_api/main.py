@@ -18,11 +18,11 @@ from restaurant_os_api.modules.identity.presentation.api.v1.admin_tenant_router 
 from restaurant_os_api.modules.identity.presentation.api.v1.auth_router import (
     router as auth_router,
 )
-from restaurant_os_api.modules.identity.presentation.api.v1.rbac_router import (
-    router as rbac_router,
-)
 from restaurant_os_api.modules.identity.presentation.api.v1.owner_activation_router import (
     router as owner_activation_router,
+)
+from restaurant_os_api.modules.identity.presentation.api.v1.rbac_router import (
+    router as rbac_router,
 )
 from restaurant_os_api.modules.identity.presentation.api.v1.self_service_tenant_router import (
     router as self_service_tenant_router,

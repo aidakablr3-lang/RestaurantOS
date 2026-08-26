@@ -81,8 +81,8 @@ from restaurant_os_api.modules.identity.infrastructure.security import (
     JWTTokenService,
 )
 from restaurant_os_api.platform.idempotency import IdempotencyGuard, PlatformIdempotencyGuard
-from restaurant_os_api.platform.rate_limiting import OwnerActivationRateLimiter
 from restaurant_os_api.platform.outbox.sqlalchemy_outbox_writer import SQLAlchemyOutboxWriter
+from restaurant_os_api.platform.rate_limiting import OwnerActivationRateLimiter
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 

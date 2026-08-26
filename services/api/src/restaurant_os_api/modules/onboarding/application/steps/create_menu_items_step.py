@@ -107,7 +107,9 @@ class CreateMenuItemsStep:
                 return VerifyFailure(reason=f"menu item {item_id} not found on read-back")
             verified.append(item.id)
 
-        return VerifySuccess(evidence=f"GET {len(verified)} menu item(s) -> all present: {verified}")
+        return VerifySuccess(
+            evidence=f"GET {len(verified)} menu item(s) -> all present: {verified}"
+        )
 
     async def undo(self, ctx: OnboardingRunContext) -> None:
         raise NotImplementedError(

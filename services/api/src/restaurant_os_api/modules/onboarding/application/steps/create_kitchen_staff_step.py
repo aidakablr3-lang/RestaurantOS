@@ -89,9 +89,9 @@ class CreateKitchenStaffStep:
     async def execute(
         self, input: CreateKitchenStaffStepInput, ctx: OnboardingRunContext
     ) -> tuple[CreateKitchenStaffResult, ...]:
-        assert ctx.tenant_id is not None and ctx.owner_id is not None and ctx.branch_id is not None, (
-            "create_kitchen_staff requires create_branch first"
-        )
+        assert (
+            ctx.tenant_id is not None and ctx.owner_id is not None and ctx.branch_id is not None
+        ), "create_kitchen_staff requires create_branch first"
         role = await self._get_role_by_name_use_case.execute(ctx.tenant_id, _ROLE_NAME)
         results: list[CreateKitchenStaffResult] = []
         for spec in input.kitchen_staff:

@@ -117,14 +117,18 @@ class ProvisionTenantStep:
 
     async def verify(self, ctx: OnboardingRunContext) -> VerifyResult:
         if ctx.tenant_id is None or ctx.owner_id is None:
-            return VerifyFailure(reason="tenant_id/owner_id not yet in context -- execute() has not run")
+            return VerifyFailure(
+                reason="tenant_id/owner_id not yet in context -- execute() has not run"
+            )
 
         try:
             tenant = await self._get_tenant_use_case.execute(ctx.tenant_id)
         except TenantNotFoundError:
             return VerifyFailure(reason=f"tenant {ctx.tenant_id} not found on read-back")
         if tenant.status != "active":
-            return VerifyFailure(reason=f"tenant {ctx.tenant_id} is '{tenant.status}', not 'active'")
+            return VerifyFailure(
+                reason=f"tenant {ctx.tenant_id} is '{tenant.status}', not 'active'"
+            )
         if (
             ctx.expected_currency_code is not None
             and tenant.default_currency_code != ctx.expected_currency_code
@@ -141,7 +145,9 @@ class ProvisionTenantStep:
         except UserNotFoundError:
             return VerifyFailure(reason=f"owner user {ctx.owner_id} not found on read-back")
         if owner.status != "invited":
-            return VerifyFailure(reason=f"owner user {ctx.owner_id} is '{owner.status}', not 'invited'")
+            return VerifyFailure(
+                reason=f"owner user {ctx.owner_id} is '{owner.status}', not 'invited'"
+            )
 
         owner_permissions = await self._resolve_user_permissions_use_case.execute(
             ctx.tenant_id, ctx.owner_id

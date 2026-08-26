@@ -147,6 +147,5 @@ class AddRecipesStep:
 
     async def undo(self, ctx: OnboardingRunContext) -> None:
         raise NotImplementedError(
-            "AddRecipesStep.undo() is not implemented in Phase 1 -- no caller abandons "
-            "a run yet."
+            "AddRecipesStep.undo() is not implemented in Phase 1 -- no caller abandons a run yet."
         )

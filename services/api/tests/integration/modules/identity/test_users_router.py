@@ -177,7 +177,9 @@ class TestCreateUser:
         self, client: TestClient, session_factory
     ) -> None:
         tenant_id = generate_ulid()
-        owner_id = await _seed_user(session_factory, tenant_id=tenant_id, email="owner2@example.com")
+        owner_id = await _seed_user(
+            session_factory, tenant_id=tenant_id, email="owner2@example.com"
+        )
         await _grant_tenant_owner(session_factory, tenant_id=tenant_id, user_id=owner_id)
         owner_token = _login(client, tenant_id=tenant_id, email="owner2@example.com")
 
@@ -192,7 +194,9 @@ class TestCreateUser:
 
     async def test_duplicate_email_is_rejected(self, client: TestClient, session_factory) -> None:
         tenant_id = generate_ulid()
-        owner_id = await _seed_user(session_factory, tenant_id=tenant_id, email="owner3@example.com")
+        owner_id = await _seed_user(
+            session_factory, tenant_id=tenant_id, email="owner3@example.com"
+        )
         await _grant_tenant_owner(session_factory, tenant_id=tenant_id, user_id=owner_id)
         owner_token = _login(client, tenant_id=tenant_id, email="owner3@example.com")
         payload = {"email": "dup@example.com"}
@@ -226,11 +230,15 @@ class TestListUsers:
         self, client: TestClient, session_factory
     ) -> None:
         tenant_id = generate_ulid()
-        owner_id = await _seed_user(session_factory, tenant_id=tenant_id, email="owner4@example.com")
+        owner_id = await _seed_user(
+            session_factory, tenant_id=tenant_id, email="owner4@example.com"
+        )
         await _grant_tenant_owner(session_factory, tenant_id=tenant_id, user_id=owner_id)
         owner_token = _login(client, tenant_id=tenant_id, email="owner4@example.com")
         client.post(
-            "/api/v1/users", headers=_auth_headers(owner_token), json={"email": "staff1@example.com"}
+            "/api/v1/users",
+            headers=_auth_headers(owner_token),
+            json={"email": "staff1@example.com"},
         )
 
         response = client.get("/api/v1/users", headers=_auth_headers(owner_token))
@@ -264,7 +272,9 @@ class TestCreateUserIdempotency:
         self, client: TestClient, session_factory
     ) -> None:
         tenant_id = generate_ulid()
-        owner_id = await _seed_user(session_factory, tenant_id=tenant_id, email="idem-owner@example.com")
+        owner_id = await _seed_user(
+            session_factory, tenant_id=tenant_id, email="idem-owner@example.com"
+        )
         await _grant_tenant_owner(session_factory, tenant_id=tenant_id, user_id=owner_id)
         owner_token = _login(client, tenant_id=tenant_id, email="idem-owner@example.com")
         headers = {**_auth_headers(owner_token), "Idempotency-Key": "create-user-key-1"}
@@ -287,7 +297,9 @@ class TestCreateUserIdempotency:
         self, client: TestClient, session_factory
     ) -> None:
         tenant_id = generate_ulid()
-        owner_id = await _seed_user(session_factory, tenant_id=tenant_id, email="idem-owner2@example.com")
+        owner_id = await _seed_user(
+            session_factory, tenant_id=tenant_id, email="idem-owner2@example.com"
+        )
         await _grant_tenant_owner(session_factory, tenant_id=tenant_id, user_id=owner_id)
         owner_token = _login(client, tenant_id=tenant_id, email="idem-owner2@example.com")
         headers = {**_auth_headers(owner_token), "Idempotency-Key": "create-user-key-2"}

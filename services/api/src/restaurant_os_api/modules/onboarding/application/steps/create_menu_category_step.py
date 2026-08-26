@@ -76,7 +76,9 @@ class CreateMenuCategoryStep:
 
     async def verify(self, ctx: OnboardingRunContext) -> VerifyResult:
         if ctx.tenant_id is None or ctx.restaurant_id is None or ctx.menu_category_id is None:
-            return VerifyFailure(reason="tenant_id/restaurant_id/menu_category_id not yet in context")
+            return VerifyFailure(
+                reason="tenant_id/restaurant_id/menu_category_id not yet in context"
+            )
         try:
             category = await self._get_menu_category_use_case.execute(
                 ctx.tenant_id, ctx.restaurant_id, ctx.menu_category_id
