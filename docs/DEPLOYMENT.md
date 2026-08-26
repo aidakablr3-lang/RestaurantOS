@@ -145,7 +145,12 @@ All of these live in one file: `/opt/restaurantos/.env`, written by `scripts/dep
       BACKUP_DIR=/var/backups/restaurantos /opt/restaurantos/scripts/deploy/backup.sh
   ```
   Retains 14 days on-host by default (`RETENTION_DAYS`). **Off-host copy is deliberately not wired up** — a same-host-only backup doesn't survive that host's own failure. Append an off-host step (rclone to S3/B2, or scp to a second machine) before treating backups as reliable — see the script's own header for why this is left as a placeholder rather than a guess.
-- **Restore:** `scripts/deploy/restore.sh <dump-file>` — drops and recreates the target database, restores, then **automatically verifies**: the restored `alembic_version` matches `alembic heads` for the code currently deployed, and the restored database has at least one table. Exits non-zero and prints `RESTORE VERIFICATION FAILED` if either check fails, rather than reporting success on a wrong or empty restore. Requires interactive `yes` confirmation (`CONFIRM=yes` bypasses it, for scripted DR drills only).
+- **Restore:** `scripts/deploy/restore.sh <dump-file>` — drops and recreates the target database, restores, then **automatically verifies**: the restored `alembic_version` matches `alembic heads` for the code currently deployed, and the restored database has at least one table. Exits non-zero and prints `RESTORE VERIFICATION FAILED` if either check fails, rather than reporting success on a wrong or empty restore. Requires interactive `yes` confirmation (`CONFIRM=yes` bypasses it, for scripted DR drills only). `DATABASE_NAME` can point at a scratch database name instead of the real one — the dump itself carries no fixed target — for a non-destructive restore drill.
+- **Row-count verification:** `scripts/deploy/compare_row_counts.sh <source-db> <target-db>` — `restore.sh`'s own checks confirm the right *tables* and migration head exist, not that every row actually came back. This compares every table's row count between two databases in the same Postgres container and fails loudly on any mismatch. Run it after a scratch restore, comparing the live database against the scratch one:
+  ```bash
+  DATABASE_USER=restaurantos DATABASE_PASSWORD=<from .env> \
+      ./scripts/deploy/compare_row_counts.sh restaurantos restaurantos_scratch_verify
+  ```
 
 Know who is authorized to run a restore, and rehearse it at least once against a disposable copy before you need it for real.
 
