@@ -1,6 +1,6 @@
 # RestaurantOS — Deployment Runbook
 
-**Target:** Ubuntu 24.04, 2 vCPU / 6GB RAM / 150GB disk, single node.
+**Target:** Ubuntu 24.04, single node. Written for an original 2 vCPU / 6GB / 150GB plan; actually deployed on an AWS Lightsail instance in Mumbai, 2 vCPU / 4GB RAM / 80GB disk, static IP `13.126.148.121` — `01_server_setup.sh` adds a 2GB swapfile specifically because of the smaller RAM (the stack runs fine at idle in 4GB, but the `admin-web` image's `next build` step is memory-hungry enough to risk an OOM kill without headroom).
 **Domains:** `api.prashanthai.com`, `admin.prashanthai.com` — DNS on Cloudflare, A records **DNS-only** (grey cloud, not proxied — Caddy needs to see the real client IP and handle its own TLS via Let's Encrypt HTTP-01/TLS-ALPN challenges, which Cloudflare's proxy would interfere with).
 
 **Status as of this writing:** nothing has been run against a real server. The VPS is pending KYC approval. Everything in this document and `scripts/deploy/` has been written and reviewed against the current codebase but **not yet executed against a real box** — treat every "verified" claim below as inherited from the code it's grounded in (migration chain, backup/restore design, RLS policies), not as "this exact runbook has been rehearsed end-to-end." Rehearse it (a disposable VPS or a local Docker stand-in for the box) before the real KYC-approved server's first run, if at all practical.

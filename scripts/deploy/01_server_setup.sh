@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # RestaurantOS deploy step 1/4 -- initial server hardening + Docker install.
 #
-# Target: Ubuntu 24.04, 2 vCPU / 6GB RAM / 150GB disk, single node.
+# Target: Ubuntu 24.04, single node -- written for the original 2 vCPU /
+# 6GB / 150GB plan, actually deployed on a 2 vCPU / 4GB / 80GB Lightsail
+# instance. The 2GB swapfile below exists specifically because of that
+# smaller-than-planned RAM.
 # Run once, as root (or via sudo), on a fresh VPS before anything else in
 # scripts/deploy/. Idempotent-ish: safe to re-run (apt/ufw/systemctl
 # calls below are all no-ops or reconciling on a system that already has
@@ -10,10 +13,13 @@
 #
 # What this does, in order:
 #   1. apt update/upgrade
-#   2. ufw: deny all incoming by default, allow 22 (ssh) / 80 / 443 only
-#   3. fail2ban: install, enable the sshd jail
-#   4. unattended-upgrades: install, enable automatic security updates
-#   5. Docker Engine + Compose plugin (needed by every later step --
+#   2. 2GB swapfile -- a box with 4GB RAM runs the stack fine at idle,
+#      but `docker compose build admin-web` (next build) is memory-
+#      hungry enough to risk an OOM kill without headroom
+#   3. ufw: deny all incoming by default, allow 22 (ssh) / 80 / 443 only
+#   4. fail2ban: install, enable the sshd jail
+#   5. unattended-upgrades: install, enable automatic security updates
+#   6. Docker Engine + Compose plugin (needed by every later step --
 #      not explicitly asked for, but nothing here runs without it)
 #
 # Does NOT touch SSH config itself (key-only auth, disabling root login,
@@ -31,6 +37,22 @@ fi
 echo "==> Updating system packages"
 apt-get update
 apt-get -y upgrade
+
+echo "==> Configuring 2GB swap"
+if swapon --show | grep -q .; then
+    echo "Swap already active, skipping."
+else
+    fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    # Low swappiness -- swap exists as headroom for the occasional build
+    # spike, not as routine memory pressure relief during normal serving.
+    echo "vm.swappiness=10" > /etc/sysctl.d/99-swappiness.conf
+    sysctl --system >/dev/null
+    swapon --show
+fi
 
 echo "==> Installing ufw, fail2ban, unattended-upgrades, and Docker prerequisites"
 apt-get install -y --no-install-recommends \
