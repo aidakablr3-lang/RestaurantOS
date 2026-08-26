@@ -3,7 +3,7 @@
 **Target:** Ubuntu 24.04, single node. Written for an original 2 vCPU / 6GB / 150GB plan; actually deployed on an AWS Lightsail instance in Mumbai, 2 vCPU / 4GB RAM / 80GB disk, static IP `13.126.148.121` — `01_server_setup.sh` adds a 2GB swapfile specifically because of the smaller RAM (the stack runs fine at idle in 4GB, but the `admin-web` image's `next build` step is memory-hungry enough to risk an OOM kill without headroom).
 **Domains:** `api.prashanthai.com`, `admin.prashanthai.com` — DNS on Cloudflare, A records **DNS-only** (grey cloud, not proxied — Caddy needs to see the real client IP and handle its own TLS via Let's Encrypt HTTP-01/TLS-ALPN challenges, which Cloudflare's proxy would interfere with).
 
-**Status as of this writing:** nothing has been run against a real server. The VPS is pending KYC approval. Everything in this document and `scripts/deploy/` has been written and reviewed against the current codebase but **not yet executed against a real box** — treat every "verified" claim below as inherited from the code it's grounded in (migration chain, backup/restore design, RLS policies), not as "this exact runbook has been rehearsed end-to-end." Rehearse it (a disposable VPS or a local Docker stand-in for the box) before the real KYC-approved server's first run, if at all practical.
+**Status as of this writing:** live. All four `scripts/deploy/` steps have been run against the real box, in order, output reviewed at each step. HTTPS is live on both domains through Caddy. Platform admin bootstrapped. Backup → scratch-database restore → per-table row-count comparison has been run and passed. A direct connection attempt to port 5432 from off the box timed out, confirming Postgres is unreachable from outside. See §13 for the current state of the security checklist.
 
 ---
 
@@ -139,12 +139,40 @@ All of these live in one file: `/opt/restaurantos/.env`, written by `scripts/dep
 
 ## 8. Backup and restore
 
-- **Backup:** `scripts/deploy/backup.sh` — `pg_dump` run inside the `postgres` container (no host port needed, matches §1's "reachable only inside Compose" design). Fails loudly on a zero-byte dump. Install as a nightly cron job:
+- **Backup:** `scripts/deploy/backup.sh` — `pg_dump` run inside the `postgres` container (no host port needed, matches §1's "reachable only inside Compose" design), then uploaded to S3 (below). Fails loudly on a zero-byte dump *or* a failed upload — a silent off-host failure is worse than no backup, since it looks like it's working when it isn't. Install as a nightly cron job (as root, since `.env` is root-only and the job needs Docker access):
   ```bash
-  0 3 * * * DATABASE_USER=restaurantos DATABASE_PASSWORD=<from .env> DATABASE_NAME=restaurantos \
-      BACKUP_DIR=/var/backups/restaurantos /opt/restaurantos/scripts/deploy/backup.sh
+  sudo crontab -e
   ```
-  Retains 14 days on-host by default (`RETENTION_DAYS`). **Off-host copy is deliberately not wired up** — a same-host-only backup doesn't survive that host's own failure. Append an off-host step (rclone to S3/B2, or scp to a second machine) before treating backups as reliable — see the script's own header for why this is left as a placeholder rather than a guess.
+  Add:
+  ```cron
+  0 3 * * * bash -c 'cd /opt/restaurantos && set -a && . .env && set +a && BACKUP_DIR=/var/backups/restaurantos RETENTION_DAYS=7 bash scripts/deploy/backup.sh' >> /var/log/restaurantos-backup.log 2>&1
+  ```
+  Confirm it's actually scheduled, not just saved: `sudo crontab -l` should show the line, and `systemctl is-active cron` should read `active`.
+
+  Retains 7 days on-host (`RETENTION_DAYS`); S3 retention is a **bucket lifecycle rule** (30 days), not script logic — it keeps pruning even if this box is down.
+
+- **Off-host copy (S3):** every dump is uploaded to a dedicated bucket immediately after a successful local dump. Set up once, per deployment:
+  1. **S3 bucket** — e.g. `restaurantos-backups-prashanthai`, region `ap-south-1` (same region as the instance). Enable **versioning**. Block all public access (default). Enable default (SSE-S3) encryption.
+  2. **Lifecycle rule** on that bucket — expire (permanently delete) current versions 30 days after creation; also expire noncurrent versions and delete expired object markers, for tidiness (this workflow never overwrites a key, so noncurrent versions shouldn't normally accumulate — versioning here is mainly a safety net against accidental/malicious overwrite).
+  3. **IAM user** — programmatic access only, no console login. Attach this inline policy (replace `BUCKET_NAME`):
+     ```json
+     {
+         "Version": "2012-10-17",
+         "Statement": [
+             {
+                 "Sid": "RestaurantOSBackupWriteOnly",
+                 "Effect": "Allow",
+                 "Action": "s3:PutObject",
+                 "Resource": "arn:aws:s3:::BUCKET_NAME/*"
+             }
+         ]
+     }
+     ```
+     `s3:PutObject` only — no `ListBucket`, no `GetObject`, no `DeleteObject`, scoped to exactly one bucket ARN. If this box is compromised, whoever has this credential still can't read or destroy a single backup, past or future. Generate an access key for this user.
+  4. Add `S3_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` to `/opt/restaurantos/.env` (see `.env.production.example`) — edit the file directly on the box (`sudo nano /opt/restaurantos/.env`) rather than pasting long-lived AWS credentials through any chat session; unlike the one-time platform-admin password, these are reusable and would need active rotation if ever exposed.
+
+  **Restoring from S3 needs a *different*, read-capable credential** — this write-only IAM user structurally cannot download anything back, by design. Use your own AWS console login or a separate CLI profile with read access to pull a dump down, then run `restore.sh` on it as usual.
+
 - **Restore:** `scripts/deploy/restore.sh <dump-file>` — drops and recreates the target database, restores, then **automatically verifies**: the restored `alembic_version` matches `alembic heads` for the code currently deployed, and the restored database has at least one table. Exits non-zero and prints `RESTORE VERIFICATION FAILED` if either check fails, rather than reporting success on a wrong or empty restore. Requires interactive `yes` confirmation (`CONFIRM=yes` bypasses it, for scripted DR drills only). `DATABASE_NAME` can point at a scratch database name instead of the real one — the dump itself carries no fixed target — for a non-destructive restore drill.
 - **Row-count verification:** `scripts/deploy/compare_row_counts.sh <source-db> <target-db>` — `restore.sh`'s own checks confirm the right *tables* and migration head exist, not that every row actually came back. This compares every table's row count between two databases in the same Postgres container and fails loudly on any mismatch. Run it after a scratch restore, comparing the live database against the scratch one:
   ```bash
@@ -210,9 +238,10 @@ docker compose -f docker-compose.prod.yml exec api python scripts/pilot_smoke_te
 | CORS restricted, no wildcard | ✅ env-driven, `https://admin.prashanthai.com` only — confirmed no wildcard accepted anywhere in `services/api/src` |
 | RLS enforced | ✅ per-tenant tables carry RLS policies scoped by `app.tenant_id`; confirmed structurally by `bootstrap_platform_admin.py`'s own need to loop per-tenant rather than query `users` directly with no tenant context |
 | First platform-admin account has no hardcoded credential | ✅ `bootstrap_platform_admin.py` takes a real email, generates or accepts a real password, refuses to run if one already exists — unlike `seed_e2e_fixtures.py`, which has a hardcoded, publicly-known password and must never be run against this database |
-| Automated backups | ✅ `backup.sh`, nightly cron (§8) — **off-host copy still not wired up, do this before go-live** |
-| Automated restore verification | ✅ `restore.sh` checks `alembic_version` and table count automatically, fails loudly rather than reporting a false success |
+| Automated backups | ✅ `backup.sh`, nightly cron (§8), with an S3 off-host copy uploaded immediately after every local dump — fails loudly if either half fails |
+| Off-host backup credential can't read or destroy backups | ✅ the S3 IAM user is `s3:PutObject`-only on one bucket — no `ListBucket`/`GetObject`/`DeleteObject`, no other buckets. A compromised box inherits this same credential and still can't touch existing backups |
+| Automated restore verification | ✅ `restore.sh` checks `alembic_version` and table count automatically, `compare_row_counts.sh` checks every table's row count against the source, both fail loudly rather than reporting a false success |
 
 ---
 
-**This runbook has not been executed against a real server.** No real DNS, VPS, or production database has been touched while writing it. Do not treat any step above as done until it has actually been run against the real box.
+**Status:** deployed to the real target (Lightsail, Mumbai, `13.126.148.121`, `api.prashanthai.com` / `admin.prashanthai.com`) — all four `scripts/deploy/` steps run and verified against the real box, HTTPS live, platform admin bootstrapped, backup → scratch-restore → row-count check proven, Postgres confirmed unreachable from outside. This document is now describing a real, running deployment, not a rehearsal.

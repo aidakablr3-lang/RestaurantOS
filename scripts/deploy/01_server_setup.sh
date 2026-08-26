@@ -21,6 +21,8 @@
 #   5. unattended-upgrades: install, enable automatic security updates
 #   6. Docker Engine + Compose plugin (needed by every later step --
 #      not explicitly asked for, but nothing here runs without it)
+#   7. AWS CLI v2 -- backup.sh needs it for the S3 off-host copy (see
+#      docs/DEPLOYMENT.md's Backup section)
 #
 # Does NOT touch SSH config itself (key-only auth, disabling root login,
 # etc.) -- out of scope for this pass; a reasonable follow-up, but higher
@@ -101,6 +103,18 @@ else
     echo "Docker already installed, skipping."
 fi
 
+echo "==> Installing AWS CLI v2"
+if ! command -v aws >/dev/null 2>&1; then
+    apt-get install -y --no-install-recommends unzip
+    tmp_dir="$(mktemp -d)"
+    curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "$tmp_dir/awscliv2.zip"
+    unzip -q "$tmp_dir/awscliv2.zip" -d "$tmp_dir"
+    "$tmp_dir/aws/install"
+    rm -rf "$tmp_dir"
+else
+    echo "AWS CLI already installed, skipping."
+fi
+
 echo "==> Server setup complete."
-echo "Verify: docker --version && docker compose version && ufw status && systemctl is-active fail2ban unattended-upgrades"
+echo "Verify: docker --version && docker compose version && aws --version && ufw status && systemctl is-active fail2ban unattended-upgrades"
 echo "Next: scripts/deploy/02_generate_secrets.sh"

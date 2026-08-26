@@ -6,24 +6,37 @@
 # this is the only way to reach it, and it also avoids needing a
 # matching pg_dump client version installed on the host.
 #
-# Usage: install as a nightly cron job on the VPS:
-#   0 3 * * * DATABASE_USER=restaurantos DATABASE_PASSWORD=... DATABASE_NAME=restaurantos \
-#       BACKUP_DIR=/var/backups/restaurantos /opt/restaurantos/scripts/deploy/backup.sh
-# (source the real DATABASE_PASSWORD from /opt/restaurantos/.env in the
-# crontab entry or a small env file it sources -- never hardcode it here.)
+# Usage: install as a nightly cron job on the VPS (see
+# docs/DEPLOYMENT.md's Backup section for the exact crontab line -- it
+# needs to source /opt/restaurantos/.env first, since every credential
+# below lives there, never hardcoded here or in the crontab itself).
 #
-# Required environment: DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME, BACKUP_DIR.
-# Optional: RETENTION_DAYS (default 14).
+# Required environment: DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME,
+# BACKUP_DIR, S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+# AWS_DEFAULT_REGION.
+# Optional: RETENTION_DAYS (default 7 -- local copies only; the S3 side
+# is pruned by the bucket's own lifecycle rule, not by this script --
+# see docs/DEPLOYMENT.md).
+#
+# Off-host copy (S3): the local copy alone doesn't survive this host's
+# own failure (disk death, provider incident), so every successful dump
+# is also uploaded to S3 immediately, and a failed upload fails this
+# whole script loudly (non-zero exit) rather than silently leaving only
+# a local copy -- a silent upload failure is worse than no backup, since
+# it looks like off-host backup is working when it isn't. The IAM user
+# behind AWS_ACCESS_KEY_ID is deliberately write-only (s3:PutObject on
+# this one bucket only, no ListBucket/GetObject/DeleteObject, no other
+# buckets) -- see docs/DEPLOYMENT.md's Backup section for the exact IAM
+# policy. That means this script itself can never read or delete a
+# backup it (or a prior run) uploaded, by design: if this box is ever
+# compromised, the attacker inherits this same credential and still
+# can't read or destroy what's already in S3.
 #
 # Restore procedure: scripts/deploy/restore.sh <dump-file> -- see that
-# script for the automated restore-verification step.
-#
-# Off-host copy is deliberately NOT done here -- a same-host-only backup
-# doesn't survive that host's own failure (disk death, provider
-# incident). Before go-live, append an off-host step (rclone to an
-# S3-compatible bucket, Backblaze B2, or scp to a second machine) --
-# left as a placeholder rather than guessing at a provider you haven't
-# chosen. See docs/DEPLOYMENT.md's Backup section.
+# script for the automated restore-verification step. Restoring from an
+# S3 copy needs a *different*, read-capable credential (your own AWS
+# console login or CLI profile) to download it first -- this script's
+# own write-only credential structurally cannot do that, on purpose.
 
 set -euo pipefail
 
@@ -34,11 +47,16 @@ COMPOSE_FILE="$REPO_DIR/docker-compose.prod.yml"
 : "${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set}"
 : "${DATABASE_NAME:?DATABASE_NAME must be set}"
 : "${BACKUP_DIR:?BACKUP_DIR must be set (e.g. /var/backups/restaurantos)}"
-RETENTION_DAYS="${RETENTION_DAYS:-14}"
+: "${S3_BUCKET:?S3_BUCKET must be set}"
+: "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID must be set}"
+: "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY must be set}"
+: "${AWS_DEFAULT_REGION:?AWS_DEFAULT_REGION must be set (e.g. ap-south-1)}"
+RETENTION_DAYS="${RETENTION_DAYS:-7}"
 
 mkdir -p "$BACKUP_DIR"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-outfile="$BACKUP_DIR/restaurantos_${timestamp}.dump"
+filename="restaurantos_${timestamp}.dump"
+outfile="$BACKUP_DIR/$filename"
 
 docker compose -f "$COMPOSE_FILE" exec -T \
     -e PGPASSWORD="$DATABASE_PASSWORD" \
@@ -56,4 +74,16 @@ fi
 
 echo "Backup written: $outfile ($(du -h "$outfile" | cut -f1))"
 
+if ! aws s3 cp "$outfile" "s3://${S3_BUCKET}/${filename}"; then
+    echo "ERROR: upload to s3://${S3_BUCKET}/${filename} failed -- the local dump" >&2
+    echo "above is real, but this backup has NO off-host copy. Investigate before" >&2
+    echo "assuming tonight's backup is safe." >&2
+    exit 1
+fi
+
+echo "Uploaded: s3://${S3_BUCKET}/${filename}"
+
+# Local retention only -- the S3-side 30-day retention is a bucket
+# lifecycle rule (see docs/DEPLOYMENT.md), not script logic, so it keeps
+# working even if this box is down or this script is never run again.
 find "$BACKUP_DIR" -name 'restaurantos_*.dump' -mtime "+${RETENTION_DAYS}" -delete
