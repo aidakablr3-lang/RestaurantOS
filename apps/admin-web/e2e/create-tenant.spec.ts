@@ -13,7 +13,11 @@ test.describe("Create Tenant", () => {
     await page.getByLabel("Legal name").fill(`${displayName} LLC`)
     await page.getByLabel("Display name").fill(displayName)
     await page.getByLabel("Default currency").fill("usd") // lowercase input, should be upper-cased
+    await page.getByLabel("Owner email").fill(`${displayName.replace(/\s+/g, "-").toLowerCase()}-owner@example.com`)
     await page.getByRole("button", { name: "Create tenant" }).click()
+
+    await page.getByRole("dialog", { name: "Tenant created" }).waitFor()
+    await page.getByRole("button", { name: "Done" }).click()
 
     await page.waitForURL(/\/tenants\/[0-9A-Z]+$/)
     await expect(page.getByRole("heading", { name: displayName })).toBeVisible()
@@ -38,18 +42,23 @@ test.describe("Create Tenant", () => {
     page,
   }) => {
     const displayName = uniqueTenantName("Duplicate Flow")
+    const ownerEmailSlug = displayName.replace(/\s+/g, "-").toLowerCase()
 
     await page.goto("/tenants/new")
     await page.getByLabel("Legal name").fill(`${displayName} LLC`)
     await page.getByLabel("Display name").fill(displayName)
     await page.getByLabel("Default currency").fill("USD")
+    await page.getByLabel("Owner email").fill(`${ownerEmailSlug}-owner@example.com`)
     await page.getByRole("button", { name: "Create tenant" }).click()
+    await page.getByRole("dialog", { name: "Tenant created" }).waitFor()
+    await page.getByRole("button", { name: "Done" }).click()
     await page.waitForURL(/\/tenants\/[0-9A-Z]+$/)
 
     await page.goto("/tenants/new")
     await page.getByLabel("Legal name").fill(`${displayName} LLC`)
     await page.getByLabel("Display name").fill(displayName)
     await page.getByLabel("Default currency").fill("USD")
+    await page.getByLabel("Owner email").fill(`${ownerEmailSlug}-owner2@example.com`)
     await page.getByRole("button", { name: "Create tenant" }).click()
 
     await expect(page.getByText(/already exists/i)).toBeVisible()
