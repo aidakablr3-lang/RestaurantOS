@@ -41,10 +41,16 @@ jobs:
   backend-typecheck:
     name: Backend / type check (advisory)
     runs-on: ubuntu-latest
-    # Non-blocking: 5 pre-existing mypy findings predate this workflow
-    # (see docs/AI_HANDOFF.md) and fixing them is an application-code
-    # change outside Step 5's release-hardening scope. Reporting here
-    # keeps them visible without gating merges on a pre-existing gap.
+    # Non-blocking: started as 5 pre-existing mypy findings (see
+    # docs/AI_HANDOFF.md) and has grown to 49 as of 2026-08-26 --
+    # almost all the same DomainEvent Protocol/ClassVar mismatch
+    # repeated across ~20 event classes (OutboxWriter.publish()'s
+    # DomainEvent Protocol declares aggregate_type/event_type as
+    # instance variables; every concrete event class defines them as
+    # class variables). A real fix means either widening the Protocol
+    # or converting those classes -- a design decision, not something
+    # to make incidentally. Reporting here keeps it visible without
+    # gating merges on a pre-existing gap.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
