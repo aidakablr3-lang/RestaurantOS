@@ -9,9 +9,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from restaurant_os_api.core.response import CamelModel
+from restaurant_os_api.platform.currencies import ISO_4217_CURRENCIES
 
 
 class OnboardTenantRequestSchema(CamelModel):
@@ -20,6 +21,18 @@ class OnboardTenantRequestSchema(CamelModel):
     default_currency_code: str = Field(..., min_length=3, max_length=3)
     owner_email: str = Field(..., min_length=3, max_length=320)
     owner_phone: str | None = None
+
+    @field_validator("default_currency_code")
+    @classmethod
+    def _default_currency_code_must_be_a_real_currency(cls, value: str) -> str:
+        # min_length/max_length above only reject the wrong *shape* --
+        # "GST" (3 uppercase letters, a tax, not a currency) passed that
+        # check and got stored, which is the actual bug this validator
+        # closes. See platform/currencies.py's own docstring.
+        code = value.upper()
+        if code not in ISO_4217_CURRENCIES:
+            raise ValueError(f"'{value}' is not a valid ISO 4217 currency code.")
+        return code
 
 
 class UpdateTenantRequestSchema(CamelModel):

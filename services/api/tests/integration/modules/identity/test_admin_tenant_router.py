@@ -208,6 +208,27 @@ class TestOnboardTenant:
         )
         assert response.status_code == 422
 
+    def test_rejects_a_currency_code_that_is_not_a_real_iso_4217_code(
+        self, client: TestClient, platform_admin_token: str
+    ) -> None:
+        """The bug this closes: "GST" (a tax, not a currency) is 3
+        uppercase letters, so it passed the length-only check the test
+        above exercises and got stored. This asserts the real ISO 4217
+        membership check (tenant_schemas.py's own validator, backed by
+        platform/currencies.py) catches it."""
+        response = client.post(
+            "/api/v1/admin/tenants",
+            headers=_auth_headers(platform_admin_token),
+            json={
+                "legalName": "Not A Currency LLC",
+                "displayName": "Not A Currency",
+                "defaultCurrencyCode": "GST",
+                "ownerEmail": "not-a-currency-owner@example.com",
+            },
+        )
+        assert response.status_code == 422
+        assert "not a valid ISO 4217 currency code" in response.text
+
     def test_requires_authentication(self, client: TestClient) -> None:
         response = client.post(
             "/api/v1/admin/tenants",
