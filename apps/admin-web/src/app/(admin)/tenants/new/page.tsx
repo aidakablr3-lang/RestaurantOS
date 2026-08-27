@@ -28,8 +28,10 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useCreateTenant } from "@/hooks/use-tenants"
 import { ApiError } from "@/lib/api-client"
+import { ISO_4217_CURRENCIES } from "@/lib/iso4217"
 import { type CreateTenantFormValues, createTenantSchema } from "@/lib/schemas/tenant"
 
 function OwnerActivationDialog({
@@ -85,7 +87,7 @@ export default function CreateTenantPage() {
 
   const form = useForm<CreateTenantFormValues>({
     resolver: zodResolver(createTenantSchema),
-    defaultValues: { legalName: "", displayName: "", defaultCurrencyCode: "", ownerEmail: "" },
+    defaultValues: { legalName: "", displayName: "", defaultCurrencyCode: "INR", ownerEmail: "" },
   })
 
   async function onSubmit(values: CreateTenantFormValues) {
@@ -168,18 +170,32 @@ export default function CreateTenantPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Default currency</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="USD"
-                        maxLength={3}
-                        {...field}
-                        onChange={(event) =>
-                          field.onChange(event.target.value.toUpperCase())
-                        }
-                      />
-                    </FormControl>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      items={Object.fromEntries(
+                        Object.entries(ISO_4217_CURRENCIES).map(([code, name]) => [
+                          code,
+                          `${code} — ${name}`,
+                        ])
+                      )}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a currency" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(ISO_4217_CURRENCIES).map(([code, name]) => (
+                          <SelectItem key={code} value={code}>
+                            {code} — {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormDescription>
-                      3-letter ISO 4217 currency code.
+                      Owners shouldn&apos;t be able to type anything here -- pick from a real
+                      ISO 4217 currency.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

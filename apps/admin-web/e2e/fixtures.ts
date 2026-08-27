@@ -44,19 +44,15 @@ export function uniqueTenantName(prefix: string): string {
  * the browser on the new tenant's details page -- same end state as
  * before that dialog existed.
  *
- * `currencyCode` defaults to "USD" -- override it only for a test that
- * specifically needs a different input value asserted on afterward
- * (e.g. Create Tenant's own "lowercase input gets upper-cased" case). */
-export async function createTenantViaUi(
-  page: Page,
-  namePrefix: string,
-  options?: { currencyCode?: string }
-): Promise<string> {
+ * Default currency is left untouched -- the form defaults to "INR"
+ * (Select, not free text, since "GST" was once accepted as a
+ * "currency" through the old text field) and none of this helper's
+ * callers need a different one. */
+export async function createTenantViaUi(page: Page, namePrefix: string): Promise<string> {
   const displayName = uniqueTenantName(namePrefix)
   await page.goto("/tenants/new")
   await page.getByLabel("Legal name").fill(`${displayName} LLC`)
   await page.getByLabel("Display name").fill(displayName)
-  await page.getByLabel("Default currency").fill(options?.currencyCode ?? "USD")
   await page.getByLabel("Owner email").fill(`${uniqueTenantName("owner").replace(/\s+/g, "-").toLowerCase()}@example.com`)
   await page.getByRole("button", { name: "Create tenant" }).click()
   await page.getByRole("dialog", { name: "Tenant created" }).waitFor()
