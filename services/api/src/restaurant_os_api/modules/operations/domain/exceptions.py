@@ -186,6 +186,25 @@ class BillAlreadyExistsError(OperationsDomainError):
         self.tab_id = tab_id
 
 
+class ImplausibleTaxRateError(OperationsDomainError):
+    """No real restaurant tax rate is ever above 50% -- a rate above
+    that is almost certainly a percent value someone forgot to convert
+    to a fraction (or converted by /10 instead of /100), not a
+    legitimate configuration. Raised by ``CreateTaxUseCase`` itself
+    (not just the presentation-layer schema) so the onboarding entry
+    point -- which has no Pydantic bound of its own -- gets the same
+    guard."""
+
+    error_code = "IMPLAUSIBLE_TAX_RATE"
+
+    def __init__(self, rate: str) -> None:
+        super().__init__(
+            f"'{rate}' is not a plausible tax rate. Rates are a fraction "
+            "(0.09 for 9%), not a percent, and must be 0.5 or less."
+        )
+        self.rate = rate
+
+
 class DiscountNotFoundError(OperationsDomainError):
     error_code = "DISCOUNT_NOT_FOUND"
 

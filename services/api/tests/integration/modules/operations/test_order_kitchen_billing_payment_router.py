@@ -982,3 +982,32 @@ class TestCreateTaxIdempotency:
         )
         assert second.status_code == 409
         assert second.json()["error"]["code"] == "IDEMPOTENCY_KEY_CONFLICT"
+
+
+class TestCreateTaxRatePlausibility:
+    """Regression coverage for a production incident: a tenant's CGST/SGST
+    rows were stored as rate=0.9 (90%) instead of 0.09 (9%) -- a
+    legally-shaped fraction under the old 0-1 bound, so nothing caught
+    it before it 10x-overcharged every bill. 0-0.5 is now enforced both
+    here (Pydantic, 422) and in CreateTaxUseCase itself (so the
+    onboarding entry point, which has no schema of its own, gets the
+    same guard)."""
+
+    def test_a_rate_above_50_percent_is_rejected(self, client: TestClient, owner: dict) -> None:
+        response = client.post(
+            "/api/v1/taxes",
+            headers=_auth_headers(owner["token"]),
+            json={"name": "CGST", "rate": "0.9"},
+        )
+        assert response.status_code == 422
+
+    def test_nine_percent_stored_as_a_fraction_is_accepted(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        response = client.post(
+            "/api/v1/taxes",
+            headers=_auth_headers(owner["token"]),
+            json={"name": "CGST", "rate": "0.09"},
+        )
+        assert response.status_code == 201, response.text
+        assert Decimal(response.json()["data"]["rate"]) == Decimal("0.09")

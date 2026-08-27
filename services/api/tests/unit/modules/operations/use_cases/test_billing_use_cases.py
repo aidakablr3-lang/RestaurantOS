@@ -38,6 +38,7 @@ from restaurant_os_api.modules.operations.domain.exceptions import (
     BillAlreadyClosedError,
     BillAlreadyExistsError,
     BillNotFoundError,
+    ImplausibleTaxRateError,
     OrderNotFoundError,
 )
 from restaurant_os_api.modules.restaurant.domain.entities import Branch, BranchStatus
@@ -165,6 +166,31 @@ class TestCreateTaxUseCase:
         assert tax.rate == Decimal("0.1")
         assert tax.is_active is True
 
+    async def test_rejects_a_rate_above_50_percent(self) -> None:
+        # Regression test: a tenant's CGST/SGST rows were stored as
+        # rate=0.9 (90%) instead of 0.09 (9%) in production -- a
+        # legally-shaped fraction under the old 0-1 bound. This check
+        # lives in the use case itself (not just the Pydantic schema)
+        # so the onboarding entry point, which calls execute() directly
+        # with no schema of its own, gets the same guard.
+        use_case = CreateTaxUseCase(
+            session_factory=_session_factory(),
+            tax_repository_factory=lambda _s: InMemoryTaxRepository(),
+        )
+
+        with pytest.raises(ImplausibleTaxRateError):
+            await use_case.execute(TENANT_ID, "CGST", "0.9")
+
+    async def test_accepts_nine_percent_stored_as_a_fraction(self) -> None:
+        use_case = CreateTaxUseCase(
+            session_factory=_session_factory(),
+            tax_repository_factory=lambda _s: InMemoryTaxRepository(),
+        )
+
+        tax = await use_case.execute(TENANT_ID, "CGST", "0.09")
+
+        assert tax.rate == Decimal("0.09")
+
 
 class TestListTaxesUseCase:
     async def test_lists_only_active_taxes_for_the_tenant(self) -> None:
@@ -260,6 +286,39 @@ class TestGenerateBillUseCase:
         tax_ids = {line.tax_id for line in result.tax_lines}
         assert tax_ids == {cgst_id, sgst_id}
         assert all(line.tax_amount == Decimal("2.5") for line in result.tax_lines)
+
+    async def test_nine_percent_cgst_and_sgst_on_3360_is_exact_to_the_paisa(self) -> None:
+        # Regression test for a production incident: a tenant's CGST/SGST
+        # rows were stored as 0.9 (90%) instead of 0.09 (9%) -- a bad
+        # stored value, not a calculation bug (subtotal * rate is and was
+        # always correct for a correctly-stored fraction). This pins the
+        # exact numbers from that incident report with a properly-stored
+        # rate, to the paisa: 3360 * 0.09 = 302.40 per line, 604.80 total
+        # tax, 3964.80 due.
+        cgst_id = "01ARZ3NDEKTSV4RRFFQ6TAXCG2"
+        sgst_id = "01ARZ3NDEKTSV4RRFFQ6TAXSG2"
+        order_repo = InMemoryOrderRepository({ORDER_ID: _order(subtotal_amount=Decimal(3360))})
+        use_case = self._use_case(
+            order_repo,
+            InMemoryBillRepository(),
+            InMemoryTaxRepository(
+                {
+                    cgst_id: _tax(id=cgst_id, name="CGST", rate=Decimal("0.09")),
+                    sgst_id: _tax(id=sgst_id, name="SGST", rate=Decimal("0.09")),
+                }
+            ),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID, "user-1", GenerateBillRequestDTO(order_id=ORDER_ID)
+        )
+
+        assert result.subtotal_amount == Decimal(3360)
+        assert all(line.tax_amount == Decimal("302.40") for line in result.tax_lines)
+        assert result.tax_amount == Decimal("604.80")
+        assert result.amount_due == Decimal("3964.80")
 
     async def test_raises_not_found_for_an_unknown_order(self) -> None:
         use_case = self._use_case(

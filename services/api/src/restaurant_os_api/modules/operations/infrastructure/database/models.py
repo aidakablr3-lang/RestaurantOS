@@ -192,7 +192,12 @@ class TaxModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, Sof
     __tablename__ = "taxes"
     __table_args__ = (
         ulid_check_constraint("id"),
-        CheckConstraint("rate >= 0 AND rate <= 1", name="rate_is_valid"),
+        # No real restaurant tax rate is ever above 50% -- this bound
+        # exists specifically to make "9% mistakenly stored as 0.9" (a
+        # produced-in-production incident) structurally impossible to
+        # store, not just structurally impossible to enter correctly.
+        # See migration 0017.
+        CheckConstraint("rate >= 0 AND rate <= 0.5", name="rate_is_valid"),
     )
 
     name: Mapped[str] = mapped_column(Text, nullable=False)

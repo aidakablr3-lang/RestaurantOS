@@ -22,7 +22,14 @@ class ApplyBillAdjustmentRequestSchema(CamelModel):
 
 class CreateTaxRequestSchema(CamelModel):
     name: str = Field(..., min_length=1, max_length=255)
-    rate: Decimal = Field(..., ge=0, le=1)
+    # A fraction (0.09 for 9%), not a percent -- ge=0.5 upper bound is a
+    # plausibility guard, not a real-world ceiling: no restaurant tax
+    # rate is ever above 50%, so anything higher is almost certainly a
+    # percent value that wasn't converted (or was converted by /10
+    # instead of /100). See CreateTaxUseCase for the matching
+    # defense-in-depth check on the onboarding entry point, which has no
+    # Pydantic schema of its own.
+    rate: Decimal = Field(..., ge=0, le=Decimal("0.5"))
 
 
 class OrderTaxLineResponseSchema(CamelModel):
