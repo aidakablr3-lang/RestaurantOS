@@ -244,6 +244,21 @@ docker compose -f docker-compose.prod.yml exec api python scripts/pilot_smoke_te
 | Off-host backup credential can't read or destroy backups | ✅ the S3 IAM user is `s3:PutObject`-only on one bucket — no `ListBucket`/`GetObject`/`DeleteObject`, no other buckets. A compromised box inherits this same credential and still can't touch existing backups |
 | Automated restore verification | ✅ `restore.sh` checks `alembic_version` and table count automatically, `compare_row_counts.sh` checks every table's row count against the source, both fail loudly rather than reporting a false success |
 
+## 14. Correcting bad billing data
+
+`order_tax_lines` and `bill_adjustments` are append-only by design (see their own model docstrings) — nothing in the app ever edits a historical charge in place, and a manual `UPDATE` against either would falsify what was actually charged and destroy the audit trail. When a bill was generated with wrong data (e.g. a mis-entered tax rate — see the `taxes.rate` incident this section grew out of), which remediation is correct depends on whether real money was involved, not on how the bug happened to be found:
+
+- **A real customer was billed and has (or may have) paid**: apply a `write_off` `BillAdjustment` for the excess (`POST /api/v1/bills/{id}/adjustments`, or the "Apply adjustment" dialog on the bill's admin-web page) if the bill is still `open`/`partially_paid`, or a `Refund` against the settled `Payment` if it's already `closed`. Either way this is the only correct path — it corrects the amount owed/refunded while leaving a truthful record that a real charge was made and then corrected. Never delete a bill a real customer was ever shown or charged against.
+- **No real customer, no payment** (test data, a smoke-test order, a rehearsal): a `write_off` here would be false — it records a charge-then-forgiveness that never happened, permanently, in reports and the audit trail. Delete the order and bill outright instead. Correct test **only when**: `bills.status != 'closed'` **and** zero rows exist in `payments` for that bill (not just zero *settled* ones — an `authorized`/`captured`-but-not-yet-`settled` payment means a real transaction is in flight even if money hasn't fully landed). If either doesn't hold, treat it as real money and use the write-off/refund path above instead.
+
+Deleting an order/bill means deleting every row that references it first — every relevant FK in this schema is `ON DELETE RESTRICT`, so a direct `DELETE FROM orders` fails outright otherwise. Dependency order, leaves first:
+
+```
+refunds → kitchen_items → bill_adjustments → payments → kitchen_tickets → order_tax_lines → order_items → bills → orders
+```
+
+(`refunds` references both `payments.id` and `orders.id`; `kitchen_items` references both `kitchen_tickets.id` and `order_items.id`.) Enumerate every row that exists for the specific order/bill first — don't assume the shape (a production incident's own audit found an order already `closed` via a standalone `close_order` action with zero payments, not the payment-triggered close path one might assume) — then delete inside a single `BEGIN; ... COMMIT;` transaction scoped by `order_id`/`bill_id`, so a missed dependency rolls back everything instead of leaving orphaned rows.
+
 ---
 
 **Status:** deployed to the real target (Lightsail, Mumbai, `13.126.148.121`, `api.prashanthai.com` / `admin.prashanthai.com`) — all four `scripts/deploy/` steps run and verified against the real box, HTTPS live, platform admin bootstrapped, backup → scratch-restore → row-count check proven, Postgres confirmed unreachable from outside. This document is now describing a real, running deployment, not a rehearsal.
