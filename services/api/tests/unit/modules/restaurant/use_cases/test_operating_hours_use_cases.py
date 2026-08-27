@@ -2,9 +2,10 @@
 in-memory fakes, no network/DB access.
 
 Covers per-row validation (day range, closed/open+times consistency,
-opens < closes), cross-row conflicts (closed+open same day, duplicate
-closed rows, overlapping open periods), legitimate split shifts, full
-replace semantics, and branch-not-found/cross-tenant behavior.
+overnight windows), cross-row conflicts (closed+open same day,
+duplicate closed rows, overlapping open periods), legitimate split
+shifts, full replace semantics, and branch-not-found/cross-tenant
+behavior.
 """
 
 from __future__ import annotations
@@ -277,6 +278,8 @@ class TestReplaceOperatingHoursUseCase:
             )
 
     async def test_rejects_opens_at_equal_to_closes_at(self) -> None:
+        # The one input that's still genuinely invalid for an open entry:
+        # a zero-length window, regardless of the time of day chosen.
         branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch()})
         use_case = _use_case(branch_repo, InMemoryOperatingHoursRepository())
 
@@ -289,32 +292,61 @@ class TestReplaceOperatingHoursUseCase:
                         OperatingHoursEntryRequestDTO(
                             day_of_week=1,
                             is_closed=False,
-                            opens_at=time(9, 0),
-                            closes_at=time(9, 0),
+                            opens_at=time(10, 0),
+                            closes_at=time(10, 0),
                         )
                     ],
                 ),
             )
 
-    async def test_rejects_opens_at_after_closes_at(self) -> None:
+    async def test_accepts_an_overnight_window_closing_after_midnight(self) -> None:
+        # opens_at > closes_at used to be rejected outright -- it's now a
+        # legitimate overnight window, closing the following calendar day
+        # (any bar/pub open past midnight needs exactly this shape).
         branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch()})
-        use_case = _use_case(branch_repo, InMemoryOperatingHoursRepository())
+        operating_hours_repo = InMemoryOperatingHoursRepository()
+        use_case = _use_case(branch_repo, operating_hours_repo)
 
-        with pytest.raises(OperatingHoursConflictError):
-            await use_case.execute(
-                TENANT_ID,
-                ReplaceOperatingHoursRequestDTO(
-                    branch_id=BRANCH_ID,
-                    entries=[
-                        OperatingHoursEntryRequestDTO(
-                            day_of_week=1,
-                            is_closed=False,
-                            opens_at=time(17, 0),
-                            closes_at=time(9, 0),
-                        )
-                    ],
-                ),
-            )
+        result = await use_case.execute(
+            TENANT_ID,
+            ReplaceOperatingHoursRequestDTO(
+                branch_id=BRANCH_ID,
+                entries=[
+                    OperatingHoursEntryRequestDTO(
+                        day_of_week=1,
+                        is_closed=False,
+                        opens_at=time(12, 30),
+                        closes_at=time(0, 30),
+                    )
+                ],
+            ),
+        )
+
+        assert result[0].opens_at == time(12, 30)
+        assert result[0].closes_at == time(0, 30)
+
+    async def test_accepts_an_overnight_window_opening_in_the_evening(self) -> None:
+        branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch()})
+        operating_hours_repo = InMemoryOperatingHoursRepository()
+        use_case = _use_case(branch_repo, operating_hours_repo)
+
+        result = await use_case.execute(
+            TENANT_ID,
+            ReplaceOperatingHoursRequestDTO(
+                branch_id=BRANCH_ID,
+                entries=[
+                    OperatingHoursEntryRequestDTO(
+                        day_of_week=1,
+                        is_closed=False,
+                        opens_at=time(18, 0),
+                        closes_at=time(2, 0),
+                    )
+                ],
+            ),
+        )
+
+        assert result[0].opens_at == time(18, 0)
+        assert result[0].closes_at == time(2, 0)
 
     async def test_rejects_a_closed_and_open_entry_for_the_same_day(self) -> None:
         branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch()})

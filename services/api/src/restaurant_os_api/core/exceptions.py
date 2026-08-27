@@ -164,11 +164,25 @@ def _format_validation_message(exc: RequestValidationError) -> str:
     plain string everywhere else in this API, and inventing a second,
     structured error shape just for this one status code would be a
     bigger contract change than the actual problem (a raw, differently
-    shaped ``{"detail": [...]}`` body) calls for."""
+    shaped ``{"detail": [...]}`` body) calls for.
+
+    A custom ``raise ValueError(...)`` inside a validator (Pydantic's
+    ``"value_error"`` error type) already carries a complete,
+    human-authored sentence -- Pydantic just prefixes it with "Value
+    error, ". Showing that sentence alone, instead of a
+    "body.entries.3: Value error, ..." fragment that means nothing
+    outside a debugger, is strictly better for every hand-written
+    validator message in this API, not just one endpoint's. Every
+    other error type (missing field, wrong type, ...) keeps the
+    original ``location: message`` shape, since those messages aren't
+    already a complete sentence on their own."""
     parts = []
     for error in exc.errors():
-        location = ".".join(str(segment) for segment in error["loc"])
-        parts.append(f"{location}: {error['msg']}")
+        if error["type"] == "value_error":
+            parts.append(str(error["msg"]).removeprefix("Value error, "))
+        else:
+            location = ".".join(str(segment) for segment in error["loc"])
+            parts.append(f"{location}: {error['msg']}")
     return "; ".join(parts) if parts else "Request validation failed."
 
 

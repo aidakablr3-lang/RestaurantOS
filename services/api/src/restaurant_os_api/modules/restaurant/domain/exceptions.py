@@ -103,7 +103,17 @@ class OperatingHoursConflictError(RestaurantDomainError):
     error_code = "OPERATING_HOURS_CONFLICT"
 
     def __init__(self, day_of_week: int, detail: str) -> None:
-        super().__init__(f"Operating hours for day {day_of_week} conflict: {detail}")
+        # Deferred import: domain.entities' package __init__ imports
+        # branch.py, which imports from this module -- importing
+        # day_of_week_name at module level here would be a circular
+        # import (this module isn't done loading yet when entities'
+        # __init__ tries to import branch.py, which imports this
+        # module back).
+        from restaurant_os_api.modules.restaurant.domain.entities.operating_hours import (
+            day_of_week_name,
+        )
+
+        super().__init__(f"{day_of_week_name(day_of_week)}: {detail}")
         self.day_of_week = day_of_week
 
 

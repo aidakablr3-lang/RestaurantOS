@@ -23,3 +23,23 @@ class OperatingHours:
     created_at: datetime
     opens_at: time | None = None
     closes_at: time | None = None
+
+
+_DAY_NAMES: tuple[str, ...] = (
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+)
+
+
+def day_of_week_name(day_of_week: int) -> str:
+    """0=Sunday..6=Saturday -- matches admin-web's own ``dayLabel()``
+    (apps/admin-web/src/lib/schemas/branch.ts). Keep both lists in sync
+    if either changes."""
+    if 0 <= day_of_week <= 6:
+        return _DAY_NAMES[day_of_week]
+    return f"day {day_of_week}"

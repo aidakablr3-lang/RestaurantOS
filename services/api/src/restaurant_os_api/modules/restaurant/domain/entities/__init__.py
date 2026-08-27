@@ -19,7 +19,10 @@ from restaurant_os_api.modules.restaurant.domain.entities.modifier_group import 
     ModifierGroup,
     ModifierSelectionType,
 )
-from restaurant_os_api.modules.restaurant.domain.entities.operating_hours import OperatingHours
+from restaurant_os_api.modules.restaurant.domain.entities.operating_hours import (
+    OperatingHours,
+    day_of_week_name,
+)
 from restaurant_os_api.modules.restaurant.domain.entities.qr_code import QRCode, QRCodeStatus
 from restaurant_os_api.modules.restaurant.domain.entities.reservation import (
     Reservation,
@@ -55,4 +58,5 @@ __all__ = [
     "Table",
     "TableStatus",
     "TableZone",
+    "day_of_week_name",
 ]

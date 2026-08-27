@@ -489,7 +489,33 @@ class TestReplaceOperatingHours:
         )
         assert response.status_code == 422
 
-    def test_opens_at_after_closes_at_is_rejected(
+    def test_an_overnight_window_closing_after_midnight_is_accepted(
+        self, client: TestClient, owner: dict, branch: dict
+    ) -> None:
+        # opens_at > closes_at used to be rejected outright. Every bar/pub
+        # open past midnight needs exactly this shape -- closing on the
+        # following calendar day, not an error.
+        response = _put_hours(
+            client,
+            owner["token"],
+            branch["id"],
+            {
+                "entries": [
+                    {
+                        "dayOfWeek": 1,
+                        "isClosed": False,
+                        "opensAt": "12:30:00",
+                        "closesAt": "00:30:00",
+                    }
+                ]
+            },
+        )
+        assert response.status_code == 200, response.text
+        entry = response.json()["data"][0]
+        assert entry["opensAt"] == "12:30:00"
+        assert entry["closesAt"] == "00:30:00"
+
+    def test_an_overnight_window_opening_in_the_evening_is_accepted(
         self, client: TestClient, owner: dict, branch: dict
     ) -> None:
         response = _put_hours(
@@ -501,13 +527,76 @@ class TestReplaceOperatingHours:
                     {
                         "dayOfWeek": 1,
                         "isClosed": False,
-                        "opensAt": "17:00:00",
-                        "closesAt": "09:00:00",
+                        "opensAt": "18:00:00",
+                        "closesAt": "02:00:00",
+                    }
+                ]
+            },
+        )
+        assert response.status_code == 200, response.text
+        entry = response.json()["data"][0]
+        assert entry["opensAt"] == "18:00:00"
+        assert entry["closesAt"] == "02:00:00"
+
+    def test_opens_at_equal_to_closes_at_is_rejected(
+        self, client: TestClient, owner: dict, branch: dict
+    ) -> None:
+        # The one input that's still genuinely invalid for an open entry:
+        # a zero-length window, regardless of the time of day chosen.
+        response = _put_hours(
+            client,
+            owner["token"],
+            branch["id"],
+            {
+                "entries": [
+                    {
+                        "dayOfWeek": 1,
+                        "isClosed": False,
+                        "opensAt": "10:00:00",
+                        "closesAt": "10:00:00",
                     }
                 ]
             },
         )
         assert response.status_code == 422
+
+    def test_multiple_invalid_days_surface_one_readable_message_per_day(
+        self, client: TestClient, owner: dict, branch: dict
+    ) -> None:
+        # The original bug report: setting the same bad value on all 7
+        # days used to dump 7 raw "body.entries.N: Value error, ..."
+        # fragments into one string. Each day's message should now be a
+        # standalone, day-labeled sentence instead.
+        response = _put_hours(
+            client,
+            owner["token"],
+            branch["id"],
+            {
+                "entries": [
+                    {
+                        "dayOfWeek": day,
+                        "isClosed": False,
+                        "opensAt": "10:00:00",
+                        "closesAt": "10:00:00",
+                    }
+                    for day in range(7)
+                ]
+            },
+        )
+        assert response.status_code == 422
+        message = response.json()["error"]["message"]
+        assert "entries." not in message
+        assert "Value error" not in message
+        for day_name in (
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+        ):
+            assert f"{day_name}: opening and closing time cannot be the same" in message
 
     def test_a_closed_and_open_entry_for_the_same_day_is_a_conflict(
         self, client: TestClient, owner: dict, branch: dict

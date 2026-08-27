@@ -104,7 +104,12 @@ class OperatingHoursModel(
     __table_args__ = (
         ulid_check_constraint("id"),
         CheckConstraint("day_of_week BETWEEN 0 AND 6", name="day_of_week_is_valid"),
-        CheckConstraint("opens_at < closes_at OR is_closed", name="opens_before_closes"),
+        # opens_at > closes_at is a legitimate overnight window (closes the
+        # following calendar day, e.g. a bar open 22:00-02:00) -- only
+        # opens_at == closes_at (a zero-length window) is rejected. See
+        # migration 0016 and ReplaceOperatingHoursUseCase's module
+        # docstring.
+        CheckConstraint("opens_at <> closes_at OR is_closed", name="opens_and_closes_are_distinct"),
     )
 
     day_of_week: Mapped[int] = mapped_column(SmallInteger, nullable=False)

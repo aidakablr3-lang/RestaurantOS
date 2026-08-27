@@ -28,10 +28,25 @@ sibling-entity precedent here to extend from -- disclosed as a known
 gap rather than silently inventing an event type architecture never
 named.
 
-No overnight (crossing-midnight), 24-hour, or timezone-conversion
-behavior is implemented -- the architecture's own ``CHECK (opens_at <
-closes_at OR is_closed)`` constraint has no wraparound provision, and
-none of these are named anywhere in SS3.1's `OperatingHours` entry.
+Overnight windows (``closes_at < opens_at``, e.g. opens 22:00 closes
+02:00) are accepted as closing on the *following* calendar day -- the
+only genuinely invalid same-day-open input is ``opens_at ==
+closes_at``. No 24-hour or timezone-conversion behavior is
+implemented; neither is named anywhere in SS3.1's `OperatingHours`
+entry.
+
+Known, disclosed gap: the overlap check below (``sorted_open`` +
+``pairwise``) only compares entries *within the same
+``day_of_week``*. It has no way to detect an overnight entry's
+spillover into the next day's own early-morning row (e.g. Friday
+22:00-02:00 stored on ``day_of_week=5`` isn't compared against a
+Saturday 01:00-06:00 row stored on ``day_of_week=6``, even though
+those two windows do overlap in real time). This was already the
+day-siloed shape of this check before overnight windows were allowed;
+allowing overnight now makes that pre-existing limitation reachable.
+Cross-day overlap detection would need entries compared as real
+instants, not per-day time-of-day values -- deferred as a separate
+piece of work, not silently built here.
 """
 
 from __future__ import annotations
@@ -78,9 +93,9 @@ def _validate_no_conflicts(entries: list[OperatingHoursEntryRequestDTO]) -> None
                 raise OperatingHoursConflictError(
                     entry.day_of_week, "an open entry requires both opens_at and closes_at"
                 )
-            if entry.opens_at >= entry.closes_at:
+            if entry.opens_at == entry.closes_at:
                 raise OperatingHoursConflictError(
-                    entry.day_of_week, "opens_at must be before closes_at"
+                    entry.day_of_week, "opening and closing time cannot be the same"
                 )
 
     by_day: dict[int, list[OperatingHoursEntryRequestDTO]] = {}
