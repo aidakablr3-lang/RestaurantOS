@@ -25,14 +25,19 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useCreateTax, useTaxes } from "@/hooks/use-bills"
 import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { ApiError } from "@/lib/api-client"
-import { type CreateTaxFormValues, createTaxSchema } from "@/lib/schemas/tax"
+import {
+  type CreateTaxFormValues,
+  createTaxSchema,
+  fractionToPercentLabel,
+  percentToFractionString,
+} from "@/lib/schemas/tax"
 import type { Tax } from "@/types/bill"
 
 function CreateTaxDialog() {
   const [open, setOpen] = React.useState(false)
   const createTax = useCreateTax()
 
-  const defaults: CreateTaxFormValues = { name: "", rate: 0.1 }
+  const defaults: CreateTaxFormValues = { name: "", ratePercent: 10 }
   const form = useForm<CreateTaxFormValues>({
     resolver: zodResolver(createTaxSchema),
     defaultValues: defaults,
@@ -45,7 +50,10 @@ function CreateTaxDialog() {
 
   async function onSubmit(values: CreateTaxFormValues) {
     try {
-      await createTax.mutateAsync({ name: values.name, rate: String(values.rate) })
+      await createTax.mutateAsync({
+        name: values.name,
+        rate: percentToFractionString(values.ratePercent),
+      })
       toast.success("Tax created.")
       setOpen(false)
     } catch (error) {
@@ -84,12 +92,12 @@ function CreateTaxDialog() {
             />
             <FormField
               control={form.control}
-              name="rate"
+              name="ratePercent"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Rate (0–1, e.g. 0.10 for 10%)</FormLabel>
+                  <FormLabel>Rate (%)</FormLabel>
                   <FormControl>
-                    <Input type="number" min={0} max={1} step="0.0001" {...field} />
+                    <Input type="number" min={0} max={50} step="0.01" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -163,7 +171,9 @@ export default function TaxesPage() {
               {taxes.map((tax) => (
                 <TableRow key={tax.id}>
                   <TableCell className="font-medium">{tax.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{tax.rate}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {fractionToPercentLabel(tax.rate)}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{tax.isActive ? "Yes" : "No"}</TableCell>
                 </TableRow>
               ))}
