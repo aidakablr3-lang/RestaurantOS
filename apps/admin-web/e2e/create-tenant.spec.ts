@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { loginViaUi, uniqueTenantName } from "./fixtures"
+import { createTenantViaUi, loginViaUi, uniqueTenantName } from "./fixtures"
 
 test.describe("Create Tenant", () => {
   test.beforeEach(async ({ page }) => {
@@ -7,19 +7,10 @@ test.describe("Create Tenant", () => {
   })
 
   test("creates a tenant and redirects to its details page", async ({ page }) => {
-    const displayName = uniqueTenantName("Create Flow")
+    // Lowercase input on purpose -- confirms client-side upper-casing,
+    // which createTenantViaUi()'s own default ("USD") wouldn't exercise.
+    const displayName = await createTenantViaUi(page, "Create Flow", { currencyCode: "usd" })
 
-    await page.goto("/tenants/new")
-    await page.getByLabel("Legal name").fill(`${displayName} LLC`)
-    await page.getByLabel("Display name").fill(displayName)
-    await page.getByLabel("Default currency").fill("usd") // lowercase input, should be upper-cased
-    await page.getByLabel("Owner email").fill(`${displayName.replace(/\s+/g, "-").toLowerCase()}-owner@example.com`)
-    await page.getByRole("button", { name: "Create tenant" }).click()
-
-    await page.getByRole("dialog", { name: "Tenant created" }).waitFor()
-    await page.getByRole("button", { name: "Done" }).click()
-
-    await page.waitForURL(/\/tenants\/[0-9A-Z]+$/)
     await expect(page.getByRole("heading", { name: displayName })).toBeVisible()
     await expect(page.getByText(/^active$/i)).toBeVisible()
     await expect(page.getByText("USD")).toBeVisible() // confirms client-side uppercasing worked
@@ -41,24 +32,17 @@ test.describe("Create Tenant", () => {
   test("rejects a duplicate legal name via the API and shows an error toast", async ({
     page,
   }) => {
-    const displayName = uniqueTenantName("Duplicate Flow")
-    const ownerEmailSlug = displayName.replace(/\s+/g, "-").toLowerCase()
+    // Real setup via the shared helper -- only the second (deliberately
+    // failing) attempt below is what this test actually exercises.
+    const displayName = await createTenantViaUi(page, "Duplicate Flow")
 
     await page.goto("/tenants/new")
     await page.getByLabel("Legal name").fill(`${displayName} LLC`)
     await page.getByLabel("Display name").fill(displayName)
     await page.getByLabel("Default currency").fill("USD")
-    await page.getByLabel("Owner email").fill(`${ownerEmailSlug}-owner@example.com`)
-    await page.getByRole("button", { name: "Create tenant" }).click()
-    await page.getByRole("dialog", { name: "Tenant created" }).waitFor()
-    await page.getByRole("button", { name: "Done" }).click()
-    await page.waitForURL(/\/tenants\/[0-9A-Z]+$/)
-
-    await page.goto("/tenants/new")
-    await page.getByLabel("Legal name").fill(`${displayName} LLC`)
-    await page.getByLabel("Display name").fill(displayName)
-    await page.getByLabel("Default currency").fill("USD")
-    await page.getByLabel("Owner email").fill(`${ownerEmailSlug}-owner2@example.com`)
+    await page
+      .getByLabel("Owner email")
+      .fill(`${displayName.replace(/\s+/g, "-").toLowerCase()}-owner2@example.com`)
     await page.getByRole("button", { name: "Create tenant" }).click()
 
     await expect(page.getByText(/already exists/i)).toBeVisible()

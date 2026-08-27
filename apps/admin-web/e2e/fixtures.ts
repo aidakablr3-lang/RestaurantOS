@@ -31,20 +31,32 @@ export function uniqueTenantName(prefix: string): string {
   return `${prefix} ${Date.now()}-${Math.floor(Math.random() * 10_000)}`
 }
 
-/** Drives the real Create Tenant form. Used as setup by specs (List,
- * Details, Edit, Suspend, Reactivate) that need a fresh tenant to act
- * on, rather than depending on whatever tenants a previous run left
- * behind. Returns the created tenant's display name, unique per call,
- * used to find it again in the list/details UI. Dismisses the one-time
- * owner-activation-token dialog (Phase 1 design doc SSA.4) the form now
- * shows on success, then leaves the browser on the new tenant's details
- * page -- same end state as before that dialog existed. */
-export async function createTenantViaUi(page: Page, namePrefix: string): Promise<string> {
+/** Drives the real Create Tenant form. Used as setup by every spec (List,
+ * Details, Edit, Suspend, Reactivate, and Create Tenant's own duplicate-
+ * legal-name test) that needs a fresh tenant to act on, rather than
+ * depending on whatever tenants a previous run left behind, or
+ * duplicating this form-fill sequence inline -- that duplication is
+ * exactly what let create-tenant.spec.ts drift out of sync with the
+ * form when the ownerEmail field was added. Returns the created
+ * tenant's display name, unique per call, used to find it again in the
+ * list/details UI. Dismisses the one-time owner-activation-token dialog
+ * (Phase 1 design doc SSA.4) the form now shows on success, then leaves
+ * the browser on the new tenant's details page -- same end state as
+ * before that dialog existed.
+ *
+ * `currencyCode` defaults to "USD" -- override it only for a test that
+ * specifically needs a different input value asserted on afterward
+ * (e.g. Create Tenant's own "lowercase input gets upper-cased" case). */
+export async function createTenantViaUi(
+  page: Page,
+  namePrefix: string,
+  options?: { currencyCode?: string }
+): Promise<string> {
   const displayName = uniqueTenantName(namePrefix)
   await page.goto("/tenants/new")
   await page.getByLabel("Legal name").fill(`${displayName} LLC`)
   await page.getByLabel("Display name").fill(displayName)
-  await page.getByLabel("Default currency").fill("USD")
+  await page.getByLabel("Default currency").fill(options?.currencyCode ?? "USD")
   await page.getByLabel("Owner email").fill(`${uniqueTenantName("owner").replace(/\s+/g, "-").toLowerCase()}@example.com`)
   await page.getByRole("button", { name: "Create tenant" }).click()
   await page.getByRole("dialog", { name: "Tenant created" }).waitFor()
