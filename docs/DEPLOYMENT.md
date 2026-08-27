@@ -195,6 +195,8 @@ This rebuilds both images and restarts them; migrations re-run automatically (`a
 
 No image registry or CD pipeline exists yet — this is a manual rebuild-in-place, same disclosed limitation the project has had since the first pilot draft.
 
+**Any migration that adds a `CHECK`/`NOT NULL`/`UNIQUE` constraint must be preceded by an audit query against production data**, run and reviewed *before* `git pull`. `api` runs `alembic upgrade head` on every container start — if a new constraint rejects a row that already exists, the migration fails, the container exits, Docker restarts it, and it fails again, crash-looping until someone notices and fixes the offending row(s) by hand. (This happened live: migration 0015 added a `CHECK` on `tenants.default_currency_code`, one existing tenant had an invalid value, and `api` crash-looped for ~10 minutes before it was caught.) Write the audit query from the migration's own new constraint condition, negated, and run it against production before applying the migration — not after a crash-loop reveals the problem.
+
 ## 10. Rollback
 
 1. **Application code:** `git checkout <previous-known-good-commit>`, then repeat §9's rebuild.
