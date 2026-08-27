@@ -78,7 +78,19 @@ function buildWeek(existing: OperatingHoursEntry[]): OperatingHoursEntryInput[] 
   })
 }
 
-function OperatingHoursDialog({
+// Most restaurants run the same hours six or seven days a week.
+// Monday is the "leader" day: setting its hours also fills in every
+// other day that's marked Open and hasn't been individually edited
+// this session (`customHours`), so the owner types opening/closing
+// time once instead of fourteen times. A day's own checkbox/time
+// fields always stay directly editable -- editing one marks it
+// "custom" so it stops following Monday, and "Apply to all days"
+// re-syncs everything (open days only) back to Monday's current
+// hours and clears the custom set, for when the owner wants to
+// start following Monday again after a one-off edit.
+const MONDAY = 1
+
+export function OperatingHoursDialog({
   branchId,
   entries,
 }: {
@@ -87,20 +99,68 @@ function OperatingHoursDialog({
 }) {
   const [open, setOpen] = React.useState(false)
   const [week, setWeek] = React.useState<OperatingHoursEntryInput[]>(() => buildWeek(entries))
+  const [customHours, setCustomHours] = React.useState<Set<number>>(() => new Set())
   const replaceHours = useReplaceOperatingHours(branchId)
 
   React.useEffect(() => {
     if (open) {
       setWeek(buildWeek(entries))
+      setCustomHours(new Set())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   function updateDay(dayOfWeek: number, patch: Partial<OperatingHoursEntryInput>) {
-    setWeek((current) =>
-      current.map((entry) => (entry.dayOfWeek === dayOfWeek ? { ...entry, ...patch } : entry))
-    )
+    if (dayOfWeek === MONDAY) {
+      setWeek((current) => {
+        const monday = { ...current.find((entry) => entry.dayOfWeek === MONDAY)!, ...patch }
+        const timesChanged = "opensAt" in patch || "closesAt" in patch
+        return current.map((entry) => {
+          if (entry.dayOfWeek === MONDAY) return monday
+          if (timesChanged && !entry.isClosed && !customHours.has(entry.dayOfWeek)) {
+            return { ...entry, opensAt: monday.opensAt, closesAt: monday.closesAt }
+          }
+          return entry
+        })
+      })
+      return
+    }
+
+    setWeek((current) => {
+      const monday = current.find((entry) => entry.dayOfWeek === MONDAY)
+      const isOpening = patch.isClosed === false
+      const inheritsMondayHours = isOpening && monday && !monday.isClosed && !customHours.has(dayOfWeek)
+      return current.map((entry) => {
+        if (entry.dayOfWeek !== dayOfWeek) return entry
+        const next = { ...entry, ...patch }
+        if (inheritsMondayHours && monday) {
+          next.opensAt = monday.opensAt
+          next.closesAt = monday.closesAt
+        }
+        return next
+      })
+    })
+
+    if ("opensAt" in patch || "closesAt" in patch) {
+      setCustomHours((current) => new Set(current).add(dayOfWeek))
+    }
   }
+
+  function applyMondayToAllDays() {
+    const monday = week.find((entry) => entry.dayOfWeek === MONDAY)
+    if (!monday || monday.isClosed) return
+    setWeek((current) =>
+      current.map((entry) =>
+        entry.dayOfWeek === MONDAY || entry.isClosed
+          ? entry
+          : { ...entry, opensAt: monday.opensAt, closesAt: monday.closesAt }
+      )
+    )
+    setCustomHours(new Set())
+  }
+
+  const monday = week.find((entry) => entry.dayOfWeek === MONDAY)
+  const canApplyToAllDays = Boolean(monday && !monday.isClosed && monday.opensAt && monday.closesAt)
 
   async function handleSave() {
     try {
@@ -128,6 +188,20 @@ function OperatingHoursDialog({
         <DialogHeader>
           <DialogTitle>Operating hours</DialogTitle>
         </DialogHeader>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            Monday&apos;s hours are applied to every other open day automatically.
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={!canApplyToAllDays}
+            onClick={applyMondayToAllDays}
+          >
+            Apply to all days
+          </Button>
+        </div>
         <div className="grid gap-2">
           {week.map((entry) => (
             <div
