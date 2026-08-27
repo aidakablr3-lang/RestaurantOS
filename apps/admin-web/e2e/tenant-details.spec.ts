@@ -11,7 +11,7 @@ test.describe("Tenant Details", () => {
 
     await expect(page.getByRole("heading", { name: displayName })).toBeVisible()
     await expect(page.getByText(`${displayName} LLC`)).toBeVisible() // legal name
-    await expect(page.getByText("USD")).toBeVisible()
+    await expect(page.getByText("INR")).toBeVisible() // createTenantViaUi()'s own default
     await expect(page.getByRole("button", { name: "Suspend", exact: true })).toBeVisible()
     await expect(page.getByRole("button", { name: "Reactivate", exact: true })).toHaveCount(0)
     await expect(page.getByRole("button", { name: "Edit" })).toBeVisible()
