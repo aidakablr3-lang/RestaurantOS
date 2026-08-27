@@ -955,7 +955,7 @@ that doesn't change how any existing tenant's data is written.
 
 ## F. Known limitations
 
-Three facts about the codebase §E step 5's concrete steps had to build
+Six facts about the codebase §E step 5's concrete steps had to build
 around, rather than fix — each traded off deliberately, not overlooked:
 
 1. **`CreateTaxUseCase.execute(tenant_id, name, rate)` takes primitive
@@ -996,3 +996,44 @@ around, rather than fix — each traded off deliberately, not overlooked:
    role-grant identity directly (e.g. "does user X hold role-by-name Y"),
    which doesn't exist yet — noted inline as a `# NOTE:` in each of the
    three steps' own `verify()`.
+
+4. **Operating-hours overlap detection is same-`day_of_week`-only.**
+   `ReplaceOperatingHoursUseCase` accepts overnight windows
+   (`closesAt < opensAt`, closing the following calendar day) and rejects
+   overlapping open periods, but only compares entries that share the
+   same `day_of_week`. It has no way to detect an overnight entry's
+   spillover into the *next* day's own early-morning row (e.g. Friday
+   22:00-02:00 stored on `day_of_week=5` is never compared against a
+   Saturday 01:00-06:00 row on `day_of_week=6`, even though those two
+   windows do overlap in real time). Cross-day overlap detection would
+   need entries compared as real instants, not per-day time-of-day
+   values — disclosed in the use case's own module docstring, not built.
+
+5. **No "is this branch currently open" logic exists anywhere in the
+   codebase.** `BranchStatus` (opened/temporarily_closed/
+   permanently_closed) is a separate, manually-toggled field, not derived
+   from `operating_hours` at all. Nothing today reads operating hours to
+   answer "is this branch open right now" — reservations, the guest
+   ordering flow, and reporting are all independent of it. Whenever this
+   is built, it must handle overnight windows correctly (a branch open
+   22:00-02:00 is still open at 01:00 the *next* calendar day) or every
+   bar/pub's computed status will be wrong for several hours after
+   midnight.
+
+6. **Menu item/category presence and pricing are restaurant-level, not
+   branch-level — a hotel with a restaurant and a separately-priced bar
+   can't be modelled today, for two different reasons.** `MenuCategory`
+   and `MenuItem` carry only `restaurant_id`/`menu_category_id`, no
+   branch column at all, so which items exist has no per-branch
+   mechanism whatsoever — every branch of a restaurant mechanically sees
+   the identical category/item set. Pricing is subtler: a
+   `MenuItemBranchPrice` override table (branch- and time-scoped) already
+   exists with working entities, a repository, and admin CRUD endpoints
+   — but neither `GuestGetMenuUseCase` (what a diner is quoted) nor
+   `AddOrderItemUseCase` (what an order is billed) resolves it; both
+   price directly off the base `MenuItem.price_amount`, so any
+   `MenuItemBranchPrice` row created today is inert. Closing the pricing
+   half needs a resolution helper wired into both read paths; closing the
+   presence half needs branch-scoping (or an override/exclusion table)
+   added to `MenuCategory`/`MenuItem`, which nothing today provides even
+   partially.
