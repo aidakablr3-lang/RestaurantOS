@@ -89,6 +89,7 @@ def _branch_from_model(model: BranchModel) -> Branch:
         created_at=model.created_at,
         address_id=model.address_id,
         allow_negative_stock=model.allow_negative_stock,
+        gstin=model.gstin,
     )
 
 
@@ -372,6 +373,7 @@ class SQLAlchemyBranchRepository:
             address_id=branch.address_id,
             name=branch.name,
             status=branch.status.value,
+            gstin=branch.gstin,
         )
         self._session.add(model)
         await self._session.flush()
@@ -385,6 +387,7 @@ class SQLAlchemyBranchRepository:
                 address_id=branch.address_id,
                 name=branch.name,
                 status=branch.status.value,
+                gstin=branch.gstin,
             )
         )
         await self._session.execute(stmt)

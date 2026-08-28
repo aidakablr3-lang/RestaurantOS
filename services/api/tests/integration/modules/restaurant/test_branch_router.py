@@ -278,6 +278,29 @@ class TestCreateBranch:
         assert address["countryCode"] == "US"
         assert address["postalCode"] == "00000"
 
+    def test_creating_with_a_valid_gstin_persists_it(
+        self, client: TestClient, owner: dict, restaurant_id: str
+    ) -> None:
+        response = client.post(
+            f"/api/v1/restaurants/{restaurant_id}/branches",
+            headers=_auth_headers(owner["token"]),
+            json=_create_body(gstin="29ABCDE1234F1Z5"),
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["data"]["gstin"] == "29ABCDE1234F1Z5"
+
+    def test_a_malformed_gstin_is_rejected(
+        self, client: TestClient, owner: dict, restaurant_id: str
+    ) -> None:
+        # The exact shape a fraction/lowercase/wrong-length mistake would
+        # produce -- 14 characters, one short of the real 15.
+        response = client.post(
+            f"/api/v1/restaurants/{restaurant_id}/branches",
+            headers=_auth_headers(owner["token"]),
+            json=_create_body(gstin="29ABCDE1234F1Z"),
+        )
+        assert response.status_code == 422
+
     def test_creating_without_an_address_is_allowed(
         self, client: TestClient, owner: dict, restaurant_id: str
     ) -> None:
@@ -672,6 +695,49 @@ class TestUpdateBranch:
         )
         assert response.status_code == 200, response.text
         assert response.json()["data"]["address"]["line1"] == "Keep Me"
+
+    def test_setting_a_gstin_on_update_persists_it(
+        self, client: TestClient, owner: dict, restaurant_id: str
+    ) -> None:
+        branch = _create_branch(client, owner, restaurant_id)
+
+        response = client.patch(
+            f"/api/v1/branches/{branch['id']}",
+            headers=_auth_headers(owner["token"]),
+            json={"name": branch["name"], "gstin": "29ABCDE1234F1Z5"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["data"]["gstin"] == "29ABCDE1234F1Z5"
+
+    def test_omitting_gstin_on_update_leaves_it_untouched(
+        self, client: TestClient, owner: dict, restaurant_id: str
+    ) -> None:
+        create_response = client.post(
+            f"/api/v1/restaurants/{restaurant_id}/branches",
+            headers=_auth_headers(owner["token"]),
+            json=_create_body(gstin="29ABCDE1234F1Z5"),
+        )
+        branch = create_response.json()["data"]
+
+        response = client.patch(
+            f"/api/v1/branches/{branch['id']}",
+            headers=_auth_headers(owner["token"]),
+            json={"name": "New Name Only"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["data"]["gstin"] == "29ABCDE1234F1Z5"
+
+    def test_a_malformed_gstin_on_update_is_rejected(
+        self, client: TestClient, owner: dict, restaurant_id: str
+    ) -> None:
+        branch = _create_branch(client, owner, restaurant_id)
+
+        response = client.patch(
+            f"/api/v1/branches/{branch['id']}",
+            headers=_auth_headers(owner["token"]),
+            json={"name": branch["name"], "gstin": "not-a-gstin"},
+        )
+        assert response.status_code == 422
 
     def test_updating_an_unknown_id_returns_404(self, client: TestClient, owner: dict) -> None:
         response = client.patch(

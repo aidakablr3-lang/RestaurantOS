@@ -108,6 +108,7 @@ class CreateBranchUseCase:
                 status=BranchStatus.OPENED,
                 created_at=now,
                 address_id=address_id,
+                gstin=request.gstin,
             )
             branch.activate()
             branch = await branch_repo.create(branch)

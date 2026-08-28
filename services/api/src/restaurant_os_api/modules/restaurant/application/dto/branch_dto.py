@@ -34,6 +34,7 @@ class CreateBranchRequestDTO:
     restaurant_id: str
     name: str
     address: AddressRequestDTO | None = None
+    gstin: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +42,7 @@ class UpdateBranchRequestDTO:
     branch_id: str
     name: str
     address: AddressRequestDTO | None = None
+    gstin: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +63,7 @@ class BranchDTO:
     status: str
     address: AddressDTO | None
     created_at: datetime
+    gstin: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +84,7 @@ class BranchDetailDTO:
     address: AddressDTO | None
     created_at: datetime
     operating_hours: list[OperatingHoursEntryDTO]
+    gstin: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

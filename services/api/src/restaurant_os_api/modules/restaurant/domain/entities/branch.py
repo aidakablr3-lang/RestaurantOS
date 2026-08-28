@@ -38,6 +38,12 @@ class Branch:
     # module's negative-inventory trigger. No route in this module sets
     # it yet -- read-only from the restaurant module's own perspective.
     allow_negative_stock: bool = False
+    # GST registration is granted per legal entity *per state* -- the
+    # legal entity lives on Restaurant, but only Branch (via its own
+    # address) is granular enough to vary by state, so this lives here
+    # rather than on Restaurant or Tenant. Branches in the same state
+    # under the same Restaurant legitimately share one value.
+    gstin: str | None = None
 
     def activate(self) -> None:
         """Initial activation, following the branch's own setup flow --

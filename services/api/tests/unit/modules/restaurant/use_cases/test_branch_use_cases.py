@@ -133,6 +133,25 @@ class TestCreateBranchUseCase:
         assert result.address is not None
         assert result.address.line1 == "1 Main St"
 
+    async def test_creating_with_a_gstin_persists_it(self) -> None:
+        restaurant_repo = InMemoryRestaurantRepository({RESTAURANT_ID: _restaurant()})
+        use_case = CreateBranchUseCase(
+            session_factory=_session_factory(),
+            restaurant_repository_factory=lambda _s: restaurant_repo,
+            branch_repository_factory=lambda _s: InMemoryBranchRepository(),
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            CreateBranchRequestDTO(
+                restaurant_id=RESTAURANT_ID, name="Downtown", gstin="29ABCDE1234F1Z5"
+            ),
+        )
+
+        assert result.gstin == "29ABCDE1234F1Z5"
+
     async def test_raises_not_found_for_an_unknown_restaurant(self) -> None:
         use_case = CreateBranchUseCase(
             session_factory=_session_factory(),
@@ -376,6 +395,37 @@ class TestUpdateBranchUseCase:
 
         assert result.address is not None
         assert result.address.line1 == "Keep Me"
+
+    async def test_setting_a_gstin_persists_it(self) -> None:
+        branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch()})
+        use_case = UpdateBranchUseCase(
+            session_factory=_session_factory(),
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            UpdateBranchRequestDTO(branch_id=BRANCH_ID, name="Downtown", gstin="29ABCDE1234F1Z5"),
+        )
+
+        assert result.gstin == "29ABCDE1234F1Z5"
+
+    async def test_omitting_gstin_leaves_an_existing_one_untouched(self) -> None:
+        branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch(gstin="29ABCDE1234F1Z5")})
+        use_case = UpdateBranchUseCase(
+            session_factory=_session_factory(),
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID, UpdateBranchRequestDTO(branch_id=BRANCH_ID, name="New Name Only")
+        )
+
+        assert result.gstin == "29ABCDE1234F1Z5"
 
     async def test_raises_not_found_for_an_unknown_id(self) -> None:
         use_case = UpdateBranchUseCase(

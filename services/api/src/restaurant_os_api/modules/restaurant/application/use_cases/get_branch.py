@@ -69,4 +69,5 @@ class GetBranchUseCase:
             address=address_to_dto(address) if address is not None else None,
             created_at=branch.created_at,
             operating_hours=[operating_hours_to_dto(entry) for entry in operating_hours],
+            gstin=branch.gstin,
         )

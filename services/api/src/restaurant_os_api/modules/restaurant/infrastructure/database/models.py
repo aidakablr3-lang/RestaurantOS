@@ -79,6 +79,14 @@ class BranchModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, 
             name="status_is_valid",
         ),
         Index("uq_branches_restaurant_id_name", "restaurant_id", "name", unique=True),
+        # 2-digit state code + 10-char PAN (5 letters, 4 digits, 1
+        # letter) + 1 entity-count char + literal 'Z' + 1 checksum char
+        # = 15. NULL always passes (a branch can exist before its GSTIN
+        # is on file) -- only a non-null value is format-checked.
+        CheckConstraint(
+            "gstin IS NULL OR gstin ~ '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$'",
+            name="gstin_is_valid",
+        ),
     )
 
     restaurant_id: Mapped[str] = mapped_column(
@@ -95,6 +103,9 @@ class BranchModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, 
     allow_negative_stock: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
+    # Per legal-entity-per-state GST registration -- see Branch's own
+    # docstring for why this lives here, not on Restaurant/Tenant.
+    gstin: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class OperatingHoursModel(

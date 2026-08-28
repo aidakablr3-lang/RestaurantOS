@@ -30,4 +30,5 @@ def branch_to_dto(branch: Branch, address: Address | None) -> BranchDTO:
         status=branch.status.value,
         address=address_to_dto(address) if address is not None else None,
         created_at=branch.created_at,
+        gstin=branch.gstin,
     )

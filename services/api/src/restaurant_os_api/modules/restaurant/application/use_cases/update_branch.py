@@ -2,8 +2,8 @@
 
 Restaurant Platform Architecture SS7/SS8's ``PATCH /api/v1/branches/
 {id}``, matching the Blueprint's Branch Details screen ("address,
-hours, status" edited together). Only ``name`` and (optionally)
-``address`` are editable here -- ``restaurant_id``/``tenant_id`` are
+hours, status" edited together). Only ``name``, ``address``, and
+``gstin`` are editable here -- ``restaurant_id``/``tenant_id`` are
 immutable (no settable field for either exists on
 ``UpdateBranchRequestDTO``), and ``status`` changes go through
 ``CloseBranchUseCase``/``ReopenBranchUseCase``'s own calls to
@@ -16,6 +16,12 @@ untouched. A request that includes one either updates the existing
 ``Address`` row in place (if the branch already has one) or creates a
 new one and links it (if the branch had none yet) -- never
 implicitly clears an address by omission.
+
+``gstin`` follows the same omission-preserves convention: a request
+that omits it (or sends ``null``) leaves whatever is already stored
+untouched. Like address, there is no way to explicitly clear an
+already-set ``gstin`` through this endpoint today -- an existing
+limitation this mirrors, not a new one.
 """
 
 from __future__ import annotations
@@ -74,6 +80,15 @@ class UpdateBranchUseCase:
                 if existing is not None and existing.id != branch.id:
                     raise BranchNameConflictError(branch.restaurant_id, request.name)
                 branch.name = request.name
+
+            # Same omission-preserves convention as address just below:
+            # a PATCH that only sends name must not silently wipe a
+            # previously-set gstin. Like address, there is currently no
+            # way to explicitly clear an already-set gstin through this
+            # endpoint -- an existing limitation this mirrors, not a
+            # new one.
+            if request.gstin is not None:
+                branch.gstin = request.gstin
 
             address: Address | None = None
             if request.address is not None:

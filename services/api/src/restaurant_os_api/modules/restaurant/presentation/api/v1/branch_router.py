@@ -92,6 +92,7 @@ def _branch_to_schema(dto: BranchDTO) -> BranchResponseSchema:
         tenant_id=dto.tenant_id,
         restaurant_id=dto.restaurant_id,
         name=dto.name,
+        gstin=dto.gstin,
         status=dto.status,
         address=(
             AddressResponseSchema(
@@ -126,6 +127,7 @@ def _branch_detail_to_schema(dto: BranchDetailDTO) -> BranchDetailResponseSchema
         tenant_id=dto.tenant_id,
         restaurant_id=dto.restaurant_id,
         name=dto.name,
+        gstin=dto.gstin,
         status=dto.status,
         address=(
             AddressResponseSchema(
@@ -163,6 +165,7 @@ async def create_branch(
                 restaurant_id=restaurant_id,
                 name=body.name,
                 address=_address_request_to_dto(body.address),
+                gstin=body.gstin,
             ),
         )
         response = ApiResponse(data=_branch_to_schema(result))
@@ -203,6 +206,7 @@ async def list_branches(
                     status=b.status.value,
                     address=None,
                     created_at=b.created_at,
+                    gstin=b.gstin,
                 )
             )
             for b in branches
@@ -237,6 +241,7 @@ async def update_branch(
                 branch_id=branch_id,
                 name=body.name,
                 address=_address_request_to_dto(body.address),
+                gstin=body.gstin,
             ),
         )
         response = ApiResponse(data=_branch_to_schema(result))
