@@ -4,9 +4,10 @@ import * as React from "react"
 import { useParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { PlusIcon, TagIcon } from "lucide-react"
+import { PlusIcon, PrinterIcon, TagIcon } from "lucide-react"
 import { toast } from "sonner"
 
+import { BillPrintView } from "./bill-print-view"
 import { BillStatusBadge } from "@/components/bill-status-badge"
 import { PaymentStatusBadge } from "@/components/payment-status-badge"
 import { PermissionRestricted } from "@/components/permission-restricted"
@@ -271,8 +272,20 @@ export default function BillDetailPage() {
   const loading = perms.isLoading || isLoading
 
   return (
-    <div className="grid gap-6">
-      <PageHeader title="Bill" description="Tax lines, adjustments, and payments for a single order's bill." />
+    <>
+    <div className="grid gap-6 print:hidden">
+      <PageHeader
+        title="Bill"
+        description="Tax lines, adjustments, and payments for a single order's bill."
+        actions={
+          bill ? (
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <PrinterIcon />
+              Print
+            </Button>
+          ) : undefined
+        }
+      />
 
       {!perms.isLoading && !canRead ? (
         <PermissionRestricted resource="this bill" />
@@ -388,5 +401,7 @@ export default function BillDetailPage() {
         </>
       )}
     </div>
+    {bill ? <BillPrintView bill={bill} /> : null}
+    </>
   )
 }

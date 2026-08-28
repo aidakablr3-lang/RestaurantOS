@@ -128,3 +128,14 @@
     @apply font-sans;
   }
 }
+
+/* 80mm thermal receipt printing (bill print view) -- Tailwind's
+   print:hidden / print:block utilities handle showing/hiding content,
+   this only sets the physical page size, which utilities can't
+   express. */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 2mm;
+  }
+}
