@@ -412,6 +412,7 @@ export default function BranchDetailsPage() {
                   : "Not set"
               }
             />
+            <DetailRow label="GSTIN" value={branch.gstin ?? "Not set"} />
             <DetailRow label="Created" value={new Date(branch.createdAt).toLocaleString()} />
           </CardContent>
         </Card>

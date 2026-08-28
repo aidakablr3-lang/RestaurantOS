@@ -34,6 +34,7 @@ export interface Branch {
   status: BranchStatus
   address: Address | null
   createdAt: string
+  gstin: string | null
 }
 
 export interface OperatingHoursEntry {
@@ -51,6 +52,7 @@ export interface BranchDetail extends Branch {
 export interface CreateBranchRequest {
   name: string
   address?: AddressInput | null
+  gstin?: string | null
 }
 
 export type UpdateBranchRequest = CreateBranchRequest

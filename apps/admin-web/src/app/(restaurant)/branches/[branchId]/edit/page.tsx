@@ -39,7 +39,7 @@ export default function EditBranchPage() {
 
   const form = useForm<BranchFormValues>({
     resolver: zodResolver(branchSchema),
-    defaultValues: { name: "", line1: "", city: "", countryCode: "", postalCode: "" },
+    defaultValues: { name: "", line1: "", city: "", countryCode: "", postalCode: "", gstin: "" },
   })
 
   React.useEffect(() => {
@@ -50,6 +50,7 @@ export default function EditBranchPage() {
         city: branch.address?.city ?? "",
         countryCode: branch.address?.countryCode ?? "",
         postalCode: branch.address?.postalCode ?? "",
+        gstin: branch.gstin ?? "",
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,6 +69,7 @@ export default function EditBranchPage() {
               postalCode: values.postalCode || null,
             }
           : null,
+        gstin: values.gstin || null,
       })
       toast.success("Branch updated.")
       router.push(`/branches/${branchId}`)
@@ -198,6 +200,24 @@ export default function EditBranchPage() {
                     <FormControl>
                       <Input
                         maxLength={2}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="gstin"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>GSTIN</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="29ABCDE1234F1Z5"
+                        maxLength={15}
                         {...field}
                         onChange={(event) => field.onChange(event.target.value.toUpperCase())}
                       />
