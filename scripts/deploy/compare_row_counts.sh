@@ -4,9 +4,9 @@
 # just "the right number of tables and the right migration head" (which
 # restore.sh's own built-in verification already checks).
 #
-# Usage:
-#   DATABASE_USER=... DATABASE_PASSWORD=... \
-#     ./scripts/deploy/compare_row_counts.sh <source_db> <target_db>
+# Usage (run from the repo root; credentials come from REPO_DIR/.env,
+# sourced by this script -- no need to source it into the shell first):
+#   ./scripts/deploy/compare_row_counts.sh <source_db> <target_db>
 #
 # Prints every table's row count from both databases; if every count
 # matches exactly, prints PASS and exits 0. If any table's count
@@ -23,6 +23,15 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMPOSE="docker compose -f $REPO_DIR/docker-compose.prod.yml"
+
+if [ ! -f "$REPO_DIR/.env" ]; then
+    echo "ERROR: $REPO_DIR/.env not found -- run scripts/deploy/02_generate_secrets.sh first." >&2
+    exit 1
+fi
+set -a
+# shellcheck source=/dev/null
+source "$REPO_DIR/.env"
+set +a
 
 : "${DATABASE_USER:?DATABASE_USER must be set}"
 : "${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set}"

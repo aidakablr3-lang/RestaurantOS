@@ -7,12 +7,14 @@
 # matching pg_dump client version installed on the host.
 #
 # Usage: install as a nightly cron job on the VPS (see
-# docs/DEPLOYMENT.md's Backup section for the exact crontab line -- it
-# needs to source /opt/restaurantos/.env first, since every credential
-# below lives there, never hardcoded here or in the crontab itself).
+# docs/DEPLOYMENT.md's Backup section for the exact crontab line). No
+# need to source .env into the caller's shell first -- this script
+# sources REPO_DIR/.env itself, below, since every credential it needs
+# lives there, never hardcoded here or in the crontab itself.
 #
-# Required environment: DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME,
-# BACKUP_DIR, S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+# Required environment (all read from .env, not the caller's shell):
+# DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME, BACKUP_DIR,
+# S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
 # AWS_DEFAULT_REGION.
 # Optional: RETENTION_DAYS (default 7 -- local copies only; the S3 side
 # is pruned by the bucket's own lifecycle rule, not by this script --
@@ -42,6 +44,15 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMPOSE_FILE="$REPO_DIR/docker-compose.prod.yml"
+
+if [ ! -f "$REPO_DIR/.env" ]; then
+    echo "ERROR: $REPO_DIR/.env not found -- run scripts/deploy/02_generate_secrets.sh first." >&2
+    exit 1
+fi
+set -a
+# shellcheck source=/dev/null
+source "$REPO_DIR/.env"
+set +a
 
 : "${DATABASE_USER:?DATABASE_USER must be set}"
 : "${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set}"

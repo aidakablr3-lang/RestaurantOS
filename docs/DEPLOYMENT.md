@@ -139,13 +139,13 @@ All of these live in one file: `/opt/restaurantos/.env`, written by `scripts/dep
 
 ## 8. Backup and restore
 
-- **Backup:** `scripts/deploy/backup.sh` — `pg_dump` run inside the `postgres` container (no host port needed, matches §1's "reachable only inside Compose" design), then uploaded to S3 (below). Fails loudly on a zero-byte dump *or* a failed upload — a silent off-host failure is worse than no backup, since it looks like it's working when it isn't. Install as a nightly cron job (as root, since `.env` is root-only and the job needs Docker access):
+- **Backup:** `scripts/deploy/backup.sh` — `pg_dump` run inside the `postgres` container (no host port needed, matches §1's "reachable only inside Compose" design), then uploaded to S3 (below). Fails loudly on a zero-byte dump *or* a failed upload — a silent off-host failure is worse than no backup, since it looks like it's working when it isn't. The script sources `/opt/restaurantos/.env` itself (via `REPO_DIR`, resolved from its own path) — no need to source it into the caller's shell first. Install as a nightly cron job (as root, since `.env` is root-only and the job needs Docker access):
   ```bash
   sudo crontab -e
   ```
   Add:
   ```cron
-  0 3 * * * bash -c 'cd /opt/restaurantos && set -a && . .env && set +a && BACKUP_DIR=/var/backups/restaurantos RETENTION_DAYS=7 bash scripts/deploy/backup.sh' >> /var/log/restaurantos-backup.log 2>&1
+  0 3 * * * cd /opt/restaurantos && BACKUP_DIR=/var/backups/restaurantos RETENTION_DAYS=7 bash scripts/deploy/backup.sh >> /var/log/restaurantos-backup.log 2>&1
   ```
   Confirm it's actually scheduled, not just saved: `sudo crontab -l` should show the line, and `systemctl is-active cron` should read `active`.
 
@@ -173,11 +173,13 @@ All of these live in one file: `/opt/restaurantos/.env`, written by `scripts/dep
 
   **Restoring from S3 needs a *different*, read-capable credential** — this write-only IAM user structurally cannot download anything back, by design. Use your own AWS console login or a separate CLI profile with read access to pull a dump down, then run `restore.sh` on it as usual.
 
-- **Restore:** `scripts/deploy/restore.sh <dump-file>` — drops and recreates the target database, restores, then **automatically verifies**: the restored `alembic_version` matches `alembic heads` for the code currently deployed, and the restored database has at least one table. Exits non-zero and prints `RESTORE VERIFICATION FAILED` if either check fails, rather than reporting success on a wrong or empty restore. Requires interactive `yes` confirmation (`CONFIRM=yes` bypasses it, for scripted DR drills only). `DATABASE_NAME` can point at a scratch database name instead of the real one — the dump itself carries no fixed target — for a non-destructive restore drill.
-- **Row-count verification:** `scripts/deploy/compare_row_counts.sh <source-db> <target-db>` — `restore.sh`'s own checks confirm the right *tables* and migration head exist, not that every row actually came back. This compares every table's row count between two databases in the same Postgres container and fails loudly on any mismatch. Run it after a scratch restore, comparing the live database against the scratch one:
+- **Restore:** `scripts/deploy/restore.sh <dump-file>` (run from `/opt/restaurantos` — it sources `.env` itself, same as `backup.sh`) — drops and recreates the target database, restores, then **automatically verifies**: the restored `alembic_version` matches `alembic heads` for the code currently deployed, and the restored database has at least one table. Exits non-zero and prints `RESTORE VERIFICATION FAILED` if either check fails, rather than reporting success on a wrong or empty restore. Requires interactive `yes` confirmation (`CONFIRM=yes` bypasses it, for scripted DR drills only). `DATABASE_NAME` defaults to `.env`'s value; export it beforehand to point at a scratch database name instead of the real one — the dump itself carries no fixed target — for a non-destructive restore drill:
   ```bash
-  DATABASE_USER=restaurantos DATABASE_PASSWORD=<from .env> \
-      ./scripts/deploy/compare_row_counts.sh restaurantos restaurantos_scratch_verify
+  DATABASE_NAME=restaurantos_scratch_verify ./scripts/deploy/restore.sh /var/backups/restaurantos/<dump-file>
+  ```
+- **Row-count verification:** `scripts/deploy/compare_row_counts.sh <source-db> <target-db>` (also sources `.env` itself) — `restore.sh`'s own checks confirm the right *tables* and migration head exist, not that every row actually came back. This compares every table's row count between two databases in the same Postgres container and fails loudly on any mismatch. Run it after a scratch restore, comparing the live database against the scratch one:
+  ```bash
+  ./scripts/deploy/compare_row_counts.sh restaurantos restaurantos_scratch_verify
   ```
 
 Know who is authorized to run a restore, and rehearse it at least once against a disposable copy before you need it for real.

@@ -3,9 +3,13 @@
 # with an automated restore-verification step (not just a suggestion to
 # check manually).
 #
-# Usage:
-#   DATABASE_USER=... DATABASE_PASSWORD=... DATABASE_NAME=... \
-#     ./scripts/deploy/restore.sh /var/backups/restaurantos/restaurantos_20260101T030000Z.dump
+# Usage (run from the repo root; credentials come from REPO_DIR/.env,
+# sourced by this script -- no need to source it into the shell first):
+#   ./scripts/deploy/restore.sh /var/backups/restaurantos/restaurantos_20260101T030000Z.dump
+#
+# DATABASE_NAME defaults to .env's value; override for a non-destructive
+# restore drill against a scratch database:
+#   DATABASE_NAME=restaurantos_scratch_verify ./scripts/deploy/restore.sh <dump-file>
 #
 # DESTRUCTIVE: this drops and recreates DATABASE_NAME before restoring.
 # Confirms interactively unless CONFIRM=yes is set (for scripted DR
@@ -26,6 +30,22 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMPOSE_FILE="$REPO_DIR/docker-compose.prod.yml"
 COMPOSE="docker compose -f $COMPOSE_FILE"
+
+if [ ! -f "$REPO_DIR/.env" ]; then
+    echo "ERROR: $REPO_DIR/.env not found -- run scripts/deploy/02_generate_secrets.sh first." >&2
+    exit 1
+fi
+# Preserve a caller-supplied DATABASE_NAME (e.g. a scratch-restore
+# drill) -- .env is sourced as a default, not an unconditional
+# override, since it always names the real database.
+_database_name_override="${DATABASE_NAME:-}"
+set -a
+# shellcheck source=/dev/null
+source "$REPO_DIR/.env"
+set +a
+if [ -n "$_database_name_override" ]; then
+    DATABASE_NAME="$_database_name_override"
+fi
 
 : "${DATABASE_USER:?DATABASE_USER must be set}"
 : "${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set}"
