@@ -10,11 +10,11 @@
  * endpoint for this exists or was added; every field here is already
  * fetchable, just not previously joined together in one view.
  *
- * "Bill ID" is the raw Bill.id (a ULID), deliberately not labeled
- * "Invoice No." -- it is not a consecutive, financial-year-scoped
- * series, which a compliant GST tax invoice number must be. See the
- * accompanying gap report; this print view does not claim to be a
- * legally complete tax invoice on its own yet.
+ * Shows "Invoice No." when the bill has a real invoiceNumber
+ * (GenerateBillUseCase only allocates one when the branch had a gstin
+ * on file at generation time), falling back to the raw Bill.id
+ * labeled plainly as "Bill ID" otherwise -- never claims a compliant
+ * invoice number exists when it doesn't.
  */
 
 import { useBranch } from "@/hooks/use-branches"
@@ -80,7 +80,7 @@ export function BillPrintView({ bill }: { bill: Bill }) {
 
       <div className="my-1 border-t border-dashed border-black" />
 
-      <p>Bill ID: {bill.id}</p>
+      <p>{bill.invoiceNumber ? `Invoice No: ${bill.invoiceNumber}` : `Bill ID: ${bill.id}`}</p>
       <p>Date: {new Date(bill.createdAt).toLocaleString()}</p>
       {tableNumber ? <p>Table: {tableNumber}</p> : null}
 

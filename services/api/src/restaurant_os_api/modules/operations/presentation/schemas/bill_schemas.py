@@ -69,6 +69,7 @@ class BillResponseSchema(CamelModel):
     amount_paid: Decimal
     tax_lines: list[OrderTaxLineResponseSchema]
     adjustments: list[BillAdjustmentResponseSchema]
+    invoice_number: str | None = None
 
 
 class TaxResponseSchema(CamelModel):

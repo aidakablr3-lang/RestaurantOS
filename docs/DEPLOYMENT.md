@@ -259,6 +259,12 @@ refunds → kitchen_items → bill_adjustments → payments → kitchen_tickets 
 
 (`refunds` references both `payments.id` and `orders.id`; `kitchen_items` references both `kitchen_tickets.id` and `order_items.id`.) Enumerate every row that exists for the specific order/bill first — don't assume the shape (a production incident's own audit found an order already `closed` via a standalone `close_order` action with zero payments, not the payment-triggered close path one might assume) — then delete inside a single `BEGIN; ... COMMIT;` transaction scoped by `order_id`/`bill_id`, so a missed dependency rolls back everything instead of leaving orphaned rows.
 
+## 15. Invoice numbering — known limitation: no void/credit-note concept
+
+`Bill.invoice_number` (migration `0019`) is a GST-compliant sequential series (`{invoice_prefix}/{FY}/{seq:06d}`, per branch, reset each 1 April IST) allocated once, atomically, the moment a bill with a `gstin`'d branch is generated. It is never reused and never reassigned to a different bill.
+
+`Bill.status` has **no `voided` state**, and there is **no credit-note concept anywhere in this schema**. If a numbered invoice needs to be cancelled after the fact, this deployment currently has no compliant way to do it — the §14 delete path only applies to bills with zero payments and is not a substitute for voiding a bill that already carries a real invoice number a customer may have seen. Do not repurpose the delete path for a numbered invoice. This is deliberately unbuilt pending confirmation from the business's CA on whether Indian GST practice requires a credit note, a formal void flag, or something else — treat any numbered-invoice cancellation as blocked until that's designed.
+
 ---
 
 **Status:** deployed to the real target (Lightsail, Mumbai, `13.126.148.121`, `api.prashanthai.com` / `admin.prashanthai.com`) — all four `scripts/deploy/` steps run and verified against the real box, HTTPS live, platform admin bootstrapped, backup → scratch-restore → row-count check proven, Postgres confirmed unreachable from outside. This document is now describing a real, running deployment, not a rehearsal.

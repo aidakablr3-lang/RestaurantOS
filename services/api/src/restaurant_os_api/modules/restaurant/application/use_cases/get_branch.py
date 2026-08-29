@@ -70,4 +70,5 @@ class GetBranchUseCase:
             created_at=branch.created_at,
             operating_hours=[operating_hours_to_dto(entry) for entry in operating_hours],
             gstin=branch.gstin,
+            invoice_prefix=branch.invoice_prefix,
         )

@@ -44,6 +44,15 @@ class Branch:
     # rather than on Restaurant or Tenant. Branches in the same state
     # under the same Restaurant legitimately share one value.
     gstin: str | None = None
+    # An invoice number series belongs to a GST registration, so this
+    # must be unique per gstin, not per tenant -- two branches sharing
+    # one GSTIN must not collide, but two branches with different (or
+    # no) GSTINs may legitimately share a prefix. Auto-generated from
+    # the branch name at creation, editable any time -- changing it
+    # only affects invoices issued afterward; already-issued numbers
+    # are frozen on their own Bill row, never derived live from this
+    # field.
+    invoice_prefix: str | None = None
 
     def activate(self) -> None:
         """Initial activation, following the branch's own setup flow --

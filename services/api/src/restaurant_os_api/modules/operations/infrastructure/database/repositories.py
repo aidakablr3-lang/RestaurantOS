@@ -11,8 +11,10 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from restaurant_os_api.core.ids import generate_ulid
 from restaurant_os_api.modules.operations.domain.entities import (
     Bill,
     BillAdjustment,
@@ -66,6 +68,7 @@ from restaurant_os_api.modules.operations.infrastructure.database.models import 
     GoodsReceiptModel,
     InventoryCategoryModel,
     InventoryItemModel,
+    InvoiceNumberCounterModel,
     KitchenItemModel,
     KitchenTicketModel,
     LedgerEntryModel,
@@ -503,6 +506,7 @@ def _bill_from_model(model: BillModel) -> Bill:
         created_at=model.created_at,
         order_id=model.order_id,
         tab_id=model.tab_id,
+        invoice_number=model.invoice_number,
     )
 
 
@@ -697,6 +701,7 @@ class SQLAlchemyBillRepository:
             order_id=bill.order_id,
             tab_id=bill.tab_id,
             status=bill.status.value,
+            invoice_number=bill.invoice_number,
         )
         self._session.add(model)
         await self._session.flush()
@@ -754,6 +759,38 @@ class SQLAlchemyBillRepository:
         )
         models = (await self._session.execute(stmt)).scalars().all()
         return [_bill_adjustment_from_model(m) for m in models]
+
+
+class SQLAlchemyInvoiceNumberCounterRepository:
+    """Implements ``InvoiceNumberCounterRepository`` -- the same
+    ``pg_insert(...).on_conflict_do_update(...)`` construct
+    ``QRResolutionRateLimiter._increment_total`` already uses. Runs
+    inside the caller's own already-open transaction (unlike the rate
+    limiter, which opens its own) -- ``GenerateBillUseCase`` needs the
+    counter increment and the ``Bill`` insert to commit or roll back
+    together, so a failed bill generation never leaves a numbering gap."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def allocate_next(self, tenant_id: str, branch_id: str, financial_year: str) -> int:
+        stmt = (
+            pg_insert(InvoiceNumberCounterModel)
+            .values(
+                id=generate_ulid(),
+                tenant_id=tenant_id,
+                branch_id=branch_id,
+                financial_year=financial_year,
+                seq=1,
+            )
+            .on_conflict_do_update(
+                index_elements=["tenant_id", "branch_id", "financial_year"],
+                set_={"seq": InvoiceNumberCounterModel.seq + 1},
+            )
+            .returning(InvoiceNumberCounterModel.seq)
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()
 
 
 class SQLAlchemyPaymentRepository:

@@ -61,6 +61,7 @@ export interface Bill {
   amountPaid: string
   taxLines: OrderTaxLine[]
   adjustments: BillAdjustment[]
+  invoiceNumber: string | null
 }
 
 export interface ApplyBillAdjustmentRequest {

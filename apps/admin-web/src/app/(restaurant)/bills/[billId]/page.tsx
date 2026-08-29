@@ -308,7 +308,12 @@ export default function BillDetailPage() {
         <>
           <Card>
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle>Summary</CardTitle>
+              <div>
+                <CardTitle>Summary</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {bill.invoiceNumber ? `Invoice ${bill.invoiceNumber}` : `Bill ${bill.id}`}
+                </p>
+              </div>
               <BillStatusBadge status={bill.status} />
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">

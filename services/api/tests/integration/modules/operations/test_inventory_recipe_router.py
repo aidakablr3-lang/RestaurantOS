@@ -176,7 +176,8 @@ async def _seed_menu(session_factory, *, tenant_id: str) -> dict[str, str]:
         await uow.session.execute(
             text(
                 "INSERT INTO branches (id, tenant_id, restaurant_id, name, "
-                "allow_negative_stock) VALUES (:id, :tenant_id, :restaurant_id, 'Downtown', false)"
+                "allow_negative_stock, invoice_prefix) "
+                "VALUES (:id, :tenant_id, :restaurant_id, 'Downtown', false, 'TST')"
             ),
             {"id": branch_id, "tenant_id": tenant_id, "restaurant_id": restaurant_id},
         )

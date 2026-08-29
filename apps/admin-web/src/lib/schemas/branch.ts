@@ -29,6 +29,16 @@ export const branchSchema = z.object({
           "GSTIN must be 15 characters: 2-digit state code, 10-character PAN, 1 entity-count character, 'Z', 1 checksum character.",
       }
     ),
+  // An invoice number series belongs to a GST registration -- two
+  // branches sharing one GSTIN must not share a prefix, but two
+  // branches with different (or no) GSTINs may. Leave blank to keep
+  // the auto-generated default from when the branch was created.
+  invoicePrefix: z
+    .string()
+    .optional()
+    .refine((value) => !value || /^[A-Z0-9]{2,10}$/.test(value), {
+      message: "Invoice prefix must be 2-10 uppercase letters/digits.",
+    }),
 })
 
 export type BranchFormValues = z.infer<typeof branchSchema>

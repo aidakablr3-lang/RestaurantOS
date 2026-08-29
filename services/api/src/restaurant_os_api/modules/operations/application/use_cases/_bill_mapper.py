@@ -66,4 +66,5 @@ def bill_to_dto(
         amount_paid=amount_paid,
         tax_lines=[order_tax_line_to_dto(t) for t in tax_lines],
         adjustments=[bill_adjustment_to_dto(a) for a in adjustments],
+        invoice_number=bill.invoice_number,
     )

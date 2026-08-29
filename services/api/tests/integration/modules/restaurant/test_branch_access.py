@@ -83,8 +83,8 @@ async def _create_branch(session_factory, tenant_id: str, *, name: str = "Branch
         )
         await uow.session.execute(
             text(
-                "INSERT INTO branches (id, tenant_id, restaurant_id, name) "
-                "VALUES (:id, :tenant_id, :restaurant_id, :name)"
+                "INSERT INTO branches (id, tenant_id, restaurant_id, name, invoice_prefix) "
+                "VALUES (:id, :tenant_id, :restaurant_id, :name, 'TST')"
             ),
             {"id": branch_id, "tenant_id": tenant_id, "restaurant_id": restaurant_id, "name": name},
         )

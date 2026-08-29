@@ -90,6 +90,7 @@ def _branch_from_model(model: BranchModel) -> Branch:
         address_id=model.address_id,
         allow_negative_stock=model.allow_negative_stock,
         gstin=model.gstin,
+        invoice_prefix=model.invoice_prefix,
     )
 
 
@@ -365,6 +366,20 @@ class SQLAlchemyBranchRepository:
         model = (await self._session.execute(stmt)).scalar_one_or_none()
         return _branch_from_model(model) if model is not None else None
 
+    async def get_by_gstin_and_invoice_prefix(
+        self, tenant_id: str, gstin: str, invoice_prefix: str, *, exclude_branch_id: str | None = None
+    ) -> Branch | None:
+        stmt = select(BranchModel).where(
+            BranchModel.tenant_id == tenant_id,
+            BranchModel.gstin == gstin,
+            BranchModel.invoice_prefix == invoice_prefix,
+            BranchModel.deleted_at.is_(None),
+        )
+        if exclude_branch_id is not None:
+            stmt = stmt.where(BranchModel.id != exclude_branch_id)
+        model = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _branch_from_model(model) if model is not None else None
+
     async def create(self, branch: Branch) -> Branch:
         model = BranchModel(
             id=branch.id,
@@ -374,6 +389,7 @@ class SQLAlchemyBranchRepository:
             name=branch.name,
             status=branch.status.value,
             gstin=branch.gstin,
+            invoice_prefix=branch.invoice_prefix,
         )
         self._session.add(model)
         await self._session.flush()
@@ -388,6 +404,7 @@ class SQLAlchemyBranchRepository:
                 name=branch.name,
                 status=branch.status.value,
                 gstin=branch.gstin,
+                invoice_prefix=branch.invoice_prefix,
             )
         )
         await self._session.execute(stmt)

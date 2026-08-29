@@ -121,6 +121,7 @@ async def _seed_table(session_factory, tenant_id: str) -> dict[str, str]:
                 name="Downtown",
                 status=BranchStatus.ACTIVE,
                 created_at=now,
+                invoice_prefix="TST",
             )
         )
         await SQLAlchemyTableZoneRepository(uow.session).create(

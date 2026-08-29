@@ -135,6 +135,7 @@ async def _create_branch(
         name=overrides.get("name", "Main Street"),
         status=BranchStatus.ACTIVE,
         created_at=NOW,
+        invoice_prefix=overrides.get("invoice_prefix", "TST"),
     )
     async with UnitOfWork(session_factory, TenantContext(tenant_id)) as uow:
         repo = SQLAlchemyBranchRepository(uow.session)
@@ -359,8 +360,8 @@ class TestBranchRepository:
             # belongs to tenant_b.
             await uow.session.execute(
                 text(
-                    "INSERT INTO branches (id, tenant_id, restaurant_id, name) "
-                    "VALUES (:id, :tenant_id, :restaurant_id, 'Cross Tenant Branch')"
+                    "INSERT INTO branches (id, tenant_id, restaurant_id, name, invoice_prefix) "
+                    "VALUES (:id, :tenant_id, :restaurant_id, 'Cross Tenant Branch', 'TST')"
                 ),
                 {"id": generate_ulid(), "tenant_id": tenant_a.id, "restaurant_id": restaurant_b.id},
             )

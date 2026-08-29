@@ -35,6 +35,7 @@ class CreateBranchRequestDTO:
     name: str
     address: AddressRequestDTO | None = None
     gstin: str | None = None
+    invoice_prefix: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +44,7 @@ class UpdateBranchRequestDTO:
     name: str
     address: AddressRequestDTO | None = None
     gstin: str | None = None
+    invoice_prefix: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +66,7 @@ class BranchDTO:
     address: AddressDTO | None
     created_at: datetime
     gstin: str | None = None
+    invoice_prefix: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +88,7 @@ class BranchDetailDTO:
     created_at: datetime
     operating_hours: list[OperatingHoursEntryDTO]
     gstin: str | None = None
+    invoice_prefix: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

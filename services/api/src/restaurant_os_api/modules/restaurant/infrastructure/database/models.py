@@ -87,6 +87,24 @@ class BranchModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, 
             "gstin IS NULL OR gstin ~ '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$'",
             name="gstin_is_valid",
         ),
+        CheckConstraint(
+            "invoice_prefix IS NULL OR invoice_prefix ~ '^[A-Z0-9]{2,10}$'",
+            name="invoice_prefix_is_valid",
+        ),
+        # An invoice number series belongs to a GST registration, not a
+        # tenant -- two branches sharing one gstin must not share a
+        # prefix, but two branches with different (or no) gstins may.
+        # Postgres treats every NULL as distinct in a unique index, and
+        # the WHERE clause excludes gstin-less rows from it entirely,
+        # so this only ever constrains branches that share a real
+        # registration.
+        Index(
+            "uq_branches_gstin_invoice_prefix",
+            "gstin",
+            "invoice_prefix",
+            unique=True,
+            postgresql_where="gstin IS NOT NULL",
+        ),
     )
 
     restaurant_id: Mapped[str] = mapped_column(
@@ -106,6 +124,7 @@ class BranchModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, 
     # Per legal-entity-per-state GST registration -- see Branch's own
     # docstring for why this lives here, not on Restaurant/Tenant.
     gstin: Mapped[str | None] = mapped_column(Text, nullable=True)
+    invoice_prefix: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class OperatingHoursModel(

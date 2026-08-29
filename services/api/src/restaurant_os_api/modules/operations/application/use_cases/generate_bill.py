@@ -16,6 +16,19 @@ built by this use case -- a Tab can aggregate several Orders, and
 computing one combined tax/adjustment basis across all of them is real,
 separate scope. Disclosed, not silently half-supported: this step's
 ``GenerateBillUseCase`` only ever creates order-scoped bills.
+
+Invoice numbering: only allocated when the branch has a ``gstin`` on
+file -- an invoice number implies a real GST registration, and
+fabricating one for a branch that isn't (yet, or ever) registered
+would misrepresent a registration that doesn't exist. When it applies,
+the number is ``"{branch.invoice_prefix}/{financial_year}/{seq:06d}"``,
+where ``financial_year`` is computed in IST (not UTC -- see
+``platform.financial_year``) and ``seq`` comes from
+``InvoiceNumberCounterRepository.allocate_next()``, a single atomic DB
+statement in the *same transaction* as this Bill's own insert -- if
+anything in this use case fails after the counter increments, the
+whole transaction (counter included) rolls back together, so a failed
+attempt never burns a number or leaves a gap in the series.
 """
 
 from __future__ import annotations
@@ -39,6 +52,7 @@ from restaurant_os_api.modules.operations.domain.exceptions import (
 )
 from restaurant_os_api.modules.operations.domain.ports import (
     BillRepository,
+    InvoiceNumberCounterRepository,
     OrderRepository,
     TaxRepository,
 )
@@ -47,6 +61,7 @@ from restaurant_os_api.modules.restaurant.application.branch_authorization impor
 )
 from restaurant_os_api.modules.restaurant.domain.ports import BranchRepository
 from restaurant_os_api.platform.database import UnitOfWork
+from restaurant_os_api.platform.financial_year import indian_financial_year
 from restaurant_os_api.platform.tenancy import TenantContext
 
 PERMISSION_CODE = "billing.manage"
@@ -61,6 +76,9 @@ class GenerateBillUseCase:
         bill_repository_factory: Callable[[AsyncSession], BillRepository],
         tax_repository_factory: Callable[[AsyncSession], TaxRepository],
         branch_repository_factory: Callable[[AsyncSession], BranchRepository],
+        invoice_number_counter_repository_factory: Callable[
+            [AsyncSession], InvoiceNumberCounterRepository
+        ],
         resolve_user_permissions: ResolveUserPermissionsUseCase,
     ) -> None:
         self._session_factory = session_factory
@@ -68,6 +86,7 @@ class GenerateBillUseCase:
         self._bill_repository_factory = bill_repository_factory
         self._tax_repository_factory = tax_repository_factory
         self._branch_repository_factory = branch_repository_factory
+        self._invoice_number_counter_repository_factory = invoice_number_counter_repository_factory
         self._resolve_user_permissions = resolve_user_permissions
 
     async def execute(
@@ -79,13 +98,14 @@ class GenerateBillUseCase:
             bill_repo = self._bill_repository_factory(uow.session)
             tax_repo = self._tax_repository_factory(uow.session)
             branch_repo = self._branch_repository_factory(uow.session)
+            invoice_counter_repo = self._invoice_number_counter_repository_factory(uow.session)
 
             order = await order_repo.get_by_id(tenant_id, request.order_id)
             if order is None:
                 raise OrderNotFoundError(request.order_id)
 
             resolved_permissions = await self._resolve_user_permissions.execute(tenant_id, user_id)
-            await resolve_and_authorize_branch(
+            branch = await resolve_and_authorize_branch(
                 branch_repository=branch_repo,
                 tenant_id=tenant_id,
                 branch_id=order.branch_id,
@@ -119,6 +139,12 @@ class GenerateBillUseCase:
             order.mark_billed()
             order = await order_repo.update(order)
 
+            invoice_number = None
+            if branch.gstin is not None:
+                financial_year = indian_financial_year(now)
+                seq = await invoice_counter_repo.allocate_next(tenant_id, branch.id, financial_year)
+                invoice_number = f"{branch.invoice_prefix}/{financial_year}/{seq:06d}"
+
             bill = await bill_repo.create(
                 Bill(
                     id=generate_ulid(),
@@ -127,6 +153,7 @@ class GenerateBillUseCase:
                     status=BillStatus.OPEN,
                     created_at=now,
                     order_id=order.id,
+                    invoice_number=invoice_number,
                 )
             )
 

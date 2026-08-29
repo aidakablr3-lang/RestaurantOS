@@ -17,11 +17,18 @@ untouched. A request that includes one either updates the existing
 new one and links it (if the branch had none yet) -- never
 implicitly clears an address by omission.
 
-``gstin`` follows the same omission-preserves convention: a request
-that omits it (or sends ``null``) leaves whatever is already stored
-untouched. Like address, there is no way to explicitly clear an
-already-set ``gstin`` through this endpoint today -- an existing
-limitation this mirrors, not a new one.
+``gstin`` and ``invoice_prefix`` both follow the same
+omission-preserves convention: a request that omits either (or sends
+``null``) leaves whatever is already stored untouched. Like address,
+there is no way to explicitly clear an already-set value through this
+endpoint today -- an existing limitation this mirrors, not a new one.
+
+Whenever either changes, this re-checks the partial ``UNIQUE (gstin,
+invoice_prefix) WHERE gstin IS NOT NULL`` constraint against the
+branch's *effective* post-update values, not just the one field that
+changed -- setting a new gstin can collide with an already-set prefix
+just as easily as setting a new prefix can collide with an
+already-set gstin.
 """
 
 from __future__ import annotations
@@ -41,6 +48,7 @@ from restaurant_os_api.modules.restaurant.domain.events import BranchUpdated
 from restaurant_os_api.modules.restaurant.domain.exceptions import (
     BranchNameConflictError,
     BranchNotFoundError,
+    InvoicePrefixConflictError,
 )
 from restaurant_os_api.modules.restaurant.domain.ports import AddressRepository, BranchRepository
 from restaurant_os_api.platform.database import UnitOfWork
@@ -83,12 +91,24 @@ class UpdateBranchUseCase:
 
             # Same omission-preserves convention as address just below:
             # a PATCH that only sends name must not silently wipe a
-            # previously-set gstin. Like address, there is currently no
-            # way to explicitly clear an already-set gstin through this
-            # endpoint -- an existing limitation this mirrors, not a
-            # new one.
+            # previously-set gstin/invoice_prefix. Like address, there
+            # is currently no way to explicitly clear either through
+            # this endpoint -- an existing limitation this mirrors, not
+            # a new one.
+            gstin_or_prefix_changed = (
+                request.gstin is not None or request.invoice_prefix is not None
+            )
             if request.gstin is not None:
                 branch.gstin = request.gstin
+            if request.invoice_prefix is not None:
+                branch.invoice_prefix = request.invoice_prefix
+
+            if gstin_or_prefix_changed and branch.gstin is not None and branch.invoice_prefix is not None:
+                conflict = await branch_repo.get_by_gstin_and_invoice_prefix(
+                    tenant_id, branch.gstin, branch.invoice_prefix, exclude_branch_id=branch.id
+                )
+                if conflict is not None:
+                    raise InvoicePrefixConflictError(branch.gstin, branch.invoice_prefix)
 
             address: Address | None = None
             if request.address is not None:

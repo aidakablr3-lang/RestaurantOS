@@ -91,6 +91,27 @@ class BranchNameConflictError(RestaurantDomainError):
         self.name = name
 
 
+class InvoicePrefixConflictError(RestaurantDomainError):
+    """Mirrors the DB's own partial ``UNIQUE (gstin, invoice_prefix)
+    WHERE gstin IS NOT NULL`` constraint (migration 0019) -- an
+    invoice number series belongs to a GST registration, so this is
+    scoped to gstin, not tenant: two branches sharing one GSTIN must
+    not share a prefix, but two branches with different (or no)
+    GSTINs may. Checked proactively, same "clean error before
+    Postgres, constraint is the real guarantee under a race" shape as
+    ``BranchNameConflictError``."""
+
+    error_code = "INVOICE_PREFIX_CONFLICT"
+
+    def __init__(self, gstin: str, invoice_prefix: str) -> None:
+        super().__init__(
+            f"Invoice prefix '{invoice_prefix}' is already used by another branch "
+            f"registered under GSTIN '{gstin}'."
+        )
+        self.gstin = gstin
+        self.invoice_prefix = invoice_prefix
+
+
 class OperatingHoursConflictError(RestaurantDomainError):
     """A submitted weekly schedule contradicts itself for one
     ``day_of_week`` -- either an explicit ``is_closed`` row mixed with

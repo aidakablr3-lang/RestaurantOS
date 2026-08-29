@@ -14,6 +14,9 @@ from restaurant_os_api.modules.operations.domain.ports.inventory_category_reposi
 from restaurant_os_api.modules.operations.domain.ports.inventory_item_repository import (
     InventoryItemRepository,
 )
+from restaurant_os_api.modules.operations.domain.ports.invoice_number_counter_repository import (
+    InvoiceNumberCounterRepository,
+)
 from restaurant_os_api.modules.operations.domain.ports.kitchen_ticket_repository import (
     KitchenTicketRepository,
 )
@@ -42,6 +45,7 @@ __all__ = [
     "GoodsReceiptRepository",
     "InventoryCategoryRepository",
     "InventoryItemRepository",
+    "InvoiceNumberCounterRepository",
     "KitchenTicketRepository",
     "LedgerRepository",
     "OrderRepository",

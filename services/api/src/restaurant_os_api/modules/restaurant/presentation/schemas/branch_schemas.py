@@ -32,6 +32,15 @@ def _validate_gstin(value: str | None) -> str | None:
     return value
 
 
+_INVOICE_PREFIX_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
+
+
+def _validate_invoice_prefix(value: str | None) -> str | None:
+    if value is not None and not _INVOICE_PREFIX_PATTERN.match(value):
+        raise ValueError("Invoice prefix must be 2-10 uppercase letters/digits.")
+    return value
+
+
 class AddressRequestSchema(CamelModel):
     # No length/format constraints beyond the DB's own ("Constraints:
     # None beyond types", Architecture SS3.1) -- postal/country code
@@ -46,16 +55,20 @@ class CreateBranchRequestSchema(CamelModel):
     name: str = Field(..., min_length=1, max_length=255)
     address: AddressRequestSchema | None = None
     gstin: str | None = None
+    invoice_prefix: str | None = None
 
     _validate_gstin = field_validator("gstin")(_validate_gstin)
+    _validate_invoice_prefix = field_validator("invoice_prefix")(_validate_invoice_prefix)
 
 
 class UpdateBranchRequestSchema(CamelModel):
     name: str = Field(..., min_length=1, max_length=255)
     address: AddressRequestSchema | None = None
     gstin: str | None = None
+    invoice_prefix: str | None = None
 
     _validate_gstin = field_validator("gstin")(_validate_gstin)
+    _validate_invoice_prefix = field_validator("invoice_prefix")(_validate_invoice_prefix)
 
 
 class AddressResponseSchema(CamelModel):
@@ -75,6 +88,7 @@ class BranchResponseSchema(CamelModel):
     address: AddressResponseSchema | None
     created_at: datetime
     gstin: str | None = None
+    invoice_prefix: str | None = None
 
 
 class BranchDetailResponseSchema(CamelModel):
@@ -92,3 +106,4 @@ class BranchDetailResponseSchema(CamelModel):
     created_at: datetime
     operating_hours: list[OperatingHoursEntryResponseSchema]
     gstin: str | None = None
+    invoice_prefix: str | None = None

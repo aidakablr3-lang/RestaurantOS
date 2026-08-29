@@ -19,6 +19,18 @@ class BranchRepository(Protocol):
         ``RoleRepository.get_by_name``)."""
         ...
 
+    async def get_by_gstin_and_invoice_prefix(
+        self, tenant_id: str, gstin: str, invoice_prefix: str, *, exclude_branch_id: str | None = None
+    ) -> Branch | None:
+        """Application-layer mirror of the partial ``UNIQUE (gstin,
+        invoice_prefix) WHERE gstin IS NOT NULL`` constraint (migration
+        0019) -- checked proactively before create/update, the
+        constraint remains the actual guarantee under a race.
+        ``exclude_branch_id`` lets an update check "does any *other*
+        branch already use this pair" without tripping over its own
+        unchanged row."""
+        ...
+
     async def create(self, branch: Branch) -> Branch: ...
 
     async def update(self, branch: Branch) -> Branch: ...

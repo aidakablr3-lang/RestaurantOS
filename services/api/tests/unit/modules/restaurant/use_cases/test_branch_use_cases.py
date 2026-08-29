@@ -37,6 +37,7 @@ from restaurant_os_api.modules.restaurant.domain.exceptions import (
     BranchNameConflictError,
     BranchNotFoundError,
     InvalidBranchStatusTransitionError,
+    InvoicePrefixConflictError,
     RestaurantNotFoundError,
 )
 from tests.unit.modules.restaurant.fakes import (
@@ -151,6 +152,113 @@ class TestCreateBranchUseCase:
         )
 
         assert result.gstin == "29ABCDE1234F1Z5"
+
+    async def test_auto_generates_an_invoice_prefix_from_the_name_when_omitted(self) -> None:
+        restaurant_repo = InMemoryRestaurantRepository({RESTAURANT_ID: _restaurant()})
+        use_case = CreateBranchUseCase(
+            session_factory=_session_factory(),
+            restaurant_repository_factory=lambda _s: restaurant_repo,
+            branch_repository_factory=lambda _s: InMemoryBranchRepository(),
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            CreateBranchRequestDTO(restaurant_id=RESTAURANT_ID, name="Downtown"),
+        )
+
+        assert result.invoice_prefix == "DOWN"
+
+    async def test_creating_with_an_explicit_invoice_prefix_persists_it(self) -> None:
+        restaurant_repo = InMemoryRestaurantRepository({RESTAURANT_ID: _restaurant()})
+        use_case = CreateBranchUseCase(
+            session_factory=_session_factory(),
+            restaurant_repository_factory=lambda _s: restaurant_repo,
+            branch_repository_factory=lambda _s: InMemoryBranchRepository(),
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            CreateBranchRequestDTO(
+                restaurant_id=RESTAURANT_ID, name="Downtown", invoice_prefix="DTN"
+            ),
+        )
+
+        assert result.invoice_prefix == "DTN"
+
+    async def test_sharing_a_gstin_and_invoice_prefix_with_a_sibling_branch_is_rejected(
+        self,
+    ) -> None:
+        restaurant_repo = InMemoryRestaurantRepository({RESTAURANT_ID: _restaurant()})
+        branch_repo = InMemoryBranchRepository(
+            {BRANCH_ID: _branch(gstin="29ABCDE1234F1Z5", invoice_prefix="DTN")}
+        )
+        use_case = CreateBranchUseCase(
+            session_factory=_session_factory(),
+            restaurant_repository_factory=lambda _s: restaurant_repo,
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        with pytest.raises(InvoicePrefixConflictError):
+            await use_case.execute(
+                TENANT_ID,
+                CreateBranchRequestDTO(
+                    restaurant_id=RESTAURANT_ID,
+                    name="Uptown",
+                    gstin="29ABCDE1234F1Z5",
+                    invoice_prefix="DTN",
+                ),
+            )
+
+    async def test_sharing_a_prefix_across_different_gstins_is_allowed(self) -> None:
+        restaurant_repo = InMemoryRestaurantRepository({RESTAURANT_ID: _restaurant()})
+        branch_repo = InMemoryBranchRepository(
+            {BRANCH_ID: _branch(gstin="29ABCDE1234F1Z5", invoice_prefix="DTN")}
+        )
+        use_case = CreateBranchUseCase(
+            session_factory=_session_factory(),
+            restaurant_repository_factory=lambda _s: restaurant_repo,
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            CreateBranchRequestDTO(
+                restaurant_id=RESTAURANT_ID,
+                name="Uptown",
+                gstin="27PQRSX5678K1Z3",
+                invoice_prefix="DTN",
+            ),
+        )
+
+        assert result.invoice_prefix == "DTN"
+
+    async def test_sharing_a_prefix_with_no_gstin_on_either_side_is_allowed(self) -> None:
+        restaurant_repo = InMemoryRestaurantRepository({RESTAURANT_ID: _restaurant()})
+        branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch(invoice_prefix="DTN")})
+        use_case = CreateBranchUseCase(
+            session_factory=_session_factory(),
+            restaurant_repository_factory=lambda _s: restaurant_repo,
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            CreateBranchRequestDTO(
+                restaurant_id=RESTAURANT_ID, name="Uptown", invoice_prefix="DTN"
+            ),
+        )
+
+        assert result.invoice_prefix == "DTN"
 
     async def test_raises_not_found_for_an_unknown_restaurant(self) -> None:
         use_case = CreateBranchUseCase(
@@ -426,6 +534,73 @@ class TestUpdateBranchUseCase:
         )
 
         assert result.gstin == "29ABCDE1234F1Z5"
+
+    async def test_omitting_invoice_prefix_leaves_an_existing_one_untouched(self) -> None:
+        branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch(invoice_prefix="DTN")})
+        use_case = UpdateBranchUseCase(
+            session_factory=_session_factory(),
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID, UpdateBranchRequestDTO(branch_id=BRANCH_ID, name="New Name Only")
+        )
+
+        assert result.invoice_prefix == "DTN"
+
+    async def test_setting_a_gstin_that_conflicts_with_a_sibling_branchs_prefix_is_rejected(
+        self,
+    ) -> None:
+        other_branch_id = "01ARZ3NDEKTSV4RRFFQ6BRNCH2"
+        branch_repo = InMemoryBranchRepository(
+            {
+                BRANCH_ID: _branch(invoice_prefix="DTN"),
+                other_branch_id: _branch(
+                    id=other_branch_id, gstin="29ABCDE1234F1Z5", invoice_prefix="DTN"
+                ),
+            }
+        )
+        use_case = UpdateBranchUseCase(
+            session_factory=_session_factory(),
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        with pytest.raises(InvoicePrefixConflictError):
+            await use_case.execute(
+                TENANT_ID,
+                UpdateBranchRequestDTO(
+                    branch_id=BRANCH_ID, name="Downtown", gstin="29ABCDE1234F1Z5"
+                ),
+            )
+
+    async def test_changing_the_prefix_alone_is_checked_against_the_branchs_existing_gstin(
+        self,
+    ) -> None:
+        other_branch_id = "01ARZ3NDEKTSV4RRFFQ6BRNCH2"
+        branch_repo = InMemoryBranchRepository(
+            {
+                BRANCH_ID: _branch(gstin="29ABCDE1234F1Z5", invoice_prefix="DTN"),
+                other_branch_id: _branch(
+                    id=other_branch_id, gstin="29ABCDE1234F1Z5", invoice_prefix="UPT"
+                ),
+            }
+        )
+        use_case = UpdateBranchUseCase(
+            session_factory=_session_factory(),
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        with pytest.raises(InvoicePrefixConflictError):
+            await use_case.execute(
+                TENANT_ID,
+                UpdateBranchRequestDTO(branch_id=BRANCH_ID, name="Downtown", invoice_prefix="UPT"),
+            )
 
     async def test_raises_not_found_for_an_unknown_id(self) -> None:
         use_case = UpdateBranchUseCase(

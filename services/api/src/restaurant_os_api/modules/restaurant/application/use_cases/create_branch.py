@@ -34,10 +34,14 @@ from restaurant_os_api.modules.restaurant.application.dto import BranchDTO, Crea
 from restaurant_os_api.modules.restaurant.application.use_cases._branch_mapper import (
     branch_to_dto,
 )
+from restaurant_os_api.modules.restaurant.application.use_cases._invoice_prefix import (
+    default_invoice_prefix,
+)
 from restaurant_os_api.modules.restaurant.domain.entities import Address, Branch, BranchStatus
 from restaurant_os_api.modules.restaurant.domain.events import BranchCreated
 from restaurant_os_api.modules.restaurant.domain.exceptions import (
     BranchNameConflictError,
+    InvoicePrefixConflictError,
     RestaurantNotFoundError,
 )
 from restaurant_os_api.modules.restaurant.domain.ports import (
@@ -100,8 +104,19 @@ class CreateBranchUseCase:
                 )
                 address_id = address.id
 
+            branch_id = generate_ulid()
+            invoice_prefix = request.invoice_prefix or default_invoice_prefix(
+                request.name, branch_id
+            )
+            if request.gstin is not None:
+                conflict = await branch_repo.get_by_gstin_and_invoice_prefix(
+                    tenant_id, request.gstin, invoice_prefix
+                )
+                if conflict is not None:
+                    raise InvoicePrefixConflictError(request.gstin, invoice_prefix)
+
             branch = Branch(
-                id=generate_ulid(),
+                id=branch_id,
                 tenant_id=tenant_id,
                 restaurant_id=request.restaurant_id,
                 name=request.name,
@@ -109,6 +124,7 @@ class CreateBranchUseCase:
                 created_at=now,
                 address_id=address_id,
                 gstin=request.gstin,
+                invoice_prefix=invoice_prefix,
             )
             branch.activate()
             branch = await branch_repo.create(branch)

@@ -31,4 +31,5 @@ def branch_to_dto(branch: Branch, address: Address | None) -> BranchDTO:
         address=address_to_dto(address) if address is not None else None,
         created_at=branch.created_at,
         gstin=branch.gstin,
+        invoice_prefix=branch.invoice_prefix,
     )

@@ -63,3 +63,4 @@ class BillDTO:
     amount_paid: Decimal
     tax_lines: list[OrderTaxLineDTO]
     adjustments: list[BillAdjustmentDTO]
+    invoice_number: str | None = None

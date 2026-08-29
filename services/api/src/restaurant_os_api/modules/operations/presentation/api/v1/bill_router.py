@@ -62,6 +62,7 @@ def _bill_to_schema(dto: BillDTO) -> BillResponseSchema:
         adjustments_total=dto.adjustments_total,
         amount_due=dto.amount_due,
         amount_paid=dto.amount_paid,
+        invoice_number=dto.invoice_number,
         tax_lines=[
             OrderTaxLineResponseSchema(
                 id=t.id,

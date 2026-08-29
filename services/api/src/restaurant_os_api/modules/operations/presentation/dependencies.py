@@ -92,6 +92,7 @@ from restaurant_os_api.modules.operations.infrastructure.database.repositories i
     SQLAlchemyGoodsReceiptRepository,
     SQLAlchemyInventoryCategoryRepository,
     SQLAlchemyInventoryItemRepository,
+    SQLAlchemyInvoiceNumberCounterRepository,
     SQLAlchemyKitchenTicketRepository,
     SQLAlchemyLedgerRepository,
     SQLAlchemyOrderRepository,
@@ -603,6 +604,7 @@ def get_generate_bill_use_case(
         bill_repository_factory=SQLAlchemyBillRepository,
         tax_repository_factory=SQLAlchemyTaxRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
+        invoice_number_counter_repository_factory=SQLAlchemyInvoiceNumberCounterRepository,
         resolve_user_permissions=resolve_user_permissions,
     )
 

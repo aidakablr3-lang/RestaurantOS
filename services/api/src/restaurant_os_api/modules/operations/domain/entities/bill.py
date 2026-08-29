@@ -36,6 +36,15 @@ class Bill:
     created_at: datetime
     order_id: str | None = None
     tab_id: str | None = None
+    # A GST-compliant, financial-year-scoped sequential number
+    # ("{branch.invoice_prefix}/{FY}/{seq}"), allocated once at bill
+    # generation and frozen here forever after -- never recomputed
+    # live from the branch's current invoice_prefix. NULL when the
+    # branch had no gstin on file at generation time: an invoice
+    # number implies a real GST registration, and fabricating one for
+    # a branch that isn't (yet, or ever) registered would misrepresent
+    # a registration that doesn't exist. See GenerateBillUseCase.
+    invoice_number: str | None = None
 
     def apply_payment_status(self, *, fully_paid: bool) -> None:
         if self.status == BillStatus.CLOSED:

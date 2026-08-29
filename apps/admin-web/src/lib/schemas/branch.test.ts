@@ -42,6 +42,31 @@ describe("branchSchema", () => {
     const result = branchSchema.safeParse({ name: "Downtown", gstin: "29abcde1234f1z5" })
     expect(result.success).toBe(false)
   })
+
+  it("accepts a branch with no invoicePrefix", () => {
+    const result = branchSchema.safeParse({ name: "Downtown" })
+    expect(result.success).toBe(true)
+  })
+
+  it("accepts a valid invoicePrefix", () => {
+    const result = branchSchema.safeParse({ name: "Downtown", invoicePrefix: "DTN" })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects an invoicePrefix that's one character short", () => {
+    const result = branchSchema.safeParse({ name: "Downtown", invoicePrefix: "D" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects an invoicePrefix longer than 10 characters", () => {
+    const result = branchSchema.safeParse({ name: "Downtown", invoicePrefix: "ABCDEFGHIJK" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects a lowercase invoicePrefix", () => {
+    const result = branchSchema.safeParse({ name: "Downtown", invoicePrefix: "dtn" })
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("dayLabel", () => {

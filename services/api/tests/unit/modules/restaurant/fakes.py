@@ -160,6 +160,24 @@ class InMemoryBranchRepository:
             b for b in self._branches.values() if b.tenant_id == tenant_id and b.id in branch_ids
         ]
 
+    async def get_by_gstin_and_invoice_prefix(
+        self,
+        tenant_id: str,
+        gstin: str,
+        invoice_prefix: str,
+        *,
+        exclude_branch_id: str | None = None,
+    ) -> Branch | None:
+        for branch in self._branches.values():
+            if (
+                branch.tenant_id == tenant_id
+                and branch.gstin == gstin
+                and branch.invoice_prefix == invoice_prefix
+                and branch.id != exclude_branch_id
+            ):
+                return branch
+        return None
+
 
 class InMemoryOperatingHoursRepository:
     def __init__(self, rows: dict[str, list[OperatingHours]] | None = None) -> None:

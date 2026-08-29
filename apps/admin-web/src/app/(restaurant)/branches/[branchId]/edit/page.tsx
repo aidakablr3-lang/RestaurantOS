@@ -39,7 +39,15 @@ export default function EditBranchPage() {
 
   const form = useForm<BranchFormValues>({
     resolver: zodResolver(branchSchema),
-    defaultValues: { name: "", line1: "", city: "", countryCode: "", postalCode: "", gstin: "" },
+    defaultValues: {
+      name: "",
+      line1: "",
+      city: "",
+      countryCode: "",
+      postalCode: "",
+      gstin: "",
+      invoicePrefix: "",
+    },
   })
 
   React.useEffect(() => {
@@ -51,6 +59,7 @@ export default function EditBranchPage() {
         countryCode: branch.address?.countryCode ?? "",
         postalCode: branch.address?.postalCode ?? "",
         gstin: branch.gstin ?? "",
+        invoicePrefix: branch.invoicePrefix ?? "",
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,6 +79,7 @@ export default function EditBranchPage() {
             }
           : null,
         gstin: values.gstin || null,
+        invoicePrefix: values.invoicePrefix || null,
       })
       toast.success("Branch updated.")
       router.push(`/branches/${branchId}`)
@@ -218,6 +228,24 @@ export default function EditBranchPage() {
                       <Input
                         placeholder="29ABCDE1234F1Z5"
                         maxLength={15}
+                        {...field}
+                        onChange={(event) => field.onChange(event.target.value.toUpperCase())}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="invoicePrefix"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Invoice prefix</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Auto-generated from the branch name if left blank"
+                        maxLength={10}
                         {...field}
                         onChange={(event) => field.onChange(event.target.value.toUpperCase())}
                       />

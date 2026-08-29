@@ -260,6 +260,16 @@ class BillModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, BranchScopedMixin,
             "(order_id IS NOT NULL AND tab_id IS NULL) OR (order_id IS NULL AND tab_id IS NOT NULL)",
             name="order_xor_tab",
         ),
+        # NULL when the branch had no gstin on file at generation time
+        # (see GenerateBillUseCase) -- excluded from the index the same
+        # way, so un-numbered bills never collide with each other.
+        Index(
+            "uq_bills_tenant_id_invoice_number",
+            "tenant_id",
+            "invoice_number",
+            unique=True,
+            postgresql_where="invoice_number IS NOT NULL",
+        ),
     )
 
     order_id: Mapped[str | None] = mapped_column(
@@ -269,6 +279,7 @@ class BillModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, BranchScopedMixin,
         Text, ForeignKey("tabs.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="open")
+    invoice_number: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class BillAdjustmentModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin):
@@ -321,6 +332,36 @@ class OrderTaxLineModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin):
     tax_rate_snapshot: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
     tax_amount: Mapped[Decimal] = mapped_column(Numeric(19, 4), nullable=False)
     created_at: Mapped[datetime] = _created_at_column()
+
+
+class InvoiceNumberCounterModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin):
+    """One row per (tenant, branch, financial_year) -- ``seq`` is
+    incremented via a single atomic ``INSERT ... ON CONFLICT ... DO
+    UPDATE ... RETURNING`` (see ``SQLAlchemyInvoiceNumberCounterRepository``),
+    the same ``pg_insert(...).on_conflict_do_update(...)`` construct
+    ``QRResolutionRateLimiter`` already uses for a per-key counter --
+    the DB row lock, not application logic, is what makes two
+    concurrent bill generations for the same branch/year get distinct
+    numbers."""
+
+    __tablename__ = "invoice_number_counters"
+    __table_args__ = (
+        ulid_check_constraint("id"),
+        CheckConstraint("seq > 0", name="seq_is_positive"),
+        Index(
+            "uq_invoice_number_counters_tenant_branch_fy",
+            "tenant_id",
+            "branch_id",
+            "financial_year",
+            unique=True,
+        ),
+    )
+
+    branch_id: Mapped[str] = mapped_column(
+        Text, ForeignKey("branches.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    financial_year: Mapped[str] = mapped_column(Text, nullable=False)
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 # --- Payments ------------------------------------------------------------

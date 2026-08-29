@@ -47,6 +47,7 @@ from tests.unit.modules.operations.fakes import (
     FakeResolveUserPermissionsUseCase,
     InMemoryBillRepository,
     InMemoryDiscountRepository,
+    InMemoryInvoiceNumberCounterRepository,
     InMemoryOrderRepository,
     InMemoryPaymentRepository,
     InMemoryTaxRepository,
@@ -224,7 +225,7 @@ class TestListTaxesUseCase:
 
 class TestGenerateBillUseCase:
     def _use_case(
-        self, order_repo, bill_repo, tax_repo, branch_repo, resolved
+        self, order_repo, bill_repo, tax_repo, branch_repo, resolved, invoice_counter_repo=None
     ) -> GenerateBillUseCase:
         return GenerateBillUseCase(
             session_factory=_session_factory(),
@@ -232,6 +233,9 @@ class TestGenerateBillUseCase:
             bill_repository_factory=lambda _s: bill_repo,
             tax_repository_factory=lambda _s: tax_repo,
             branch_repository_factory=lambda _s: branch_repo,
+            invoice_number_counter_repository_factory=lambda _s: (
+                invoice_counter_repo or InMemoryInvoiceNumberCounterRepository()
+            ),
             resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved),
         )
 
@@ -255,6 +259,72 @@ class TestGenerateBillUseCase:
         updated_order = await order_repo.get_by_id(TENANT_ID, ORDER_ID)
         assert updated_order is not None
         assert updated_order.status == OrderStatus.BILLED
+
+    async def test_allocates_no_invoice_number_when_the_branch_has_no_gstin(self) -> None:
+        order_repo = InMemoryOrderRepository({ORDER_ID: _order()})
+        use_case = self._use_case(
+            order_repo,
+            InMemoryBillRepository(),
+            InMemoryTaxRepository({TAX_ID: _tax()}),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),  # no gstin
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID, "user-1", GenerateBillRequestDTO(order_id=ORDER_ID)
+        )
+
+        assert result.invoice_number is None
+
+    async def test_allocates_a_formatted_invoice_number_when_the_branch_has_a_gstin(self) -> None:
+        order_repo = InMemoryOrderRepository({ORDER_ID: _order()})
+        use_case = self._use_case(
+            order_repo,
+            InMemoryBillRepository(),
+            InMemoryTaxRepository({TAX_ID: _tax()}),
+            InMemoryBranchRepository(
+                {BRANCH_ID: _branch(gstin="29ABCDE1234F1Z5", invoice_prefix="DNT")}
+            ),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID, "user-1", GenerateBillRequestDTO(order_id=ORDER_ID)
+        )
+
+        assert result.invoice_number is not None
+        assert result.invoice_number.startswith("DNT/")
+        assert result.invoice_number.endswith("/000001")
+
+    async def test_consecutive_bills_for_the_same_branch_get_consecutive_invoice_numbers(
+        self,
+    ) -> None:
+        order_a_id = "01ARZ3NDEKTSV4RRFFQ6ORDRAA"
+        order_b_id = "01ARZ3NDEKTSV4RRFFQ6ORDRBB"
+        order_repo = InMemoryOrderRepository(
+            {order_a_id: _order(id=order_a_id), order_b_id: _order(id=order_b_id)}
+        )
+        counter_repo = InMemoryInvoiceNumberCounterRepository()
+        use_case = self._use_case(
+            order_repo,
+            InMemoryBillRepository(),
+            InMemoryTaxRepository({TAX_ID: _tax()}),
+            InMemoryBranchRepository(
+                {BRANCH_ID: _branch(gstin="29ABCDE1234F1Z5", invoice_prefix="DNT")}
+            ),
+            ResolvedPermissions(tenant_wide=frozenset({"billing.manage"})),
+            counter_repo,
+        )
+
+        first = await use_case.execute(
+            TENANT_ID, "user-1", GenerateBillRequestDTO(order_id=order_a_id)
+        )
+        second = await use_case.execute(
+            TENANT_ID, "user-1", GenerateBillRequestDTO(order_id=order_b_id)
+        )
+
+        assert first.invoice_number is not None and first.invoice_number.endswith("/000001")
+        assert second.invoice_number is not None and second.invoice_number.endswith("/000002")
 
     async def test_applies_two_simultaneous_active_taxes_eg_cgst_and_sgst(self) -> None:
         # Indian GST-style setup: two active taxes at once (CGST + SGST,

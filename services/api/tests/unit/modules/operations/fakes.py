@@ -515,6 +515,24 @@ class InMemoryTaxRepository:
         return [t for t in self._taxes.values() if t.tenant_id == tenant_id and t.is_active]
 
 
+class InMemoryInvoiceNumberCounterRepository:
+    """Implements ``InvoiceNumberCounterRepository``. The real
+    implementation's atomic-under-concurrency guarantee comes from a
+    single Postgres statement (see
+    ``SQLAlchemyInvoiceNumberCounterRepository``) -- this fake only
+    needs to prove the sequential-per-key increment logic itself, not
+    reprove concurrency safety an in-memory dict can't meaningfully
+    test anyway."""
+
+    def __init__(self) -> None:
+        self._counters: dict[tuple[str, str, str], int] = {}
+
+    async def allocate_next(self, tenant_id: str, branch_id: str, financial_year: str) -> int:
+        key = (tenant_id, branch_id, financial_year)
+        self._counters[key] = self._counters.get(key, 0) + 1
+        return self._counters[key]
+
+
 class InMemoryInventoryCategoryRepository:
     def __init__(self, categories: dict[str, InventoryCategory] | None = None) -> None:
         self._categories = categories or {}
