@@ -20,7 +20,12 @@ class BranchRepository(Protocol):
         ...
 
     async def get_by_gstin_and_invoice_prefix(
-        self, tenant_id: str, gstin: str, invoice_prefix: str, *, exclude_branch_id: str | None = None
+        self,
+        tenant_id: str,
+        gstin: str,
+        invoice_prefix: str,
+        *,
+        exclude_branch_id: str | None = None,
     ) -> Branch | None:
         """Application-layer mirror of the partial ``UNIQUE (gstin,
         invoice_prefix) WHERE gstin IS NOT NULL`` constraint (migration

@@ -367,7 +367,12 @@ class SQLAlchemyBranchRepository:
         return _branch_from_model(model) if model is not None else None
 
     async def get_by_gstin_and_invoice_prefix(
-        self, tenant_id: str, gstin: str, invoice_prefix: str, *, exclude_branch_id: str | None = None
+        self,
+        tenant_id: str,
+        gstin: str,
+        invoice_prefix: str,
+        *,
+        exclude_branch_id: str | None = None,
     ) -> Branch | None:
         stmt = select(BranchModel).where(
             BranchModel.tenant_id == tenant_id,

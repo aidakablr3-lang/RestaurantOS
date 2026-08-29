@@ -103,7 +103,11 @@ class UpdateBranchUseCase:
             if request.invoice_prefix is not None:
                 branch.invoice_prefix = request.invoice_prefix
 
-            if gstin_or_prefix_changed and branch.gstin is not None and branch.invoice_prefix is not None:
+            if (
+                gstin_or_prefix_changed
+                and branch.gstin is not None
+                and branch.invoice_prefix is not None
+            ):
                 conflict = await branch_repo.get_by_gstin_and_invoice_prefix(
                     tenant_id, branch.gstin, branch.invoice_prefix, exclude_branch_id=branch.id
                 )

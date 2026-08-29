@@ -112,10 +112,16 @@ def upgrade() -> None:
         sa.Column("financial_year", sa.Text(), nullable=False),
         sa.Column("seq", sa.Integer(), nullable=False),
         sa.Column(
-            "created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.PrimaryKeyConstraint("id", name=conv("pk_invoice_number_counters")),
         sa.ForeignKeyConstraint(
@@ -166,7 +172,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP TRIGGER IF EXISTS trg_invoice_number_counters_set_updated_at ON invoice_number_counters")
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_invoice_number_counters_set_updated_at ON invoice_number_counters"
+    )
     op.drop_table("invoice_number_counters")
 
     op.drop_index("uq_bills_tenant_id_invoice_number", table_name="bills")
