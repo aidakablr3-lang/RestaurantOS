@@ -19,10 +19,12 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useBranch, useUpdateBranch } from "@/hooks/use-branches"
 import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { ApiError } from "@/lib/api-client"
+import { INDIAN_STATE_GST_CODES, stateNameForGstin } from "@/lib/indian-states"
 import { type BranchFormValues, branchSchema } from "@/lib/schemas/branch"
 
 export default function EditBranchPage() {
@@ -43,6 +45,7 @@ export default function EditBranchPage() {
       name: "",
       line1: "",
       city: "",
+      state: "",
       countryCode: "",
       postalCode: "",
       gstin: "",
@@ -56,6 +59,7 @@ export default function EditBranchPage() {
         name: branch.name,
         line1: branch.address?.line1 ?? "",
         city: branch.address?.city ?? "",
+        state: branch.address?.state ?? "",
         countryCode: branch.address?.countryCode ?? "",
         postalCode: branch.address?.postalCode ?? "",
         gstin: branch.gstin ?? "",
@@ -65,15 +69,24 @@ export default function EditBranchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branch])
 
+  const watchedState = form.watch("state")
+  const watchedGstin = form.watch("gstin")
+  const expectedStateForGstin = stateNameForGstin(watchedGstin)
+  const stateGstinMismatch = Boolean(
+    watchedState && expectedStateForGstin && watchedState !== expectedStateForGstin
+  )
+
   async function onSubmit(values: BranchFormValues) {
     try {
-      const hasAddress = values.line1 || values.city || values.countryCode || values.postalCode
+      const hasAddress =
+        values.line1 || values.city || values.state || values.countryCode || values.postalCode
       await updateBranch.mutateAsync({
         name: values.name,
         address: hasAddress
           ? {
               line1: values.line1 || null,
               city: values.city || null,
+              state: values.state || null,
               countryCode: values.countryCode || null,
               postalCode: values.postalCode || null,
             }
@@ -201,6 +214,42 @@ export default function EditBranchPage() {
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="state"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>State</FormLabel>
+                    <Select
+                      value={field.value || undefined}
+                      onValueChange={field.onChange}
+                      items={Object.fromEntries(
+                        Object.keys(INDIAN_STATE_GST_CODES).map((state) => [state, state])
+                      )}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a state" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.keys(INDIAN_STATE_GST_CODES).map((state) => (
+                          <SelectItem key={state} value={state}>
+                            {state}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {stateGstinMismatch ? (
+                      <p className="text-sm text-destructive">
+                        &quot;{watchedState}&quot; doesn&apos;t match GSTIN {watchedGstin}&apos;s
+                        state code ({watchedGstin?.slice(0, 2)} = {expectedStateForGstin}).
+                      </p>
+                    ) : null}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="countryCode"

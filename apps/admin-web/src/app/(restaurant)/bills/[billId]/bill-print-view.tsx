@@ -3,7 +3,19 @@
 /**
  * 80mm thermal-receipt print view for a bill. Rendered off-screen at
  * all times (`hidden print:block`) -- window.print() on the bill
- * detail page shows only this subtree, per globals.css's @page rule.
+ * detail page shows only this subtree, per globals.css's @page rule
+ * and its `.print-receipt` visibility isolation (which hides the rest
+ * of the admin shell -- sidebar, header, tenant id, dark-mode toggle,
+ * account avatar -- none of which has its own print:hidden class, so
+ * without that global rule every one of those prints too).
+ *
+ * Heading is conditional, not always "TAX INVOICE": that heading only
+ * belongs on a document that actually carries a compliant GST invoice
+ * number. A branch with no gstin on file gets a plain "RECEIPT"
+ * instead, matching this file's own established rule below (never
+ * claims a compliant invoice number exists when it doesn't) -- calling
+ * an uncompliant printout a "tax invoice" would be actively wrong, not
+ * just an omission.
  *
  * Composed entirely from existing endpoints (bill, order, branch,
  * restaurant, tables, taxes, payments) -- no dedicated backend
@@ -30,6 +42,10 @@ const TENDER_TYPE_LABEL: Record<string, string> = {
   cash: "Cash",
   card: "Card",
   wallet: "Wallet",
+}
+
+function money(value: number | string): string {
+  return `₹${Number(value).toFixed(2)}`
 }
 
 export function BillPrintView({ bill }: { bill: Bill }) {
@@ -62,16 +78,25 @@ export function BillPrintView({ bill }: { bill: Bill }) {
   const subtotal = Number(bill.subtotalAmount)
   const tax = Number(bill.taxAmount)
   const adjustments = Number(bill.adjustmentsTotal)
-  const total = (subtotal + tax + adjustments).toFixed(2)
+  const total = subtotal + tax + adjustments
 
   const addressLine = branch?.address
-    ? [branch.address.line1, branch.address.city, branch.address.postalCode]
+    ? [
+        branch.address.line1,
+        branch.address.city,
+        branch.address.state,
+        branch.address.postalCode,
+      ]
         .filter(Boolean)
         .join(", ")
     : null
 
   return (
-    <div className="hidden print:block w-[76mm] text-xs leading-snug">
+    <div className="print-receipt hidden print:block w-[72mm] text-xs leading-snug">
+      <p className="text-center text-sm font-bold">
+        {bill.invoiceNumber ? "TAX INVOICE" : "RECEIPT"}
+      </p>
+
       <div className="text-center">
         <p className="text-sm font-bold">{restaurant?.legalName ?? restaurant?.displayName}</p>
         {addressLine ? <p>{addressLine}</p> : null}
@@ -86,21 +111,29 @@ export function BillPrintView({ bill }: { bill: Bill }) {
 
       <div className="my-1 border-t border-dashed border-black" />
 
-      <table className="w-full">
+      <table className="w-full table-fixed border-collapse">
+        <colgroup>
+          <col className="w-[46%]" />
+          <col className="w-[12%]" />
+          <col className="w-[20%]" />
+          <col className="w-[22%]" />
+        </colgroup>
         <thead>
           <tr className="border-b border-dashed border-black text-left">
-            <th className="font-normal">Item</th>
-            <th className="w-6 text-right font-normal">Qty</th>
-            <th className="w-10 text-right font-normal">Rate</th>
-            <th className="w-12 text-right font-normal">Amount</th>
+            <th className="pr-1 font-normal">Item</th>
+            <th className="pr-1 text-right font-normal">Qty</th>
+            <th className="pr-1 text-right font-normal">Rate</th>
+            <th className="text-right font-normal">Amount</th>
           </tr>
         </thead>
         <tbody>
           {(order?.items ?? []).map((item) => (
             <tr key={item.id}>
-              <td>{menuItemNameById.get(item.menuItemId) ?? item.menuItemId}</td>
-              <td className="text-right">{item.quantity}</td>
-              <td className="text-right">{item.unitPriceAmount}</td>
+              <td className="pr-1 break-words">
+                {menuItemNameById.get(item.menuItemId) ?? item.menuItemId}
+              </td>
+              <td className="pr-1 text-right">{item.quantity}</td>
+              <td className="pr-1 text-right">{Number(item.unitPriceAmount).toFixed(2)}</td>
               <td className="text-right">
                 {(Number(item.unitPriceAmount) * item.quantity).toFixed(2)}
               </td>
@@ -113,7 +146,7 @@ export function BillPrintView({ bill }: { bill: Bill }) {
 
       <div className="flex justify-between">
         <span>Subtotal</span>
-        <span>{subtotal.toFixed(2)}</span>
+        <span>{money(subtotal)}</span>
       </div>
       {bill.taxLines.map((line) => (
         <div key={line.id} className="flex justify-between">
@@ -121,13 +154,13 @@ export function BillPrintView({ bill }: { bill: Bill }) {
             {taxNameById.get(line.taxId) ?? "Tax"} @{" "}
             {(Number(line.taxRateSnapshot) * 100).toFixed(2)}%
           </span>
-          <span>{line.taxAmount}</span>
+          <span>{money(line.taxAmount)}</span>
         </div>
       ))}
       <div className="my-1 border-t border-dashed border-black" />
       <div className="flex justify-between text-sm font-bold">
         <span>Total</span>
-        <span>{total}</span>
+        <span>{money(total)}</span>
       </div>
 
       <div className="my-1 border-t border-dashed border-black" />
@@ -137,7 +170,7 @@ export function BillPrintView({ bill }: { bill: Bill }) {
         {payments.length === 0
           ? "Pending"
           : payments
-              .map((p) => `${TENDER_TYPE_LABEL[p.tenderType] ?? p.tenderType} ${p.amount}`)
+              .map((p) => `${TENDER_TYPE_LABEL[p.tenderType] ?? p.tenderType} ${money(p.amount)}`)
               .join(", ")}
       </p>
     </div>

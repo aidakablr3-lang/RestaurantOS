@@ -70,6 +70,7 @@ class UpdateSupplierUseCase:
                     assert address is not None, "supplier.address_id references a live address row"
                     address.line1 = request.address.line1
                     address.city = request.address.city
+                    address.state = request.address.state
                     address.country_code = request.address.country_code
                     address.postal_code = request.address.postal_code
                     address = await address_repo.update(address)
@@ -81,6 +82,7 @@ class UpdateSupplierUseCase:
                             created_at=now,
                             line1=request.address.line1,
                             city=request.address.city,
+                            state=request.address.state,
                             country_code=request.address.country_code,
                             postal_code=request.address.postal_code,
                         )

@@ -16,6 +16,7 @@ from restaurant_os_api.core.response import CamelModel
 from restaurant_os_api.modules.restaurant.presentation.schemas.operating_hours_schemas import (
     OperatingHoursEntryResponseSchema,
 )
+from restaurant_os_api.platform.indian_states import INDIAN_STATE_GST_CODES
 
 # 2-digit state code + 10-char PAN (5 letters, 4 digits, 1 letter) +
 # 1 entity-count char + literal 'Z' + 1 checksum char = 15. Format only
@@ -41,14 +42,27 @@ def _validate_invoice_prefix(value: str | None) -> str | None:
     return value
 
 
+def _validate_state(value: str | None) -> str | None:
+    if value is not None and value not in INDIAN_STATE_GST_CODES:
+        raise ValueError(
+            "State must be a real Indian state or union territory name, e.g. 'Karnataka'."
+        )
+    return value
+
+
 class AddressRequestSchema(CamelModel):
     # No length/format constraints beyond the DB's own ("Constraints:
     # None beyond types", Architecture SS3.1) -- postal/country code
     # formats vary too widely internationally to invent a bound here.
+    # state is the one exception: membership against a real, fixed list
+    # (INDIAN_STATE_GST_CODES), same reasoning as gstin/invoice_prefix.
     line1: str | None = None
     city: str | None = None
+    state: str | None = None
     country_code: str | None = None
     postal_code: str | None = None
+
+    _validate_state = field_validator("state")(_validate_state)
 
 
 class CreateBranchRequestSchema(CamelModel):
@@ -75,6 +89,7 @@ class AddressResponseSchema(CamelModel):
     id: str
     line1: str | None
     city: str | None
+    state: str | None
     country_code: str | None
     postal_code: str | None
 

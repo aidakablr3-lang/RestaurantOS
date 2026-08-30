@@ -23,5 +23,6 @@ class Address:
     created_at: datetime
     line1: str | None = None
     city: str | None = None
+    state: str | None = None
     country_code: str | None = None
     postal_code: str | None = None

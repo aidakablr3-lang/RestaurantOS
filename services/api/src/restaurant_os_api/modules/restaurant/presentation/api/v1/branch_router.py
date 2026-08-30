@@ -81,6 +81,7 @@ def _address_request_to_dto(schema: AddressRequestSchema | None) -> AddressReque
     return AddressRequestDTO(
         line1=schema.line1,
         city=schema.city,
+        state=schema.state,
         country_code=schema.country_code,
         postal_code=schema.postal_code,
     )
@@ -100,6 +101,7 @@ def _branch_to_schema(dto: BranchDTO) -> BranchResponseSchema:
                 id=dto.address.id,
                 line1=dto.address.line1,
                 city=dto.address.city,
+                state=dto.address.state,
                 country_code=dto.address.country_code,
                 postal_code=dto.address.postal_code,
             )
@@ -136,6 +138,7 @@ def _branch_detail_to_schema(dto: BranchDetailDTO) -> BranchDetailResponseSchema
                 id=dto.address.id,
                 line1=dto.address.line1,
                 city=dto.address.city,
+                state=dto.address.state,
                 country_code=dto.address.country_code,
                 postal_code=dto.address.postal_code,
             )

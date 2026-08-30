@@ -74,6 +74,7 @@ def _address_from_model(model: AddressModel) -> Address:
         created_at=model.created_at,
         line1=model.line1,
         city=model.city,
+        state=model.state,
         country_code=model.country_code,
         postal_code=model.postal_code,
     )
@@ -317,6 +318,7 @@ class SQLAlchemyAddressRepository:
             tenant_id=address.tenant_id,
             line1=address.line1,
             city=address.city,
+            state=address.state,
             country_code=address.country_code,
             postal_code=address.postal_code,
         )
@@ -331,6 +333,7 @@ class SQLAlchemyAddressRepository:
             .values(
                 line1=address.line1,
                 city=address.city,
+                state=address.state,
                 country_code=address.country_code,
                 postal_code=address.postal_code,
             )

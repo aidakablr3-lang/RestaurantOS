@@ -15,6 +15,7 @@ export interface Address {
   id: string
   line1: string | null
   city: string | null
+  state: string | null
   countryCode: string | null
   postalCode: string | null
 }
@@ -22,6 +23,7 @@ export interface Address {
 export interface AddressInput {
   line1?: string | null
   city?: string | null
+  state?: string | null
   countryCode?: string | null
   postalCode?: string | null
 }

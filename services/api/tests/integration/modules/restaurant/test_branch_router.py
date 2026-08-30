@@ -301,6 +301,27 @@ class TestCreateBranch:
         )
         assert response.status_code == 422
 
+    def test_creating_with_a_valid_address_state_persists_it(
+        self, client: TestClient, owner: dict, restaurant_id: str
+    ) -> None:
+        response = client.post(
+            f"/api/v1/restaurants/{restaurant_id}/branches",
+            headers=_auth_headers(owner["token"]),
+            json=_create_body(address={"city": "Bengaluru", "state": "Karnataka"}),
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["data"]["address"]["state"] == "Karnataka"
+
+    def test_an_unrecognized_address_state_is_rejected(
+        self, client: TestClient, owner: dict, restaurant_id: str
+    ) -> None:
+        response = client.post(
+            f"/api/v1/restaurants/{restaurant_id}/branches",
+            headers=_auth_headers(owner["token"]),
+            json=_create_body(address={"city": "Bengaluru", "state": "Wakanda"}),
+        )
+        assert response.status_code == 422
+
     def test_creating_without_an_address_is_allowed(
         self, client: TestClient, owner: dict, restaurant_id: str
     ) -> None:

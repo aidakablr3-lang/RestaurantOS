@@ -134,6 +134,28 @@ class TestCreateBranchUseCase:
         assert result.address is not None
         assert result.address.line1 == "1 Main St"
 
+    async def test_creating_with_an_address_state_persists_it(self) -> None:
+        restaurant_repo = InMemoryRestaurantRepository({RESTAURANT_ID: _restaurant()})
+        use_case = CreateBranchUseCase(
+            session_factory=_session_factory(),
+            restaurant_repository_factory=lambda _s: restaurant_repo,
+            branch_repository_factory=lambda _s: InMemoryBranchRepository(),
+            address_repository_factory=lambda _s: InMemoryAddressRepository(),
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            CreateBranchRequestDTO(
+                restaurant_id=RESTAURANT_ID,
+                name="Downtown",
+                address=AddressRequestDTO(city="Bengaluru", state="Karnataka"),
+            ),
+        )
+
+        assert result.address is not None
+        assert result.address.state == "Karnataka"
+
     async def test_creating_with_a_gstin_persists_it(self) -> None:
         restaurant_repo = InMemoryRestaurantRepository({RESTAURANT_ID: _restaurant()})
         use_case = CreateBranchUseCase(
@@ -453,6 +475,34 @@ class TestUpdateBranchUseCase:
 
         assert result.address is not None
         assert result.address.line1 == "New Address"
+
+    async def test_updating_an_address_state_persists_it(self) -> None:
+        address = Address(
+            id="01ARZ3NDEKTSV4RRFFQ6ADDR01",
+            tenant_id=TENANT_ID,
+            created_at=datetime.now(UTC),
+            line1="1 Main St",
+        )
+        branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch(address_id=address.id)})
+        address_repo = InMemoryAddressRepository({address.id: address})
+        use_case = UpdateBranchUseCase(
+            session_factory=_session_factory(),
+            branch_repository_factory=lambda _s: branch_repo,
+            address_repository_factory=lambda _s: address_repo,
+            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            UpdateBranchRequestDTO(
+                branch_id=BRANCH_ID,
+                name="Downtown",
+                address=AddressRequestDTO(line1="1 Main St", state="Karnataka"),
+            ),
+        )
+
+        assert result.address is not None
+        assert result.address.state == "Karnataka"
 
     async def test_updating_an_existing_address_edits_it_in_place(self) -> None:
         address = Address(

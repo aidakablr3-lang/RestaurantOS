@@ -98,6 +98,7 @@ class CreateBranchUseCase:
                         created_at=now,
                         line1=request.address.line1,
                         city=request.address.city,
+                        state=request.address.state,
                         country_code=request.address.country_code,
                         postal_code=request.address.postal_code,
                     )

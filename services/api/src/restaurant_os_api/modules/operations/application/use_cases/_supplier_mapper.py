@@ -11,6 +11,7 @@ def address_to_dto(address: Address) -> AddressDTO:
         id=address.id,
         line1=address.line1,
         city=address.city,
+        state=address.state,
         country_code=address.country_code,
         postal_code=address.postal_code,
     )

@@ -406,7 +406,13 @@ export default function BranchDetailsPage() {
               label="Address"
               value={
                 address
-                  ? [address.line1, address.city, address.postalCode, address.countryCode]
+                  ? [
+                      address.line1,
+                      address.city,
+                      address.state,
+                      address.postalCode,
+                      address.countryCode,
+                    ]
                       .filter(Boolean)
                       .join(", ") || "—"
                   : "Not set"

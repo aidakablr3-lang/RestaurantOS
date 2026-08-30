@@ -62,10 +62,29 @@ class RestaurantModel(
 
 class AddressModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "addresses"
-    __table_args__ = (ulid_check_constraint("id"),)
+    __table_args__ = (
+        ulid_check_constraint("id"),
+        # Membership, not just shape -- same "fixed set of allowed
+        # values" idiom as tenants.default_currency_code (migration
+        # 0015). See migration 0021's own docstring for why the list
+        # is duplicated there as a frozen literal rather than imported.
+        CheckConstraint(
+            "state IS NULL OR state IN ("
+            "'Jammu and Kashmir', 'Himachal Pradesh', 'Punjab', 'Chandigarh', "
+            "'Uttarakhand', 'Haryana', 'Delhi', 'Rajasthan', 'Uttar Pradesh', 'Bihar', "
+            "'Sikkim', 'Arunachal Pradesh', 'Nagaland', 'Manipur', 'Mizoram', 'Tripura', "
+            "'Meghalaya', 'Assam', 'West Bengal', 'Jharkhand', 'Odisha', 'Chhattisgarh', "
+            "'Madhya Pradesh', 'Gujarat', 'Dadra and Nagar Haveli and Daman and Diu', "
+            "'Maharashtra', 'Andhra Pradesh', 'Karnataka', 'Goa', 'Lakshadweep', "
+            "'Kerala', 'Tamil Nadu', 'Puducherry', 'Andaman and Nicobar Islands', "
+            "'Telangana', 'Ladakh')",
+            name="state_is_a_real_indian_state_or_ut",
+        ),
+    )
 
     line1: Mapped[str | None] = mapped_column(Text, nullable=True)
     city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    state: Mapped[str | None] = mapped_column(Text, nullable=True)
     country_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
 

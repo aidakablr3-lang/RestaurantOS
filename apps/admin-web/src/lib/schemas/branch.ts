@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { INDIAN_STATE_GST_CODES } from "@/lib/indian-states"
+
 export const branchSchema = z.object({
   name: z
     .string()
@@ -7,6 +9,12 @@ export const branchSchema = z.object({
     .max(255, "Branch name must be 255 characters or fewer."),
   line1: z.string().max(255).optional(),
   city: z.string().max(255).optional(),
+  state: z
+    .string()
+    .optional()
+    .refine((value) => !value || value in INDIAN_STATE_GST_CODES, {
+      message: "Select a real Indian state or union territory.",
+    }),
   countryCode: z
     .string()
     .max(2)

@@ -25,6 +25,7 @@ from restaurant_os_api.modules.restaurant.application.dto.operating_hours_dto im
 class AddressRequestDTO:
     line1: str | None = None
     city: str | None = None
+    state: str | None = None
     country_code: str | None = None
     postal_code: str | None = None
 
@@ -52,6 +53,7 @@ class AddressDTO:
     id: str
     line1: str | None
     city: str | None
+    state: str | None
     country_code: str | None
     postal_code: str | None
 

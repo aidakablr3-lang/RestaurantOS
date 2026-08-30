@@ -129,13 +129,40 @@
   }
 }
 
-/* 80mm thermal receipt printing (bill print view) -- Tailwind's
-   print:hidden / print:block utilities handle showing/hiding content,
-   this only sets the physical page size, which utilities can't
-   express. */
+/* 80mm thermal receipt printing (bill print view). `size: 80mm auto`
+   with no fixed height is what makes the page continuous rather than
+   paginated -- `auto` is an unbounded block dimension, so a 20+ line
+   bill flows as one long receipt instead of splitting across "pages".
+   `margin: 0` (not a few mm) because the receipt itself is already
+   sized to 72mm (see bill-print-view.tsx) inside an 80mm sheet, giving
+   thermal printers' own narrower mechanical printable area headroom
+   without the browser doubling up on top of it.
+
+   The visibility rule below is what actually keeps the rest of the
+   admin shell (sidebar, header, tenant id, dark-mode toggle, account
+   avatar) off the page: none of those components carries its own
+   print:hidden class, and Tailwind's print:block on the receipt only
+   controls the receipt's own display, not anything else's -- without
+   this, the whole app chrome prints alongside it. `.print-receipt` is
+   the one marker element (bill-print-view.tsx's root) this isolates. */
 @media print {
   @page {
     size: 80mm auto;
-    margin: 2mm;
+    margin: 0;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-receipt,
+  .print-receipt * {
+    visibility: visible;
+  }
+
+  .print-receipt {
+    position: absolute;
+    top: 0;
+    left: 0;
   }
 }
