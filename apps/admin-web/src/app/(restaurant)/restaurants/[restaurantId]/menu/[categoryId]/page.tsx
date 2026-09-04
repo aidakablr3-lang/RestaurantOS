@@ -25,6 +25,7 @@ import { useMenuCategory } from "@/hooks/use-menu-categories"
 import { useMenuItems } from "@/hooks/use-menu-items"
 import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { ApiError } from "@/lib/api-client"
+import { formatMoney } from "@/lib/money"
 
 const PAGE_SIZE = 20
 
@@ -146,7 +147,7 @@ export default function MenuItemsPage() {
                     </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {item.priceAmount} {item.currencyCode}
+                    {formatMoney(item.priceAmount, item.currencyCode)}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="capitalize">

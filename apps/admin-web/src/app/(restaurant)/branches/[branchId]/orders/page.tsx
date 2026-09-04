@@ -32,6 +32,7 @@ import { useCreateOrder, useOrders } from "@/hooks/use-orders"
 import { useTables } from "@/hooks/use-tables"
 import { ApiError } from "@/lib/api-client"
 import { newIdempotencyKey } from "@/lib/idempotency"
+import { formatMoney } from "@/lib/money"
 import { type CreateOrderFormValues, createOrderSchema } from "@/lib/schemas/order"
 import type { OrderStatus } from "@/types/order"
 
@@ -314,7 +315,7 @@ export default function OrdersPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{order.itemCount}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {order.totalAmount} {order.currencyCode}
+                    {formatMoney(order.totalAmount, order.currencyCode)}
                   </TableCell>
                   <TableCell>
                     <Button

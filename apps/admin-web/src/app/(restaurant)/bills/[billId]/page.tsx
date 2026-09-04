@@ -38,6 +38,10 @@ import {
   recordPaymentSchema,
 } from "@/lib/schemas/bill"
 import { useCurrentUserId } from "@/lib/current-user"
+// Bill carries no currencyCode of its own (see its own type) -- INR is
+// hardcoded here, matching bill-print-view.tsx's own precedent for the
+// same reason: every real deployment of this product is India-only.
+import { formatMoney } from "@/lib/money"
 
 // "tip" is deliberately excluded -- a tip is not part of the
 // restaurant bill (P0 correction, 2026-08-12); the backend rejects any
@@ -319,11 +323,11 @@ export default function BillDetailPage() {
             <CardContent className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
               <div>
                 <p className="text-xs text-muted-foreground">Subtotal</p>
-                <p className="font-medium">{bill.subtotalAmount}</p>
+                <p className="font-medium">{formatMoney(bill.subtotalAmount, "INR")}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Tax</p>
-                <p className="font-medium">{bill.taxAmount}</p>
+                <p className="font-medium">{formatMoney(bill.taxAmount, "INR")}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Adjustments</p>
@@ -331,11 +335,11 @@ export default function BillDetailPage() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Amount due</p>
-                <p className="font-medium">{bill.amountDue}</p>
+                <p className="font-medium">{formatMoney(bill.amountDue, "INR")}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Amount paid</p>
-                <p className="font-medium">{bill.amountPaid}</p>
+                <p className="font-medium">{formatMoney(bill.amountPaid, "INR")}</p>
               </div>
             </CardContent>
           </Card>
@@ -361,7 +365,9 @@ export default function BillDetailPage() {
                     {bill.adjustments.map((adjustment) => (
                       <TableRow key={adjustment.id}>
                         <TableCell>{ADJUSTMENT_TYPE_LABEL[adjustment.adjustmentType] ?? adjustment.adjustmentType}</TableCell>
-                        <TableCell className="text-muted-foreground">{adjustment.amount}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatMoney(adjustment.amount, "INR")}
+                        </TableCell>
                         <TableCell className="text-muted-foreground">{adjustment.reason ?? "—"}</TableCell>
                       </TableRow>
                     ))}
@@ -392,7 +398,9 @@ export default function BillDetailPage() {
                     {payments.map((payment) => (
                       <TableRow key={payment.id}>
                         <TableCell className="capitalize">{payment.tenderType}</TableCell>
-                        <TableCell className="text-muted-foreground">{payment.amount}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatMoney(payment.amount, "INR")}
+                        </TableCell>
                         <TableCell>
                           <PaymentStatusBadge status={payment.status} />
                         </TableCell>

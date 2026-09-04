@@ -7,6 +7,7 @@ import { toast } from "sonner"
 
 import { ApiError } from "@/lib/api-client"
 import { GuestTokenError } from "@/lib/guest-api-client"
+import { formatMoney } from "@/lib/money"
 import {
   useAddGuestOrderItem,
   useCreateGuestOrder,
@@ -173,9 +174,7 @@ export default function GuestOrderPage() {
           </ul>
           <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm font-medium text-foreground">
             <span>Total</span>
-            <span>
-              {orderQuery.data.totalAmount} {orderQuery.data.currencyCode}
-            </span>
+            <span>{formatMoney(orderQuery.data.totalAmount, orderQuery.data.currencyCode)}</span>
           </div>
         </section>
       )}
@@ -202,7 +201,7 @@ export default function GuestOrderPage() {
                     <div className="min-w-0">
                       <p className="truncate font-medium text-foreground">{item.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {item.priceAmount} {item.currencyCode}
+                        {formatMoney(item.priceAmount, item.currencyCode)}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">

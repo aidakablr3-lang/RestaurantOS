@@ -51,6 +51,7 @@ import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { useTables } from "@/hooks/use-tables"
 import { ApiError } from "@/lib/api-client"
 import { newIdempotencyKey } from "@/lib/idempotency"
+import { formatMoney } from "@/lib/money"
 import { type AddOrderItemFormValues, addOrderItemSchema } from "@/lib/schemas/order"
 import type { MenuItem } from "@/types/menu-item"
 
@@ -127,7 +128,7 @@ function AddItemDialog({
                     <SelectContent>
                       {available.map((item) => (
                         <SelectItem key={item.id} value={item.id}>
-                          {item.name} — {item.priceAmount} {item.currencyCode}
+                          {item.name} — {formatMoney(item.priceAmount, item.currencyCode)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -273,19 +274,19 @@ export default function OrderDetailPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Subtotal</p>
                 <p className="font-medium">
-                  {order.subtotalAmount} {order.currencyCode}
+                  {formatMoney(order.subtotalAmount, order.currencyCode)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Tax</p>
                 <p className="font-medium">
-                  {order.taxAmount} {order.currencyCode}
+                  {formatMoney(order.taxAmount, order.currencyCode)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total</p>
                 <p className="font-medium">
-                  {order.totalAmount} {order.currencyCode}
+                  {formatMoney(order.totalAmount, order.currencyCode)}
                 </p>
               </div>
               <div>
@@ -393,7 +394,9 @@ export default function OrderDetailPage() {
                           {menuItemNameById.get(item.menuItemId) ?? item.menuItemId}
                         </TableCell>
                         <TableCell className="text-muted-foreground">{item.quantity}</TableCell>
-                        <TableCell className="text-muted-foreground">{item.unitPriceAmount}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatMoney(item.unitPriceAmount, order.currencyCode)}
+                        </TableCell>
                         <TableCell>
                           <OrderItemLineStatusBadge status={item.lineStatus} />
                         </TableCell>

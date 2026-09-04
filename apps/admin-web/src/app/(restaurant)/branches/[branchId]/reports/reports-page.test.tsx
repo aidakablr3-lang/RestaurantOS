@@ -78,9 +78,9 @@ describe("EndOfDayReportPage", () => {
 
     render(<EndOfDayReportPage />)
 
-    expect(screen.getByText("300.0000 USD")).toBeInTheDocument()
-    expect(screen.getByText("285.0000 USD")).toBeInTheDocument()
-    expect(screen.getByText("15.0000 USD")).toBeInTheDocument()
+    expect(screen.getByText("$300.00")).toBeInTheDocument()
+    expect(screen.getByText("$285.00")).toBeInTheDocument()
+    expect(screen.getByText("$15.00")).toBeInTheDocument()
     expect(screen.getByText("cash")).toBeInTheDocument()
     expect(screen.getByText("card")).toBeInTheDocument()
     expect(screen.getByText("Burger")).toBeInTheDocument()

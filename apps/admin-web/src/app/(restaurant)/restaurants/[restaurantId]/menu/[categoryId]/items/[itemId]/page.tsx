@@ -61,6 +61,7 @@ import { useModifierGroups } from "@/hooks/use-modifier-groups"
 import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { ApiError } from "@/lib/api-client"
 import { newIdempotencyKey } from "@/lib/idempotency"
+import { formatMoney } from "@/lib/money"
 import {
   type MenuItemAvailabilityFormValues,
   menuItemAvailabilitySchema,
@@ -579,7 +580,7 @@ export default function MenuItemDetailPage() {
           </CardHeader>
           <CardContent className="divide-y">
             <DetailRow label="Name" value={item.name} />
-            <DetailRow label="Price" value={`${item.priceAmount} ${item.currencyCode}`} />
+            <DetailRow label="Price" value={formatMoney(item.priceAmount, item.currencyCode)} />
             <DetailRow
               label="Station"
               value={
@@ -632,7 +633,9 @@ export default function MenuItemDetailPage() {
                   {branchPrices.map((price) => (
                     <TableRow key={price.id}>
                       <TableCell>{branchNameById.get(price.branchId) ?? price.branchId}</TableCell>
-                      <TableCell className="text-muted-foreground">{price.priceAmount}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatMoney(price.priceAmount, item.currencyCode)}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {toDatetimeLocal(price.effectiveFrom).replace("T", " ")}
                         {price.effectiveTo

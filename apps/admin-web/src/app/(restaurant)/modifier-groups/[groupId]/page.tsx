@@ -43,6 +43,9 @@ import { useCreateModifier, useModifiers, useUpdateModifier } from "@/hooks/use-
 import { usePermissionHelpers } from "@/hooks/use-permissions"
 import { ApiError } from "@/lib/api-client"
 import { newIdempotencyKey } from "@/lib/idempotency"
+// Modifier carries no currencyCode -- only the 2-decimal amount is
+// formatted here, no currency symbol (matches priceDelta's sign-preserving semantics).
+import { formatAmount } from "@/lib/money"
 import { type ModifierFormValues, modifierSchema } from "@/lib/schemas/modifier"
 import type { Modifier } from "@/types/modifier"
 
@@ -283,7 +286,7 @@ export default function ModifierGroupDetailPage() {
                     <TableRow key={modifier.id}>
                       <TableCell className="font-medium">{modifier.name}</TableCell>
                       <TableCell className="text-muted-foreground">
-                        {modifier.priceDelta}
+                        {formatAmount(modifier.priceDelta)}
                       </TableCell>
                       {canManage ? (
                         <TableCell>

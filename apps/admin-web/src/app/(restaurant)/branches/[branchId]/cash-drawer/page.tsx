@@ -23,6 +23,10 @@ import {
   openCashDrawerSchema,
 } from "@/lib/schemas/cash-drawer"
 import type { CashDrawer } from "@/types/cash-drawer"
+// No currencyCode on CashDrawer (see its own type) -- INR is
+// hardcoded, matching bill-print-view.tsx's and the bill detail
+// page's own precedent for the same reason.
+import { formatMoney } from "@/lib/money"
 
 export default function CashDrawerPage() {
   const params = useParams<{ branchId: string }>()
@@ -92,7 +96,7 @@ export default function CashDrawerPage() {
           </CardHeader>
           <CardContent className="grid gap-4">
             <p className="text-sm text-muted-foreground">
-              Opened with a float of {drawer.openingFloatAmount} at{" "}
+              Opened with a float of {formatMoney(drawer.openingFloatAmount, "INR")} at{" "}
               {new Date(drawer.openedAt).toLocaleString()}.
             </p>
             <Form {...closeForm}>
@@ -127,8 +131,16 @@ export default function CashDrawerPage() {
               <div className="grid gap-1 rounded-lg border bg-muted/40 p-4 text-sm">
                 <p className="font-medium">Last drawer closed</p>
                 <p className="text-muted-foreground">
-                  Expected {closed.expectedCashAmount ?? "—"}, counted {closed.closingCountedAmount}, variance{" "}
-                  {closed.varianceAmount ?? "—"}.
+                  Expected{" "}
+                  {closed.expectedCashAmount !== null
+                    ? formatMoney(closed.expectedCashAmount, "INR")
+                    : "—"}
+                  , counted{" "}
+                  {closed.closingCountedAmount !== null
+                    ? formatMoney(closed.closingCountedAmount, "INR")
+                    : "—"}
+                  , variance{" "}
+                  {closed.varianceAmount !== null ? formatMoney(closed.varianceAmount, "INR") : "—"}.
                 </p>
               </div>
             ) : null}

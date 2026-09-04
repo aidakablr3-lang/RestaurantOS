@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table"
 import { useEndOfDayReport } from "@/hooks/use-reports"
 import { usePermissionHelpers } from "@/hooks/use-permissions"
+import { formatMoney } from "@/lib/money"
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10)
@@ -91,29 +92,29 @@ export default function EndOfDayReportPage() {
                 <StatCard label="Orders" value={String(report.orderCount)} />
                 <StatCard
                   label="Gross sales"
-                  value={`${report.grossSalesAmount} ${report.currencyCode}`}
+                  value={formatMoney(report.grossSalesAmount, report.currencyCode)}
                 />
                 <StatCard
                   label="Net collected"
-                  value={`${report.netCollectedAmount} ${report.currencyCode}`}
+                  value={formatMoney(report.netCollectedAmount, report.currencyCode)}
                 />
                 <StatCard
                   label="Outstanding"
-                  value={`${report.outstandingAmount} ${report.currencyCode}`}
+                  value={formatMoney(report.outstandingAmount, report.currencyCode)}
                 />
                 <StatCard label="Items sold" value={String(report.itemsSoldCount)} />
                 <StatCard
                   label="Tips"
-                  value={`${report.totalTipsAmount} ${report.currencyCode}`}
+                  value={formatMoney(report.totalTipsAmount, report.currencyCode)}
                 />
                 <StatCard
                   label="Refunded"
-                  value={`${report.totalRefundedAmount} ${report.currencyCode}`}
+                  value={formatMoney(report.totalRefundedAmount, report.currencyCode)}
                 />
                 <StatCard label="Voided orders" value={String(report.voidedOrderCount)} />
                 <StatCard
                   label="Voided sales"
-                  value={`${report.voidedSalesAmount} ${report.currencyCode}`}
+                  value={formatMoney(report.voidedSalesAmount, report.currencyCode)}
                 />
               </div>
 
@@ -139,7 +140,7 @@ export default function EndOfDayReportPage() {
                             <TableCell className="capitalize">{t.tenderType}</TableCell>
                             <TableCell className="text-right">{t.paymentCount}</TableCell>
                             <TableCell className="text-right">
-                              {t.amount} {report.currencyCode}
+                              {formatMoney(t.amount, report.currencyCode)}
                             </TableCell>
                           </TableRow>
                         ))}
