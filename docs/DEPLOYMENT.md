@@ -44,9 +44,10 @@ Nothing else needs to pre-exist on the box — `scripts/deploy/01_server_setup.s
 
 Listed once here, not scattered through the steps below:
 
-1. **DNS**: two Cloudflare A records, DNS-only (grey cloud):
+1. **DNS**: three Cloudflare A records, DNS-only (grey cloud):
    - `api.prashanthai.com` → the VPS's public IPv4
    - `admin.prashanthai.com` → the VPS's public IPv4
+   - `restaurantos.prashanthai.com` → the VPS's public IPv4 (the marketing site, `apps/marketing` — static, served directly by Caddy, no app container of its own)
 2. **ACME email** — a real address Let's Encrypt can send certificate expiry/problem notices to. Passed to `scripts/deploy/02_generate_secrets.sh --acme-email` (or `deploy.sh --acme-email`).
 3. **Platform-admin email** — the real email the first platform-admin account should use. Passed to `scripts/deploy/04_bootstrap_platform_admin.sh` (or `deploy.sh --admin-email`). Its password is generated on the box and printed once during that step — nowhere else.
 4. **The VPS itself** (root/sudo SSH access) — pending KYC approval per your own note.
@@ -96,8 +97,9 @@ After step 4, everything except Caddy is running. Caddy is deliberately **not** 
    ```bash
    curl -I https://admin.prashanthai.com
    curl -I https://api.prashanthai.com/health/live
+   curl -I https://restaurantos.prashanthai.com
    ```
-   Both should return a valid certificate (no browser/curl TLS warning) within a minute or two of Caddy starting — it issues Let's Encrypt certificates automatically on first request per domain.
+   All three should return a valid certificate (no browser/curl TLS warning) within a minute or two of Caddy starting — it issues Let's Encrypt certificates automatically on first request per domain.
 
 Confirm no development artifacts are reachable: `curl` for ports 3000/5432/8000 directly against the VPS's public IP should all **time out or refuse** (`ufw` blocks everything but 22/80/443 at the host firewall, and postgres/api/admin-web publish no host ports at all regardless — two independent layers, not one).
 
@@ -196,6 +198,14 @@ docker compose -f docker-compose.prod.yml up -d --build api admin-web
 This rebuilds both images and restarts them; migrations re-run automatically (`api`'s own `CMD`) before it starts serving. `postgres` and `caddy` are untouched by this command. Run the smoke test (§10) after every update, not just at initial go-live.
 
 No image registry or CD pipeline exists yet — this is a manual rebuild-in-place, same disclosed limitation the project has had since the first pilot draft.
+
+**Updating the marketing site (`apps/marketing`) needs neither of those steps.** It's static files bind-mounted read-only straight into the `caddy` container (see the Caddyfile's own `restaurantos.prashanthai.com` block) — a plain `git pull` is the entire update:
+
+```bash
+cd /opt/restaurantos && git pull origin develop
+```
+
+Caddy serves whatever's on disk on every request; no rebuild, no restart, no downtime. If a change ever needs a genuinely new Caddy config (new domain, new directive), only then does `docker compose -f docker-compose.prod.yml up -d caddy` (or `restart`) apply.
 
 **Any migration that adds a `CHECK`/`NOT NULL`/`UNIQUE` constraint must be preceded by an audit query against production data**, run and reviewed *before* `git pull`. `api` runs `alembic upgrade head` on every container start — if a new constraint rejects a row that already exists, the migration fails, the container exits, Docker restarts it, and it fails again, crash-looping until someone notices and fixes the offending row(s) by hand. (This happened live: migration 0015 added a `CHECK` on `tenants.default_currency_code`, one existing tenant had an invalid value, and `api` crash-looped for ~10 minutes before it was caught.) Write the audit query from the migration's own new constraint condition, negated, and run it against production before applying the migration — not after a crash-loop reveals the problem.
 

@@ -31,3 +31,14 @@ admin.prashanthai.com {
 api.prashanthai.com {
 	reverse_proxy api:8000
 }
+
+# Marketing site (apps/marketing) -- static HTML/CSS/JS, no backend, no
+# build step. Served directly by this same Caddy instance rather than a
+# fourth container: there's nothing here for a Node/Next process to do
+# that file_server doesn't already do, and one fewer moving part is one
+# fewer thing that can go down. Mounted read-only into the caddy
+# service (docker-compose.prod.yml) at /srv/marketing.
+restaurantos.prashanthai.com {
+	root * /srv/marketing
+	file_server
+}

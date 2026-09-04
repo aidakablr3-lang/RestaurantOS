@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RestaurantOS — Order-to-bill software for Indian restaurants &amp; bars</title>
+<meta name="description" content="QR ordering, kitchen display, billing, and GST-correct printed invoices — built and personally installed for restaurants and bars in India. Bengaluru-based." />
+<meta name="theme-color" content="#17130f" />
+
+<!-- Open Graph -->
+<meta property="og:title" content="RestaurantOS — Software for the floor, not the boardroom" />
+<meta property="og:description" content="Order-to-bill software for restaurants and bars in India, with a GST-correct printed invoice on every bill." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://restaurantos.prashanthai.com" />
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%2317130f%22/><text x=%2250%22 y=%2266%22 font-size=%2258%22 text-anchor=%22middle%22 fill=%22%23e3a83b%22 font-family=%22Georgia,serif%22>R</text></svg>" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- =============== NAV =============== -->
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a href="#top" class="wordmark">Restaurant<em>OS</em></a>
+    <nav class="nav-links">
+      <a href="#screenshots">See it running</a>
+      <a href="#what-it-does">What it does</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#who">Who I am</a>
+    </nav>
+    <a class="nav-cta" href="#contact">Talk to me</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- =============== HERO =============== -->
+  <section class="hero">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="hero-texture" aria-hidden="true"></div>
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow reveal">Running live in Bengaluru right now</span>
+        <h1 class="reveal">Software for the floor, <em>not the boardroom.</em></h1>
+        <p class="hero-desc reveal">
+          Order-to-bill software for restaurants and bars in India — QR
+          ordering, kitchen display, billing, and a GST-correct printed
+          invoice, right every single time.
+        </p>
+        <div class="hero-actions reveal">
+          <a class="btn btn-primary" href="#screenshots">
+            See it running
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn-ghost" href="tel:+91XXXXXXXXXX" data-todo="phone">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            +91 XXXXX XXXXX
+          </a>
+        </div>
+        <div class="hero-proof reveal">
+          <span class="dot-live" aria-hidden="true"></span>
+          One install, one owner, one number to call when something's wrong.
+        </div>
+      </div>
+
+      <div class="receipt-stage reveal">
+        <div class="receipt-shadow-card" aria-hidden="true"></div>
+        <div class="receipt" role="img" aria-label="Sample printed GST invoice from RestaurantOS">
+          <span class="receipt-badge">TAX INVOICE</span>
+          <div class="receipt-head">
+            <div class="biz">Thanisandra Tap House</div>
+            <div class="addr">Thanisandra, Bengaluru, Karnataka 560045<br />GSTIN 29ABCDE1234F1Z5</div>
+          </div>
+          <hr />
+          <div class="row"><span>Invoice No</span><span>THN/2026-27/000418</span></div>
+          <div class="row"><span>Table 12</span><span>02:11 AM</span></div>
+          <hr />
+          <div class="items">
+            <div class="row"><span>Chicken 65 x2</span><span>560.00</span></div>
+            <div class="row"><span>Garlic Naan x4</span><span>320.00</span></div>
+            <div class="row"><span>Kingfisher x6</span><span>2,400.00</span></div>
+          </div>
+          <hr />
+          <div class="row"><span>Subtotal</span><span>3,280.00</span></div>
+          <div class="row"><span>CGST @ 9%</span><span>295.20</span></div>
+          <div class="row"><span>SGST @ 9%</span><span>295.20</span></div>
+          <div class="row total"><span>Total</span><span>&#8377;3,870.40</span></div>
+          <div class="gst">Thank you — see you again</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== SCREENSHOTS =============== -->
+  <section class="section" id="screenshots">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">See it running</span>
+        <h2>What's actually on the screen.</h2>
+        <p>Real screenshots from a real, currently-running install — not
+          mockups. Images land here shortly; the layout's already live.</p>
+      </div>
+
+      <div class="shots-grid reveal-stagger">
+        <div class="shot-card">
+          <div class="shot-frame">
+            <div class="shot-frame-inner">
+              <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5M7 13h4M7 16h7"/></svg>
+              <span class="placeholder-tag">Billing screen — image coming</span>
+            </div>
+          </div>
+          <div class="shot-caption">
+            <h3>Billing</h3>
+            <span>Split tender, cash drawer</span>
+          </div>
+        </div>
+
+        <div class="shot-card">
+          <div class="shot-frame">
+            <div class="shot-frame-inner">
+              <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8M12 18v3"/><path d="M6 9h4M6 12h6"/><rect x="13" y="8.5" width="6" height="6" rx="1"/></svg>
+              <span class="placeholder-tag">Kitchen display — image coming</span>
+            </div>
+          </div>
+          <div class="shot-caption">
+            <h3>Kitchen display</h3>
+            <span>Per-station tickets</span>
+          </div>
+        </div>
+
+        <div class="shot-card">
+          <div class="shot-frame">
+            <div class="shot-frame-inner">
+              <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2M14 19h2M19 19h2v2h-2z"/></svg>
+              <span class="placeholder-tag">Table QR — image coming</span>
+            </div>
+          </div>
+          <div class="shot-caption">
+            <h3>Table QR ordering</h3>
+            <span>No app, no login</span>
+          </div>
+        </div>
+
+        <div class="shot-card">
+          <div class="shot-frame">
+            <div class="shot-frame-inner">
+              <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>
+              <span class="placeholder-tag">Real printed invoice — photo coming</span>
+            </div>
+          </div>
+          <div class="shot-caption">
+            <h3>A real printed bill</h3>
+            <span>Off the actual printer</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== WHAT IT DOES =============== -->
+  <section class="section section-alt" id="what-it-does">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">What it does</span>
+        <h2>Five things, done properly.</h2>
+      </div>
+
+      <div class="points reveal-stagger">
+        <div class="point">
+          <span class="point-num mono">01</span>
+          <div>
+            <h3>Orders</h3>
+            <p>A guest scans a QR at the table, or a waiter takes it on
+              their own screen. Either way, it's in the kitchen in
+              seconds, no relaying by hand.</p>
+          </div>
+        </div>
+        <div class="point">
+          <span class="point-num mono">02</span>
+          <div>
+            <h3>Kitchen</h3>
+            <p>One screen per station — kitchen and bar see only their
+              own tickets, in the order they were fired. Nothing
+              shouted across the pass.</p>
+          </div>
+        </div>
+        <div class="point">
+          <span class="point-num mono">03</span>
+          <div>
+            <h3>Billing</h3>
+            <p>Tax, discounts, split tender, cash drawer reconciliation
+              — the whole bill, closed correctly, every time, on
+              every table.</p>
+          </div>
+        </div>
+        <div class="point">
+          <span class="point-num mono">04</span>
+          <div>
+            <h3>Invoicing</h3>
+            <p>GSTIN on file, a sequential invoice number that resets
+              on the financial year, printed on real 80mm thermal paper
+              — not a hand-written slip.</p>
+          </div>
+        </div>
+        <div class="point">
+          <span class="point-num mono">05</span>
+          <div>
+            <h3>Reporting</h3>
+            <p>What sold, what came in, and what's still outstanding —
+              at the end of every single night, without adding up a
+              cashbook by hand.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== PRICING =============== -->
+  <section class="section" id="pricing">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">Pricing</span>
+        <h2>One number. No surprises later.</h2>
+        <p>Stated plainly, because "contact us for pricing" is how
+          software gets expensive after you've already switched to it.</p>
+      </div>
+
+      <div class="pricing-card reveal">
+        <div>
+          <ul class="pricing-list">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Every module included — ordering, kitchen, billing, invoicing, reporting
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Setup, staff training, and the first month of support included
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              One flat number per branch — no per-order or per-bill fees
+            </li>
+          </ul>
+          <a class="btn btn-primary" href="#contact">Ask for the branch discount</a>
+        </div>
+        <div>
+          <div class="pricing-figure mono" data-todo="pricing">
+            &#8377;X,XXX<span class="unit">/ month</span><span class="placeholder-flag">Set real price</span>
+          </div>
+          <p class="pricing-note">Per branch, billed monthly. Multi-branch and annual pricing available — ask.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== WHO I AM =============== -->
+  <section class="section section-alt" id="who">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">Who I am</span>
+        <h2>Not a company. A person who shows up.</h2>
+      </div>
+
+      <div class="who-grid reveal">
+        <div class="who-photo" data-todo="photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+        </div>
+        <div class="who-copy">
+          <p>I build RestaurantOS, and I install it myself. Based in
+            Bengaluru — if you're within reach, I come set it up on
+            your floor, train your staff on it directly, and stay
+            reachable after, on the same phone number that's on this
+            page.</p>
+          <p>There's no ticket queue and no offshore support desk.
+            When something's wrong at 11 PM on a Saturday, you call
+            the person who wrote the code.</p>
+          <p>It's running right now at a working pub in Bengaluru —
+            billing, kitchen, and printed invoices, every night. Happy
+            to have you see it in person before you decide anything.</p>
+          <div class="who-signoff">
+            Prashanth
+            <span>Bengaluru, India</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============== CONTACT / FOOTER =============== -->
+  <footer class="footer" id="contact">
+    <div class="wrap">
+      <span class="eyebrow reveal">Get in touch</span>
+      <h2 class="reveal">Call, or send a WhatsApp.</h2>
+      <p class="reveal">No form to fill in. Tell me about your place and
+        I'll tell you honestly whether this is a good fit.</p>
+      <div class="footer-actions reveal">
+        <a class="btn btn-primary" href="tel:+91XXXXXXXXXX" data-todo="phone">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          +91 XXXXX XXXXX
+        </a>
+        <a class="btn btn-ember" href="https://wa.me/91XXXXXXXXXX" data-todo="whatsapp" target="_blank" rel="noopener">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.29-.15-1.7-.84-1.96-.93-.26-.1-.46-.15-.65.15-.2.29-.75.93-.92 1.12-.17.2-.34.22-.63.08-.29-.15-1.22-.45-2.32-1.43-.86-.76-1.44-1.7-1.6-1.99-.17-.29-.02-.45.13-.6.13-.13.29-.34.44-.5.15-.18.2-.3.29-.5.1-.2.05-.37-.02-.52-.08-.15-.65-1.56-.89-2.14-.23-.56-.47-.48-.65-.49h-.56c-.2 0-.5.07-.77.37-.26.29-1 .98-1 2.4 0 1.4 1.03 2.76 1.17 2.95.15.2 2.02 3.08 4.9 4.32.69.3 1.22.47 1.64.6.69.22 1.32.19 1.81.11.55-.08 1.7-.7 1.94-1.36.24-.67.24-1.24.17-1.36-.07-.12-.26-.2-.55-.34z"/><path d="M12.02 2.5c-5.24 0-9.5 4.26-9.5 9.5 0 1.68.44 3.25 1.2 4.62L2.5 21.5l4.99-1.19a9.44 9.44 0 0 0 4.53 1.16h.01c5.24 0 9.5-4.26 9.5-9.5s-4.26-9.47-9.51-9.47Zm0 17.28h-.01a7.9 7.9 0 0 1-4.03-1.1l-.29-.17-2.99.71.71-2.9-.19-.3a7.76 7.76 0 0 1-1.2-4.02c0-4.3 3.5-7.79 7.81-7.79 2.08 0 4.04.81 5.52 2.29a7.72 7.72 0 0 1 2.28 5.51c0 4.3-3.5 7.77-7.61 7.77Z"/></svg>
+          WhatsApp
+        </a>
+      </div>
+
+      <div class="footer-meta">
+        <span>&copy; 2026 RestaurantOS &middot; Bengaluru, India</span>
+        <span>restaurantos.prashanthai.com</span>
+      </div>
+    </div>
+  </footer>
+
+</main>
+
+<!-- =============== STICKY MOBILE BAR =============== -->
+<div class="sticky-bar">
+  <a class="call" href="tel:+91XXXXXXXXXX" data-todo="phone">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    Call
+  </a>
+  <a class="whatsapp" href="https://wa.me/91XXXXXXXXXX" data-todo="whatsapp" target="_blank" rel="noopener">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.29-.15-1.7-.84-1.96-.93-.26-.1-.46-.15-.65.15-.2.29-.75.93-.92 1.12-.17.2-.34.22-.63.08-.29-.15-1.22-.45-2.32-1.43-.86-.76-1.44-1.7-1.6-1.99-.17-.29-.02-.45.13-.6.13-.13.29-.34.44-.5.15-.18.2-.3.29-.5.1-.2.05-.37-.02-.52-.08-.15-.65-1.56-.89-2.14-.23-.56-.47-.48-.65-.49h-.56c-.2 0-.5.07-.77.37-.26.29-1 .98-1 2.4 0 1.4 1.03 2.76 1.17 2.95.15.2 2.02 3.08 4.9 4.32.69.3 1.22.47 1.64.6.69.22 1.32.19 1.81.11.55-.08 1.7-.7 1.94-1.36.24-.67.24-1.24.17-1.36-.07-.12-.26-.2-.55-.34z"/><path d="M12.02 2.5c-5.24 0-9.5 4.26-9.5 9.5 0 1.68.44 3.25 1.2 4.62L2.5 21.5l4.99-1.19a9.44 9.44 0 0 0 4.53 1.16h.01c5.24 0 9.5-4.26 9.5-9.5s-4.26-9.47-9.51-9.47Zm0 17.28h-.01a7.9 7.9 0 0 1-4.03-1.1l-.29-.17-2.99.71.71-2.9-.19-.3a7.76 7.76 0 0 1-1.2-4.02c0-4.3 3.5-7.79 7.81-7.79 2.08 0 4.04.81 5.52 2.29a7.72 7.72 0 0 1 2.28 5.51c0 4.3-3.5 7.77-7.61 7.77Z"/></svg>
+    WhatsApp
+  </a>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
