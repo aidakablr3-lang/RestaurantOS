@@ -1059,3 +1059,24 @@ around, rather than fix — each traded off deliberately, not overlooked:
    window — deliberately not built three days before a real install, to
    avoid a change touching every report query on a client-blocking
    timeline; see the surrounding commit for the full tradeoff.
+
+   **Do not "fix" the report page's date-picker default to compute
+   "today" in IST — it is already correct, on purpose, and an
+   IST-shifted default would regress it.** `todayIsoDate()`
+   (`apps/admin-web/.../branches/[branchId]/reports/page.tsx`) computes
+   the default via `new Date().toISOString().slice(0, 10)` — raw UTC.
+   That's the same UTC arithmetic the backend's own window boundary
+   above is built from, so the two stay in lockstep by construction:
+   restated in IST terms, day D's report window is `[D 05:30 IST,
+   D+1 05:30 IST)`, and literal-UTC "today" already evaluates to
+   exactly "D if it's ≥05:30 IST right now, else D-1" — which *is* the
+   currently-active window. Checking the picker right after a 2:30 AM
+   close correctly defaults to the night that just ended, not "today."
+   Recomputing the default with an explicit IST offset (`Date.now() +
+   5.5h`) makes it return the real IST calendar date at *all* times
+   instead, including 2 AM — the one case that currently works — and
+   would start defaulting to a day that hasn't opened yet. A later
+   check (e.g. 9 AM, before the branch reopens) landing on an empty
+   "today" is real, but it isn't a UTC-vs-IST bug — it's this same
+   missing trading-day concept wearing a different hat, and needs the
+   picker to know the branch's opening hour, not a timezone swap.
