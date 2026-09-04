@@ -325,6 +325,31 @@ class TestReplaceOperatingHoursUseCase:
         assert result[0].opens_at == time(12, 30)
         assert result[0].closes_at == time(0, 30)
 
+    async def test_accepts_a_pub_open_past_midnight_1230pm_to_230am(self) -> None:
+        # The exact real-world case this feature exists for: a pub open
+        # from 12:30 PM to 2:30 AM the following day.
+        branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch()})
+        operating_hours_repo = InMemoryOperatingHoursRepository()
+        use_case = _use_case(branch_repo, operating_hours_repo)
+
+        result = await use_case.execute(
+            TENANT_ID,
+            ReplaceOperatingHoursRequestDTO(
+                branch_id=BRANCH_ID,
+                entries=[
+                    OperatingHoursEntryRequestDTO(
+                        day_of_week=1,
+                        is_closed=False,
+                        opens_at=time(12, 30),
+                        closes_at=time(2, 30),
+                    )
+                ],
+            ),
+        )
+
+        assert result[0].opens_at == time(12, 30)
+        assert result[0].closes_at == time(2, 30)
+
     async def test_accepts_an_overnight_window_opening_in_the_evening(self) -> None:
         branch_repo = InMemoryBranchRepository({BRANCH_ID: _branch()})
         operating_hours_repo = InMemoryOperatingHoursRepository()
