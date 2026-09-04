@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { ArmchairIcon, PencilIcon, PlusIcon, QrCodeIcon } from "lucide-react"
+import { ArmchairIcon, PencilIcon, PlusIcon, PrinterIcon, QrCodeIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { BranchSubNav } from "@/components/branch-sub-nav"
@@ -48,16 +48,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { useBranch } from "@/hooks/use-branches"
 import { usePermissionHelpers } from "@/hooks/use-permissions"
+import { useRestaurant } from "@/hooks/use-restaurants"
 import { useTableZones } from "@/hooks/use-table-zones"
 import { useChangeTableStatus, useCreateTable, useTables, useUpdateTable } from "@/hooks/use-tables"
 import { ApiError } from "@/lib/api-client"
+import { listQRCodes } from "@/lib/api/qr-codes"
+import { listTables } from "@/lib/api/tables"
+import { guestOrderUrl } from "@/lib/guest-url"
 import { newIdempotencyKey } from "@/lib/idempotency"
 import { type TableFormValues, tableSchema } from "@/lib/schemas/table"
 import type { Table, TableStatus } from "@/types/table"
 import type { TableZone } from "@/types/table-zone"
 
+import { type QRSheetCard, QRCodeSheetPrintView } from "./qr-code-sheet-print-view"
+
 const PAGE_SIZE = 20
+const TABLE_FETCH_LIMIT = 100
 const STATUS_OPTIONS: TableStatus[] = ["available", "occupied", "reserved", "cleaning"]
 
 function TableFormDialog({
@@ -228,6 +236,22 @@ function TableStatusSelect({
   )
 }
 
+// "Print all" needs every table in the branch, not just the current
+// page -- the on-screen list above is paginated at PAGE_SIZE (20), but
+// the backend caps a single request's limit at 100 (table_router.py),
+// so this pages through with that cap until the branch is exhausted.
+async function fetchAllTables(branchId: string): Promise<Table[]> {
+  const all: Table[] = []
+  let offset = 0
+  for (;;) {
+    const { data, meta } = await listTables(branchId, { offset, limit: TABLE_FETCH_LIMIT })
+    all.push(...data)
+    if (!meta || all.length >= meta.total || data.length === 0) break
+    offset += TABLE_FETCH_LIMIT
+  }
+  return all
+}
+
 export default function TablesPage() {
   const params = useParams<{ branchId: string }>()
   const branchId = params.branchId
@@ -254,156 +278,215 @@ export default function TablesPage() {
   const meta = data?.meta
   const loading = perms.isLoading || isLoading
 
+  const branchQuery = useBranch(branchId)
+  const branch = branchQuery.data?.data
+  const restaurantQuery = useRestaurant(branch?.restaurantId)
+  const restaurant = restaurantQuery.data?.data
+
+  const [printCards, setPrintCards] = React.useState<QRSheetCard[] | null>(null)
+  const [printingAll, setPrintingAll] = React.useState(false)
+
+  React.useEffect(() => {
+    if (printCards === null) return
+    window.print()
+  }, [printCards])
+
+  async function handlePrintAll() {
+    setPrintingAll(true)
+    try {
+      const allTables = await fetchAllTables(branchId)
+      const results = await Promise.all(
+        allTables.map(async (t) => {
+          const { data: codes } = await listQRCodes(t.id)
+          const active = codes.find((c) => c.status === "active")
+          return active ? { tableId: t.id, tableNumber: t.tableNumber, url: guestOrderUrl(active.token) } : null
+        })
+      )
+      const cards = results.filter((c): c is QRSheetCard => c !== null)
+      const skipped = allTables.length - cards.length
+      if (cards.length === 0) {
+        toast.error("No tables have an active QR code yet. Generate one from each table's page first.")
+        return
+      }
+      if (skipped > 0) {
+        toast.info(`${skipped} table${skipped === 1 ? "" : "s"} skipped -- no active QR code.`)
+      }
+      setPrintCards(cards)
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Failed to load QR codes for printing.")
+    } finally {
+      setPrintingAll(false)
+    }
+  }
+
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title="Tables"
-        description="Every table for this branch, its dining area, capacity, and current status."
-        actions={
-          canManage ? (
-            <TableFormDialog
-              branchId={branchId}
-              zones={zones}
-              trigger={
-                <Button size="sm" disabled={zones.length === 0}>
-                  <PlusIcon />
-                  Add table
+    <>
+      <div className="grid gap-6 print:hidden">
+        <PageHeader
+          title="Tables"
+          description="Every table for this branch, its dining area, capacity, and current status."
+          actions={
+            canRead ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrintAll}
+                  disabled={printingAll || tables.length === 0}
+                >
+                  <PrinterIcon />
+                  {printingAll ? "Preparing…" : "Print all QR codes"}
                 </Button>
-              }
-            />
-          ) : undefined
-        }
-      />
-
-      <BranchSubNav branchId={branchId} />
-
-      {!perms.isLoading && !canRead ? (
-        <PermissionRestricted resource="tables" />
-      ) : isError ? (
-        <div className="grid gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
-          <p className="text-sm text-destructive">
-            {error instanceof ApiError ? error.message : "Failed to load tables."}
-          </p>
-          <Button variant="outline" className="mx-auto" onClick={() => refetch()}>
-            Retry
-          </Button>
-        </div>
-      ) : loading ? (
-        <div className="grid gap-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-10 w-full" />
-          ))}
-        </div>
-      ) : tables.length === 0 ? (
-        <EmptyState
-          icon={ArmchairIcon}
-          title="No tables yet"
-          description={
-            zones.length === 0
-              ? canManage
-                ? "Add a dining area first, then add tables to it."
-                : "No tables have been set up for this branch yet."
-              : canManage
-                ? "Add this branch's first table."
-                : "No tables have been set up for this branch yet."
-          }
-          action={
-            canManage && zones.length > 0 ? (
-              <TableFormDialog
-                branchId={branchId}
-                zones={zones}
-                trigger={
-                  <Button size="sm">
-                    <PlusIcon />
-                    Add table
-                  </Button>
-                }
-              />
-            ) : canManage && zones.length === 0 ? (
-              <Button size="sm" render={<Link href={`/branches/${branchId}/dining-areas`} />} nativeButton={false}>
-                Go to dining areas
-              </Button>
+                {canManage ? (
+                  <TableFormDialog
+                    branchId={branchId}
+                    zones={zones}
+                    trigger={
+                      <Button size="sm" disabled={zones.length === 0}>
+                        <PlusIcon />
+                        Add table
+                      </Button>
+                    }
+                  />
+                ) : null}
+              </div>
             ) : undefined
           }
         />
-      ) : (
-        <div className="min-w-0 rounded-xl border">
-          <TableComponent>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Table</TableHead>
-                <TableHead>Dining area</TableHead>
-                <TableHead>Capacity</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-20" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tables.map((table) => (
-                <TableRow key={table.id}>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/branches/${branchId}/tables/${table.id}`}
-                      className="hover:underline"
-                    >
-                      {table.tableNumber}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {zoneNameById.get(table.tableZoneId) ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{table.capacity}</TableCell>
-                  <TableCell>
-                    {canManage ? (
-                      <TableStatusSelect branchId={branchId} table={table} disabled={!canManage} />
-                    ) : (
-                      <TableStatusBadge status={table.status} />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`QR codes for table ${table.tableNumber}`}
-                        render={<Link href={`/branches/${branchId}/tables/${table.id}`} />}
-                        nativeButton={false}
-                      >
-                        <QrCodeIcon />
-                      </Button>
-                      {canManage ? (
-                        <TableFormDialog
-                          branchId={branchId}
-                          zones={zones}
-                          table={table}
-                          trigger={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Edit table ${table.tableNumber}`}
-                            >
-                              <PencilIcon />
-                            </Button>
-                          }
-                        />
-                      ) : null}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </TableComponent>
-        </div>
-      )}
 
-      {meta && meta.total > 0 ? (
-        <Pagination
-          offset={meta.offset}
-          limit={meta.limit}
-          total={meta.total}
-          onOffsetChange={setOffset}
-        />
+        <BranchSubNav branchId={branchId} />
+
+        {!perms.isLoading && !canRead ? (
+          <PermissionRestricted resource="tables" />
+        ) : isError ? (
+          <div className="grid gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+            <p className="text-sm text-destructive">
+              {error instanceof ApiError ? error.message : "Failed to load tables."}
+            </p>
+            <Button variant="outline" className="mx-auto" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </div>
+        ) : loading ? (
+          <div className="grid gap-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : tables.length === 0 ? (
+          <EmptyState
+            icon={ArmchairIcon}
+            title="No tables yet"
+            description={
+              zones.length === 0
+                ? canManage
+                  ? "Add a dining area first, then add tables to it."
+                  : "No tables have been set up for this branch yet."
+                : canManage
+                  ? "Add this branch's first table."
+                  : "No tables have been set up for this branch yet."
+            }
+            action={
+              canManage && zones.length > 0 ? (
+                <TableFormDialog
+                  branchId={branchId}
+                  zones={zones}
+                  trigger={
+                    <Button size="sm">
+                      <PlusIcon />
+                      Add table
+                    </Button>
+                  }
+                />
+              ) : canManage && zones.length === 0 ? (
+                <Button size="sm" render={<Link href={`/branches/${branchId}/dining-areas`} />} nativeButton={false}>
+                  Go to dining areas
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="min-w-0 rounded-xl border">
+            <TableComponent>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Table</TableHead>
+                  <TableHead>Dining area</TableHead>
+                  <TableHead>Capacity</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-20" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tables.map((table) => (
+                  <TableRow key={table.id}>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/branches/${branchId}/tables/${table.id}`}
+                        className="hover:underline"
+                      >
+                        {table.tableNumber}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {zoneNameById.get(table.tableZoneId) ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{table.capacity}</TableCell>
+                    <TableCell>
+                      {canManage ? (
+                        <TableStatusSelect branchId={branchId} table={table} disabled={!canManage} />
+                      ) : (
+                        <TableStatusBadge status={table.status} />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`QR codes for table ${table.tableNumber}`}
+                          render={<Link href={`/branches/${branchId}/tables/${table.id}`} />}
+                          nativeButton={false}
+                        >
+                          <QrCodeIcon />
+                        </Button>
+                        {canManage ? (
+                          <TableFormDialog
+                            branchId={branchId}
+                            zones={zones}
+                            table={table}
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Edit table ${table.tableNumber}`}
+                              >
+                                <PencilIcon />
+                              </Button>
+                            }
+                          />
+                        ) : null}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </TableComponent>
+          </div>
+        )}
+
+        {meta && meta.total > 0 ? (
+          <Pagination
+            offset={meta.offset}
+            limit={meta.limit}
+            total={meta.total}
+            onOffsetChange={setOffset}
+          />
+        ) : null}
+      </div>
+      {printCards && restaurant ? (
+        <QRCodeSheetPrintView cards={printCards} restaurantName={restaurant.displayName} />
       ) : null}
-    </div>
+    </>
   )
 }

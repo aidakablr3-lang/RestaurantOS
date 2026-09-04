@@ -145,10 +145,26 @@
    controls the receipt's own display, not anything else's -- without
    this, the whole app chrome prints alongside it. `.print-receipt` is
    the one marker element (bill-print-view.tsx's root) this isolates. */
+
+/* QR table-card printing (qr-code-print-view.tsx, single card; and
+   qr-code-sheet-print-view.tsx, an A4 grid of every table's card). An
+   unnamed `@page` rule applies to every printed page in the document,
+   so a second unnamed one here would silently override the receipt's
+   80mm @page above for ALL prints, including receipts -- these use a
+   *named* page ("qr-print") instead, opted into per-print-root via the
+   `page` property below, leaving the receipt's default page untouched.
+   Both the single card and the sheet share this one A4 page: their
+   card size (90mm square, see qr-table-card.tsx) was chosen to tile
+   2-up per row within this margin regardless of which view is active. */
 @media print {
   @page {
     size: 80mm auto;
     margin: 0;
+  }
+
+  @page qr-print {
+    size: A4;
+    margin: 12mm;
   }
 
   body * {
@@ -161,6 +177,21 @@
   }
 
   .print-receipt {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .print-qr-card,
+  .print-qr-card *,
+  .print-qr-sheet,
+  .print-qr-sheet * {
+    visibility: visible;
+  }
+
+  .print-qr-card,
+  .print-qr-sheet {
+    page: qr-print;
     position: absolute;
     top: 0;
     left: 0;
