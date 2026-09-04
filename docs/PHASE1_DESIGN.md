@@ -1037,3 +1037,25 @@ around, rather than fix — each traded off deliberately, not overlooked:
    presence half needs branch-scoping (or an override/exclusion table)
    added to `MenuCategory`/`MenuItem`, which nothing today provides even
    partially.
+
+7. **`GetEndOfDayReportUseCase` buckets `report_date` as one literal UTC
+   calendar day, `[00:00, 24:00)` UTC — there is no per-branch timezone
+   anywhere in this schema, so it cannot resolve a real local "trading
+   day."** For a branch trading past local midnight, this is only
+   correct by coincidence: IST is UTC+5:30, so the UTC boundary lands at
+   05:30 IST, not local midnight, and a branch that closes before 05:30
+   IST has every order land under the day it opened purely because of
+   that offset — not because this use case understands trading days.
+   **EOD reports are only correct for a branch closing before 05:30 IST,
+   and only for a branch operating in IST.** Push a closing time to or
+   past 05:30 IST, or run this codebase outside IST, and a real
+   overnight order silently reports under the following calendar day
+   instead of the night it belongs to (guarded, not fixed, by
+   `TestISTOvernightBoundaryCoincidence` in `test_report_use_cases.py`,
+   which pins both the coincidence and its exact failure edge so this
+   breaking is caught by a red test, not a wrong report in front of an
+   owner). Closing this properly needs a branch-local timezone column
+   and reporting queries computed against it, not this literal UTC
+   window — deliberately not built three days before a real install, to
+   avoid a change touching every report query on a client-blocking
+   timeline; see the surrounding commit for the full tradeoff.

@@ -208,6 +208,62 @@ class TestGetEndOfDayReportUseCase:
         assert result.total_collected_amount == Decimal("22.00")
         assert result.total_tips_amount == Decimal("3.00")
 
+
+class TestISTOvernightBoundaryCoincidence:
+    """Pins, rather than fixes, a disclosed limitation (see this use
+    case's own module docstring, and PHASE1_DESIGN.md SSF): report_date
+    is bucketed as one literal UTC calendar day, [00:00, 24:00) UTC --
+    there is no per-branch timezone anywhere in this schema yet.
+
+    IST is UTC+5:30, so that UTC boundary lands at 05:30 IST, not local
+    midnight. A branch trading past midnight but closing before 05:30
+    IST has every order land under the day it *opened*, purely by
+    coincidence of that offset -- not because this use case understands
+    trading days. These two tests exist so that coincidence breaking (a
+    closing time pushed to/past 05:30 IST, or this codebase ever used
+    outside IST) fails loudly here first, instead of silently
+    mis-splitting a real end-of-day report for someone relying on it.
+    """
+
+    async def test_a_pub_trading_past_midnight_reports_under_the_night_it_opened(
+        self,
+    ) -> None:
+        # 12:30 PM IST on report_date (2026-08-12) -> 07:00 UTC same day.
+        opened_at = datetime(2026, 8, 12, 7, 0, tzinfo=UTC)
+        # 2:30 AM IST the *next* calendar day -- this pub's real closing
+        # time -- is still only 21:00 UTC on report_date itself.
+        last_order_at = datetime(2026, 8, 12, 21, 0, tzinfo=UTC)
+        order_repo = InMemoryOrderRepository(
+            {
+                ORDER_ID: _order(opened_at=opened_at),
+                CLOSED_ORDER_ID: _order(id=CLOSED_ORDER_ID, opened_at=last_order_at),
+            }
+        )
+        use_case = _use_case(order_repo, InMemoryPaymentRepository())
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID, REPORT_DATE)
+
+        assert result.order_count == 2
+
+    async def test_an_order_at_530am_ist_or_later_falls_out_of_the_previous_nights_report(
+        self,
+    ) -> None:
+        # 05:30 IST the *next* calendar day is exactly 00:00 UTC that
+        # next day -- the first instant the UTC boundary actually lands.
+        # A real overnight order placed at or after this silently
+        # reports under the following day instead of the night it
+        # belongs to. This branch's own 2:30 AM close never reaches
+        # here today -- that gap is the entire reason the coincidence in
+        # the test above currently holds, and is exactly what would
+        # break it if hours ever changed.
+        opened_at_at_cutoff = datetime(2026, 8, 13, 0, 0, tzinfo=UTC)
+        order_repo = InMemoryOrderRepository({ORDER_ID: _order(opened_at=opened_at_at_cutoff)})
+        use_case = _use_case(order_repo, InMemoryPaymentRepository())
+
+        result = await use_case.execute(TENANT_ID, BRANCH_ID, REPORT_DATE)
+
+        assert result.order_count == 0
+
     async def test_voided_orders_are_excluded_from_gross_sales_but_counted_separately(
         self,
     ) -> None:
