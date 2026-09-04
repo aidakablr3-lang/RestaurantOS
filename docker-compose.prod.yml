@@ -94,6 +94,10 @@ services:
       - "443:443"
     volumes:
       - ./infrastructure/reverse-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Static marketing site (apps/marketing) -- Caddy serves it
+      # directly (see the Caddyfile's own restaurantos.prashanthai.com
+      # block), no container of its own needed for plain static files.
+      - ./apps/marketing:/srv/marketing:ro
       - caddy_data:/data
       - caddy_config:/config
 
