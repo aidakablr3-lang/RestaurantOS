@@ -14,6 +14,9 @@ dependencies = [
     "argon2-cffi>=23.1",
     "pyjwt[crypto]>=2.9",
     "python-ulid>=2.7",
+    "anthropic>=0.69",
+    "python-multipart>=0.0.20",
+    "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +25,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "ruff>=0.7",
     "mypy>=1.13",
+    "types-openpyxl>=3.1",
     # Pinned to the exact httpx version this suite is verified against
     # (full local pytest run: 1257 passed, 2026-08-15). Originally added
     # to fix TestClient(client=(ip, port)) failing on a fresh install --

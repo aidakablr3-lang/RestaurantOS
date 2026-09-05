@@ -163,4 +163,7 @@ class TestOpenApiSecurityScheme:
         # silently stale.
         # Phase 1 (Setup Copilot, design doc SSA.4) added 1 more, public:
         # POST /api/v1/owner-activation.
-        assert checked == 127
+        # Menu import from photo/PDF/CSV/XLSX added 2 more, both
+        # authenticated (menu.manage): POST .../menu-imports/extract and
+        # POST .../menu-imports/commit.
+        assert checked == 129

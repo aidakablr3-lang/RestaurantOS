@@ -33,6 +33,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from restaurant_os_api.core.config import get_settings
 from restaurant_os_api.modules.identity.application.dto import AuthenticatedPrincipalDTO
 from restaurant_os_api.modules.identity.presentation.dependencies import (
     AuthenticatedPrincipalDep,
@@ -45,6 +46,7 @@ from restaurant_os_api.modules.identity.presentation.dependencies import (
 from restaurant_os_api.modules.restaurant.application.use_cases import (
     ChangeTableStatusUseCase,
     CloseBranchUseCase,
+    CommitMenuImportUseCase,
     CreateBranchUseCase,
     CreateMenuCategoryUseCase,
     CreateMenuItemAvailabilityUseCase,
@@ -58,6 +60,7 @@ from restaurant_os_api.modules.restaurant.application.use_cases import (
     CreateTableUseCase,
     CreateTableZoneUseCase,
     DiscontinueRestaurantUseCase,
+    ExtractMenuImportUseCase,
     GetBranchUseCase,
     GetMenuCategoryUseCase,
     GetMenuItemUseCase,
@@ -726,6 +729,33 @@ def get_create_menu_item_use_case(session_factory: SessionFactoryDep) -> CreateM
 
 
 CreateMenuItemUseCaseDep = Annotated[CreateMenuItemUseCase, Depends(get_create_menu_item_use_case)]
+
+
+def get_extract_menu_import_use_case() -> ExtractMenuImportUseCase:
+    settings = get_settings()
+    return ExtractMenuImportUseCase(anthropic_api_key=settings.anthropic.api_key)
+
+
+ExtractMenuImportUseCaseDep = Annotated[
+    ExtractMenuImportUseCase, Depends(get_extract_menu_import_use_case)
+]
+
+
+def get_commit_menu_import_use_case(
+    session_factory: SessionFactoryDep,
+) -> CommitMenuImportUseCase:
+    return CommitMenuImportUseCase(
+        session_factory=session_factory,
+        restaurant_repository_factory=SQLAlchemyRestaurantRepository,
+        menu_category_repository_factory=SQLAlchemyMenuCategoryRepository,
+        menu_item_repository_factory=SQLAlchemyMenuItemRepository,
+        outbox_writer_factory=SQLAlchemyOutboxWriter,
+    )
+
+
+CommitMenuImportUseCaseDep = Annotated[
+    CommitMenuImportUseCase, Depends(get_commit_menu_import_use_case)
+]
 
 
 def get_get_menu_item_use_case(session_factory: SessionFactoryDep) -> GetMenuItemUseCase:

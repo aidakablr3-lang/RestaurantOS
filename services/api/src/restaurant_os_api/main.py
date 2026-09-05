@@ -72,6 +72,9 @@ from restaurant_os_api.modules.restaurant.presentation.api.v1.branch_router impo
 from restaurant_os_api.modules.restaurant.presentation.api.v1.menu_category_router import (
     router as menu_category_router,
 )
+from restaurant_os_api.modules.restaurant.presentation.api.v1.menu_import_router import (
+    router as menu_import_router,
+)
 from restaurant_os_api.modules.restaurant.presentation.api.v1.menu_item_router import (
     router as menu_item_router,
 )
@@ -182,6 +185,7 @@ def create_app() -> FastAPI:
     app.include_router(guest_order_router)
     app.include_router(menu_category_router)
     app.include_router(menu_item_router)
+    app.include_router(menu_import_router)
     app.include_router(modifier_group_router)
     app.include_router(modifier_router)
     app.include_router(reservation_router)

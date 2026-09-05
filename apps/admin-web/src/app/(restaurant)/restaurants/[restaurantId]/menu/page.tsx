@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { BookOpenIcon, PencilIcon, PlusIcon } from "lucide-react"
+import { BookOpenIcon, PencilIcon, PlusIcon, UploadIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { PermissionRestricted } from "@/components/permission-restricted"
@@ -177,15 +177,26 @@ export default function MenuCategoriesPage() {
         description="Categories organize this restaurant's menu items. Menu items are shared across every branch."
         actions={
           canManage ? (
-            <MenuCategoryFormDialog
-              restaurantId={restaurantId}
-              trigger={
-                <Button size="sm">
-                  <PlusIcon />
-                  Add category
-                </Button>
-              }
-            />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                render={<Link href={`/restaurants/${restaurantId}/menu/import`} />}
+                nativeButton={false}
+              >
+                <UploadIcon />
+                Import from photo
+              </Button>
+              <MenuCategoryFormDialog
+                restaurantId={restaurantId}
+                trigger={
+                  <Button size="sm">
+                    <PlusIcon />
+                    Add category
+                  </Button>
+                }
+              />
+            </div>
           ) : undefined
         }
       />

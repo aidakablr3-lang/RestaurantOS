@@ -297,3 +297,49 @@ class InvalidReservationStatusTransitionError(RestaurantDomainError):
         self.reservation_id = reservation_id
         self.from_status = from_status
         self.to_status = to_status
+
+
+class MenuImportNotConfiguredError(RestaurantDomainError):
+    """No ANTHROPIC_API_KEY configured -- extraction is unavailable, not
+    broken; every other route in this module works without it."""
+
+    error_code = "MENU_IMPORT_NOT_CONFIGURED"
+
+    def __init__(self) -> None:
+        super().__init__("Menu import from photo/PDF is not configured on this server.")
+
+
+class MenuImportUnsupportedFileError(RestaurantDomainError):
+    error_code = "MENU_IMPORT_UNSUPPORTED_FILE"
+
+    def __init__(self, filename: str, content_type: str) -> None:
+        super().__init__(f"'{filename}' ({content_type}) is not a supported file type.")
+        self.filename = filename
+        self.content_type = content_type
+
+
+class MenuImportExtractionFailedError(RestaurantDomainError):
+    """The vision call itself failed (rate limit, timeout, malformed
+    response) or a spreadsheet's columns couldn't be recognized at all --
+    distinct from a low-confidence row, which is a normal, expected
+    extraction outcome surfaced in the review grid, not an error."""
+
+    error_code = "MENU_IMPORT_EXTRACTION_FAILED"
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"Menu extraction failed: {reason}")
+        self.reason = reason
+
+
+class MenuImportInvalidRowError(RestaurantDomainError):
+    """Defense in depth: the review grid should never let an invalid row
+    reach commit, but the commit endpoint validates again server-side
+    rather than trusting the client -- and fails the whole transaction on
+    the first bad row rather than partially importing."""
+
+    error_code = "MENU_IMPORT_INVALID_ROW"
+
+    def __init__(self, row_index: int, reason: str) -> None:
+        super().__init__(f"Row {row_index + 1}: {reason}")
+        self.row_index = row_index
+        self.reason = reason

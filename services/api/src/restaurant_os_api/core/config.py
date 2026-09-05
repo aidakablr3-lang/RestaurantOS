@@ -39,12 +39,24 @@ class JWTSettings(BaseSettings):
     issuer: str = Field(default="restaurantos")
 
 
+class AnthropicSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="ANTHROPIC_")
+
+    api_key: str | None = Field(
+        default=None,
+        description="Required only for POST .../menu-imports/extract (Claude vision "
+        "extraction of a photographed/scanned menu). Every other route works without "
+        "it; that one route returns 503 if unset.",
+    )
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: str = Field(default="development", alias="APP_ENV")
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     jwt: JWTSettings = Field(default_factory=JWTSettings)  # type: ignore[arg-type]
+    anthropic: AnthropicSettings = Field(default_factory=AnthropicSettings)
     # A plain, comma-separated `str` -- not `list[str]` -- because
     # pydantic-settings parses any complex-typed env var as JSON by
     # default, which rejects a plain comma-separated value outright.

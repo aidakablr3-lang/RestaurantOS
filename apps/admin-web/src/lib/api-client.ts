@@ -50,6 +50,10 @@ export interface ApiResult<T> {
 
 interface RequestOptions {
   idempotencyKey?: string
+  // Menu-import extraction runs a vision call over several photos and
+  // routinely takes longer than the default -- everything else keeps
+  // the 15s default.
+  timeoutMs?: number
 }
 
 // Several requests can 401 with an expired access token at once (e.g. a
@@ -100,11 +104,18 @@ async function doRefresh(): Promise<boolean> {
 async function rawRequest(
   path: string,
   init: RequestInit,
-  idempotencyKey?: string
+  idempotencyKey?: string,
+  timeoutMs: number = REQUEST_TIMEOUT_MS
 ): Promise<Response> {
   const accessToken = useAuthStore.getState().accessToken
   const headers = new Headers(init.headers)
-  headers.set("Content-Type", "application/json")
+  // A FormData body (multipart file upload) must NOT get this header --
+  // fetch sets its own Content-Type with the multipart boundary
+  // automatically, and overriding it here would break the server's
+  // multipart parser.
+  if (!(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json")
+  }
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`)
   }
@@ -113,7 +124,7 @@ async function rawRequest(
   }
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     return await fetch(`${API_BASE_URL}${path}`, {
       ...init,
@@ -138,7 +149,7 @@ async function request<T>(
   options: RequestOptions = {},
   isRetry = false
 ): Promise<ApiResult<T>> {
-  const response = await rawRequest(path, init, options.idempotencyKey)
+  const response = await rawRequest(path, init, options.idempotencyKey, options.timeoutMs)
 
   if (response.status === 204) {
     return { data: undefined as T, meta: null }
@@ -170,6 +181,8 @@ export const apiClient = {
   get: <T>(path: string) => request<T>(path, { method: "GET" }),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>(path, jsonInit("POST", body), options),
+  postForm: <T>(path: string, body: FormData, options?: RequestOptions) =>
+    request<T>(path, { method: "POST", body }, options),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>(path, jsonInit("PATCH", body), options),
   put: <T>(path: string, body?: unknown, options?: RequestOptions) =>
