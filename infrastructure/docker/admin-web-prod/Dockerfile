@@ -51,6 +51,14 @@ COPY --from=builder --chown=restaurantos:nodejs /app/.next/static ./.next/static
 USER restaurantos
 EXPOSE 3000
 
+# Next.js's standalone server.js binds to `process.env.HOSTNAME || '0.0.0.0'`
+# -- and Docker sets HOSTNAME to the container's own short ID for every
+# container, which overrides that default and makes the app listen only on
+# the container's bridge-network IP, never on 127.0.0.1. Caddy still reaches
+# it fine (by service name, over that same IP), but the healthcheck below
+# probes 127.0.0.1 and would get ECONNREFUSED without this override.
+ENV HOSTNAME="0.0.0.0"
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD node -e "require('http').get('http://127.0.0.1:3000/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
 
