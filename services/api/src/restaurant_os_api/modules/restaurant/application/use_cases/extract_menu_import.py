@@ -22,6 +22,9 @@ from restaurant_os_api.modules.restaurant.application.dto import (
     MenuImportConfidence,
     MenuImportExtractResultDTO,
 )
+from restaurant_os_api.modules.restaurant.application.services.menu_import_image_normalizer import (
+    normalize_to_png,
+)
 from restaurant_os_api.modules.restaurant.application.services.menu_import_price_parser import (
     parse_menu_price,
 )
@@ -31,7 +34,7 @@ from restaurant_os_api.modules.restaurant.application.services.menu_import_sprea
 )
 from restaurant_os_api.modules.restaurant.application.services.menu_import_vision_extractor import (
     PDF_MEDIA_TYPE,
-    SUPPORTED_IMAGE_MEDIA_TYPES,
+    PNG_MEDIA_TYPE,
     MenuImagePage,
     MenuImportVisionExtractor,
 )
@@ -60,10 +63,16 @@ class ExtractMenuImportUseCase:
         rows: list[ExtractedMenuRowDTO] = []
 
         for file in files:
-            if file.content_type in SUPPORTED_IMAGE_MEDIA_TYPES or (
-                file.content_type == PDF_MEDIA_TYPE
+            if file.content_type == PDF_MEDIA_TYPE:
+                vision_pages.append(MenuImagePage(media_type=PDF_MEDIA_TYPE, data=file.data))
+            elif file.content_type.startswith("image/") or _looks_like_image_filename(
+                file.filename
             ):
-                vision_pages.append(MenuImagePage(media_type=file.content_type, data=file.data))
+                # Re-encoded to PNG regardless of source format (AVIF,
+                # HEIC, WEBP, ...) -- see the normalizer's own docstring
+                # for why this isn't a format allow-list.
+                png_data = normalize_to_png(file.filename, file.data)
+                vision_pages.append(MenuImagePage(media_type=PNG_MEDIA_TYPE, data=png_data))
             elif file.content_type in _CSV_CONTENT_TYPES:
                 rows.extend(parse_csv(file.data))
             elif file.content_type in _XLSX_CONTENT_TYPES:
@@ -78,6 +87,17 @@ class ExtractMenuImportUseCase:
             rows.extend(extractor.extract(vision_pages))
 
         return MenuImportExtractResultDTO(rows=[_normalize_price(row) for row in rows])
+
+
+_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".heic", ".heif", ".bmp", ".tiff")
+
+
+def _looks_like_image_filename(filename: str) -> bool:
+    """Fallback for a browser/OS that sends a generic content-type
+    (``application/octet-stream``) for a less common image format --
+    seen in practice for AVIF and HEIC. The normalizer itself is the
+    real validator; this only decides whether to attempt it."""
+    return filename.lower().endswith(_IMAGE_EXTENSIONS)
 
 
 def _normalize_price(row: ExtractedMenuRowDTO) -> ExtractedMenuRowDTO:

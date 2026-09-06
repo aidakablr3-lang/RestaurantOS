@@ -17,6 +17,8 @@ dependencies = [
     "anthropic>=0.69",
     "python-multipart>=0.0.20",
     "openpyxl>=3.1",
+    "pillow>=11.1",
+    "pillow-heif>=0.22",
 ]
 
 [project.optional-dependencies]
@@ -62,6 +64,12 @@ target-version = "py313"
 [tool.mypy]
 python_version = "3.13"
 strict = true
+
+# No stubs published for this library (a thin ctypes/CFFI wrapper around
+# libheif) -- ignored per-module rather than disabling strict mode.
+[[tool.mypy.overrides]]
+module = "pillow_heif"
+ignore_missing_imports = true
 
 [build-system]
 requires = ["setuptools>=68"]

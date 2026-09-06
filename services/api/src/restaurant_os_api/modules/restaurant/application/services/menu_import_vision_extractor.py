@@ -34,7 +34,11 @@ from restaurant_os_api.modules.restaurant.domain.exceptions import (
 
 MODEL_ID = "claude-opus-5"
 
-SUPPORTED_IMAGE_MEDIA_TYPES = frozenset({"image/jpeg", "image/png", "image/webp", "image/gif"})
+# Every image, whatever its source format, is normalized to this by
+# menu_import_image_normalizer before it reaches here -- see that
+# module's docstring. PDFs are the one format Claude reads natively, so
+# they bypass normalization and keep their own media type.
+PNG_MEDIA_TYPE = "image/png"
 PDF_MEDIA_TYPE = "application/pdf"
 
 _ROW_SCHEMA = {
