@@ -5,10 +5,30 @@ constructor covers both images and PDFs (no separate "document" block
 type), and ``Part.from_bytes`` takes raw bytes directly -- no manual
 base64 encoding into the request body.
 
-``MODEL_ID`` below is a placeholder pending confirmation against a real
-key via ``client.models.list()`` (the user explicitly asked not to pick
-this from docs) -- do not treat it as verified until that check has
-actually run.
+``MODEL_ID`` was picked from real calls against a live key
+(2026-09-06), not from docs or ``client.models.list()`` alone -- the
+model list includes models the key cannot actually use, which only
+shows up by calling them:
+
+- ``gemini-2.5-pro`` / ``gemini-2.5-flash`` (the GA "stability bar"
+  choice, matching a pinned ``claude-opus-*`` ID) -- both 404
+  "no longer available to new users" on this key, each redirecting to
+  a specific newer model in the error message itself.
+- ``gemini-3.1-pro-preview`` (the "pro" reasoning tier, matching the
+  Anthropic side's Opus-not-Sonnet choice) -- listed as available, but
+  429s with an explicit `limit: 0` free-tier quota for the whole
+  `gemini-3.1-pro` metric family. Not "rate limited, retry later" --
+  a hard tier wall.
+- ``gemini-3.6-flash`` -- the one model in this generation that actually
+  completes a call on this key, confirmed against both a plain prompt
+  and the real ``RESPONSE_SCHEMA`` (enums, ``additionalProperties:
+  false``, nested array -- the parts flagged as risky -- included).
+
+So this is the flash tier, not pro, despite the Anthropic side using
+Opus -- not a matched reasoning-tier choice, a "this is what the key
+can actually run" one. If billing is upgraded past the free tier later,
+re-run this same probe (call each candidate model for real, don't just
+read `client.models.list()`) before assuming a "pro" model is usable.
 """
 
 from __future__ import annotations
@@ -30,8 +50,7 @@ from restaurant_os_api.modules.restaurant.domain.exceptions import (
     MenuImportExtractionFailedError,
 )
 
-# PLACEHOLDER -- not yet confirmed against a real key. See module docstring.
-MODEL_ID = "gemini-2.5-flash"
+MODEL_ID = "gemini-3.6-flash"
 
 
 class GeminiVisionExtractor:

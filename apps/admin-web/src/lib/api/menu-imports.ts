@@ -9,8 +9,10 @@ const BASE = (restaurantId: string) => `/api/v1/restaurants/${restaurantId}/menu
 
 // A multi-image vision extraction call routinely takes longer than the
 // 15s default request timeout -- this is the one call in the app that
-// needs real headroom.
-const EXTRACT_TIMEOUT_MS = 120_000
+// needs real headroom. 10 minutes, not 2: real testing against a
+// free-tier Gemini key saw individual calls take up to ~400s under
+// throttling/retry, well past what a shorter timeout would allow.
+const EXTRACT_TIMEOUT_MS = 600_000
 
 export function extractMenuImport(restaurantId: string, files: File[]) {
   const body = new FormData()

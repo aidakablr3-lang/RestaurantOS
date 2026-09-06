@@ -135,6 +135,8 @@ All of these live in one file: `/opt/restaurantos/.env`, written by `scripts/dep
 | `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | api | `02_generate_secrets.sh` (`openssl genrsa`/`openssl rsa`) | Full PEM content, real deployment-specific keypair — never the dev keypair in `infrastructure/docker/dev-jwt/` or anything from this repo's git history |
 | `CORS_ALLOWED_ORIGINS` | api | `02_generate_secrets.sh` (literal `https://admin.prashanthai.com`) | Must match the admin origin exactly — no wildcard is accepted anywhere in source |
 | `NEXT_PUBLIC_API_BASE_URL` | admin-web (build arg) | `02_generate_secrets.sh` (literal `https://api.prashanthai.com`) | Baked in at image build time |
+| `MENU_IMPORT_VISION_PROVIDER` | api | You (`anthropic` or `gemini`; defaults to `anthropic` if unset) | Picks which of the two keys below menu import actually uses |
+| `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` | api | You | Both optional — only the one named by `MENU_IMPORT_VISION_PROVIDER` needs a real value; menu import returns 503 with neither set, every other route is unaffected |
 | `CADDY_ACME_EMAIL` | caddy | You, via `--acme-email` (or edited into `.env` afterward) | Let's Encrypt notices only, never published |
 
 `apps/admin-web/.env.local.example` and `services/api/.env.example` are for **local, non-Docker development only** — this production deploy doesn't read either; `docker-compose.prod.yml` sources everything from the one root `.env`.

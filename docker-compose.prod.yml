@@ -59,6 +59,18 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS must be set to https://admin.prashanthai.com}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?JWT_PRIVATE_KEY must be set}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?JWT_PUBLIC_KEY must be set}
+      # Menu import (photo/PDF -> menu rows). Both optional -- unset
+      # entirely, menu import just returns 503; only the provider named
+      # by MENU_IMPORT_VISION_PROVIDER needs its key set. Listing a var
+      # here with no `.env` value sets it to an empty string in the
+      # container, not "unset" -- ANTHROPIC_API_KEY/GEMINI_API_KEY are
+      # fine with that (the app treats "" the same as unset), but
+      # MENU_IMPORT_VISION_PROVIDER is a strict anthropic|gemini literal
+      # and would crash the whole app on startup if substituted as "" --
+      # hence the :-anthropic fallback, matching the app's own default.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      MENU_IMPORT_VISION_PROVIDER: ${MENU_IMPORT_VISION_PROVIDER:-anthropic}
     # No `ports:` -- reached only by caddy, over the internal Compose
     # network at api:8000. Migrations run automatically on container
     # start (see the production Dockerfile's own CMD); scripts/deploy/
