@@ -29,6 +29,7 @@ established for ``roles.assign``.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends
@@ -42,6 +43,15 @@ from restaurant_os_api.modules.identity.presentation.dependencies import (
     require_branch_permission,
     require_permission,
     require_permission_at_any_scope,
+)
+from restaurant_os_api.modules.restaurant.application.services.menu_import_vision_extractor import (
+    VisionExtractor,
+)
+from restaurant_os_api.modules.restaurant.application.services.menu_import_vision_extractor_anthropic import (
+    AnthropicVisionExtractor,
+)
+from restaurant_os_api.modules.restaurant.application.services.menu_import_vision_extractor_gemini import (
+    GeminiVisionExtractor,
 )
 from restaurant_os_api.modules.restaurant.application.use_cases import (
     ChangeTableStatusUseCase,
@@ -731,9 +741,27 @@ def get_create_menu_item_use_case(session_factory: SessionFactoryDep) -> CreateM
 CreateMenuItemUseCaseDep = Annotated[CreateMenuItemUseCase, Depends(get_create_menu_item_use_case)]
 
 
-def get_extract_menu_import_use_case() -> ExtractMenuImportUseCase:
+def _vision_extractor_factory() -> Callable[[], VisionExtractor] | None:
+    """The one place that decides which vision provider is live --
+    MENU_IMPORT_VISION_PROVIDER picks the class, its own settings block
+    supplies the key. Returns None (not configured) rather than raising,
+    so a CSV/XLSX-only import still works with no vision provider set
+    up at all -- ExtractMenuImportUseCase only calls this when a file in
+    the request actually needs vision extraction."""
     settings = get_settings()
-    return ExtractMenuImportUseCase(anthropic_api_key=settings.anthropic.api_key)
+    if settings.menu_import_vision_provider == "gemini":
+        gemini_api_key = settings.gemini.api_key
+        if not gemini_api_key:
+            return None
+        return lambda: GeminiVisionExtractor(api_key=gemini_api_key)
+    anthropic_api_key = settings.anthropic.api_key
+    if not anthropic_api_key:
+        return None
+    return lambda: AnthropicVisionExtractor(api_key=anthropic_api_key)
+
+
+def get_extract_menu_import_use_case() -> ExtractMenuImportUseCase:
+    return ExtractMenuImportUseCase(vision_extractor_factory=_vision_extractor_factory())
 
 
 ExtractMenuImportUseCaseDep = Annotated[

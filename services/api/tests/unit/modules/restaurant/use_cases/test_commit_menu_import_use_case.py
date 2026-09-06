@@ -129,7 +129,7 @@ async def test_raises_on_invalid_row_before_persisting_anything(
     assert (await category_repo.list_for_restaurant(TENANT_ID, RESTAURANT_ID, offset=0, limit=100))[
         1
     ] == 0
-    assert item_repo._menu_items == {}  # noqa: SLF001 -- verifying nothing was persisted at all
+    assert item_repo._menu_items == {}
 
 
 async def test_creates_a_new_category_and_item() -> None:

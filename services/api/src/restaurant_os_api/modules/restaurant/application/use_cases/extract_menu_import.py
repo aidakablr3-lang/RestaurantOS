@@ -15,6 +15,7 @@ separately, only once the owner approves).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 from restaurant_os_api.modules.restaurant.application.dto import (
@@ -36,7 +37,7 @@ from restaurant_os_api.modules.restaurant.application.services.menu_import_visio
     PDF_MEDIA_TYPE,
     PNG_MEDIA_TYPE,
     MenuImagePage,
-    MenuImportVisionExtractor,
+    VisionExtractor,
 )
 from restaurant_os_api.modules.restaurant.domain.exceptions import (
     MenuImportNotConfiguredError,
@@ -55,8 +56,13 @@ class UploadedMenuFile:
 
 
 class ExtractMenuImportUseCase:
-    def __init__(self, *, anthropic_api_key: str | None) -> None:
-        self._anthropic_api_key = anthropic_api_key
+    def __init__(self, *, vision_extractor_factory: Callable[[], VisionExtractor] | None) -> None:
+        # A factory, not an already-built extractor, so nothing is
+        # constructed (no client, no auth check) unless a file in this
+        # particular request actually needs vision extraction -- a
+        # CSV/XLSX-only import works even with no vision provider
+        # configured at all.
+        self._vision_extractor_factory = vision_extractor_factory
 
     def execute(self, files: list[UploadedMenuFile]) -> MenuImportExtractResultDTO:
         vision_pages: list[MenuImagePage] = []
@@ -81,15 +87,26 @@ class ExtractMenuImportUseCase:
                 raise MenuImportUnsupportedFileError(file.filename, file.content_type)
 
         if vision_pages:
-            if not self._anthropic_api_key:
+            if self._vision_extractor_factory is None:
                 raise MenuImportNotConfiguredError()
-            extractor = MenuImportVisionExtractor(api_key=self._anthropic_api_key)
+            extractor = self._vision_extractor_factory()
             rows.extend(extractor.extract(vision_pages))
 
         return MenuImportExtractResultDTO(rows=[_normalize_price(row) for row in rows])
 
 
-_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".heic", ".heif", ".bmp", ".tiff")
+_IMAGE_EXTENSIONS = (
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".avif",
+    ".heic",
+    ".heif",
+    ".bmp",
+    ".tiff",
+)
 
 
 def _looks_like_image_filename(filename: str) -> bool:

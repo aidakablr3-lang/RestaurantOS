@@ -300,8 +300,10 @@ class InvalidReservationStatusTransitionError(RestaurantDomainError):
 
 
 class MenuImportNotConfiguredError(RestaurantDomainError):
-    """No ANTHROPIC_API_KEY configured -- extraction is unavailable, not
-    broken; every other route in this module works without it."""
+    """No API key configured for the selected vision provider
+    (MENU_IMPORT_VISION_PROVIDER) -- extraction is unavailable, not
+    broken; every other route in this module works without it, and a
+    CSV/XLSX-only import doesn't need a vision provider at all."""
 
     error_code = "MENU_IMPORT_NOT_CONFIGURED"
 

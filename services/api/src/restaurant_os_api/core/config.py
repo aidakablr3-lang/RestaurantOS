@@ -11,6 +11,7 @@ replace it.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -44,9 +45,20 @@ class AnthropicSettings(BaseSettings):
 
     api_key: str | None = Field(
         default=None,
-        description="Required only for POST .../menu-imports/extract (Claude vision "
-        "extraction of a photographed/scanned menu). Every other route works without "
-        "it; that one route returns 503 if unset.",
+        description="Required only when MENU_IMPORT_VISION_PROVIDER=anthropic. Every "
+        "other route works without it; menu import returns 503 if the selected "
+        "provider's key is unset.",
+    )
+
+
+class GeminiSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="GEMINI_")
+
+    api_key: str | None = Field(
+        default=None,
+        description="Required only when MENU_IMPORT_VISION_PROVIDER=gemini. Every "
+        "other route works without it; menu import returns 503 if the selected "
+        "provider's key is unset.",
     )
 
 
@@ -57,6 +69,14 @@ class Settings(BaseSettings):
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     jwt: JWTSettings = Field(default_factory=JWTSettings)  # type: ignore[arg-type]
     anthropic: AnthropicSettings = Field(default_factory=AnthropicSettings)
+    gemini: GeminiSettings = Field(default_factory=GeminiSettings)
+    menu_import_vision_provider: Literal["anthropic", "gemini"] = Field(
+        default="anthropic",
+        alias="MENU_IMPORT_VISION_PROVIDER",
+        description="Which vision provider POST .../menu-imports/extract calls for "
+        "photo/PDF extraction. A config value, not a plugin registry -- exactly one "
+        "of AnthropicVisionExtractor/GeminiVisionExtractor is wired up at a time.",
+    )
     # A plain, comma-separated `str` -- not `list[str]` -- because
     # pydantic-settings parses any complex-typed env var as JSON by
     # default, which rejects a plain comma-separated value outright.
@@ -84,4 +104,4 @@ def get_settings() -> Settings:
     once, injected via DI") rather than re-read from the environment on
     every request.
     """
-    return Settings()  # type: ignore[call-arg]
+    return Settings()

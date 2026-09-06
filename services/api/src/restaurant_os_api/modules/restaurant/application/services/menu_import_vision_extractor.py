@@ -1,47 +1,48 @@
-"""Claude vision extraction for the menu-import feature.
+"""Provider-agnostic pieces of the menu-import vision extraction step.
 
-Sends every uploaded photo/PDF page of a physical menu card to Claude in
-one message (not one call per page) so the model has full cross-page
-context -- catching a category that continues across two photos, or
-avoiding treating the same category name on two pages as two different
-ones. Uses forced JSON-schema output (``output_config.format``) rather
-than a free-text prompt, so a malformed response is a hard error here,
-not a silent bad parse three layers up.
+Sends every uploaded photo/PDF page of a physical menu card to the
+vision model in one message (not one call per page) so the model has
+full cross-page context -- catching a category that continues across
+two photos, or avoiding treating the same category name on two pages as
+two different ones. Uses forced JSON-schema output rather than a
+free-text prompt, so a malformed response is a hard error here, not a
+silent bad parse three layers up.
 
 Deliberately does NOT normalize the extracted price text itself --
 ``rawPrice`` is required to be the price exactly as printed. Normalizing
-"90/-" / "₹90" / "Rs. 120" into a plain number is `menu_import_price_parser`'s
-job: a pure, independently-tested function, not something asked of the
-model and trusted blind.
+"90/-" / "₹90" / "Rs. 120" into a plain number is
+`menu_import_price_parser`'s job: a pure, independently-tested function,
+not something asked of the model and trusted blind.
+
+The provider split lives in ``menu_import_vision_extractor_anthropic.py``
+and ``menu_import_vision_extractor_gemini.py`` -- both implement
+``VisionExtractor`` and share the schema/prompt/row-parsing defined
+here, so switching providers never means the two schemas silently
+drift apart. ``ExtractMenuImportUseCase`` depends only on the
+``VisionExtractor`` protocol; which concrete class it gets is a
+dependency-wiring decision (``presentation/dependencies.py``), driven
+by one config value (``MENU_IMPORT_VISION_PROVIDER``).
 """
 
 from __future__ import annotations
 
-import base64
 import json
 from dataclasses import dataclass
-from typing import cast
-
-import anthropic
+from typing import Protocol, cast
 
 from restaurant_os_api.modules.restaurant.application.dto import (
     ExtractedMenuRowDTO,
     MenuImportConfidence,
 )
-from restaurant_os_api.modules.restaurant.domain.exceptions import (
-    MenuImportExtractionFailedError,
-)
-
-MODEL_ID = "claude-opus-5"
 
 # Every image, whatever its source format, is normalized to this by
 # menu_import_image_normalizer before it reaches here -- see that
-# module's docstring. PDFs are the one format Claude reads natively, so
-# they bypass normalization and keep their own media type.
+# module's docstring. PDFs are the one format both providers read
+# natively, so they bypass normalization and keep their own media type.
 PNG_MEDIA_TYPE = "image/png"
 PDF_MEDIA_TYPE = "application/pdf"
 
-_ROW_SCHEMA = {
+ROW_SCHEMA = {
     "type": "object",
     "properties": {
         "category": {"type": "string"},
@@ -68,14 +69,14 @@ _ROW_SCHEMA = {
     "additionalProperties": False,
 }
 
-_RESPONSE_SCHEMA = {
+RESPONSE_SCHEMA = {
     "type": "object",
-    "properties": {"rows": {"type": "array", "items": _ROW_SCHEMA}},
+    "properties": {"rows": {"type": "array", "items": ROW_SCHEMA}},
     "required": ["rows"],
     "additionalProperties": False,
 }
 
-_INSTRUCTIONS_TEMPLATE = """You are extracting a structured list of menu items from \
+INSTRUCTIONS_TEMPLATE = """You are extracting a structured list of menu items from \
 {count} photo(s)/page(s) of a physical restaurant menu card. The source may be \
 blurry, handwritten in places, or printed in two or more columns. Read \
 section-by-section and column-by-column -- do not read across a column break as \
@@ -122,57 +123,13 @@ class MenuImagePage:
     data: bytes
 
 
-class MenuImportVisionExtractor:
-    def __init__(self, *, api_key: str) -> None:
-        self._client = anthropic.Anthropic(api_key=api_key)
-
-    def extract(self, pages: list[MenuImagePage]) -> list[ExtractedMenuRowDTO]:
-        content: list[dict[str, object]] = []
-        for page in pages:
-            block_type = "document" if page.media_type == PDF_MEDIA_TYPE else "image"
-            content.append(
-                {
-                    "type": block_type,
-                    "source": {
-                        "type": "base64",
-                        "media_type": page.media_type,
-                        "data": base64.standard_b64encode(page.data).decode("ascii"),
-                    },
-                }
-            )
-        content.append({"type": "text", "text": _INSTRUCTIONS_TEMPLATE.format(count=len(pages))})
-
-        try:
-            # The SDK's overloaded, heavily-TypedDict'd signature can't be
-            # matched by a dynamically-built plain-dict payload without
-            # importing every nested param type just for this one call --
-            # the shape below is exactly the documented json_schema +
-            # multi-image pattern, verified at runtime by the try/except
-            # below rather than by mypy here.
-            response = self._client.messages.create(  # type: ignore[call-overload]
-                model=MODEL_ID,
-                max_tokens=16000,
-                output_config={"format": {"type": "json_schema", "schema": _RESPONSE_SCHEMA}},
-                messages=[{"role": "user", "content": content}],
-            )
-        except anthropic.RateLimitError as exc:
-            raise MenuImportExtractionFailedError("rate limited, try again shortly") from exc
-        except anthropic.APIStatusError as exc:
-            raise MenuImportExtractionFailedError(f"upstream error ({exc.status_code})") from exc
-        except anthropic.APIConnectionError as exc:
-            raise MenuImportExtractionFailedError("couldn't reach the extraction service") from exc
-
-        try:
-            text = next(b.text for b in response.content if b.type == "text")
-            payload = json.loads(text)
-            rows = payload["rows"]
-        except (StopIteration, KeyError, json.JSONDecodeError) as exc:
-            raise MenuImportExtractionFailedError("received an unreadable response") from exc
-
-        return [_row_from_payload(row) for row in rows]
+class VisionExtractor(Protocol):
+    def extract(self, pages: list[MenuImagePage]) -> list[ExtractedMenuRowDTO]: ...
 
 
-def _row_from_payload(row: dict[str, object]) -> ExtractedMenuRowDTO:
+def row_from_payload(row: dict[str, object]) -> ExtractedMenuRowDTO:
+    """Shared between providers -- both are forced into ``RESPONSE_SCHEMA``,
+    so both produce this exact same row shape."""
     return ExtractedMenuRowDTO(
         category=str(row["category"]),
         name=str(row["name"]),
@@ -185,3 +142,10 @@ def _row_from_payload(row: dict[str, object]) -> ExtractedMenuRowDTO:
         pricing_unit=str(row["pricingUnit"]) or None,
         note=str(row["note"]) or None,
     )
+
+
+def parse_rows_response(text: str) -> list[ExtractedMenuRowDTO]:
+    """Shared response-JSON parsing -- both providers hand this a JSON
+    string matching ``RESPONSE_SCHEMA``."""
+    payload = json.loads(text)
+    return [row_from_payload(row) for row in payload["rows"]]
