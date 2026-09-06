@@ -16,9 +16,21 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Every nested BaseSettings class below needs its OWN `env_file`/`extra`
+# -- pydantic-settings does not propagate the outer Settings class's
+# model_config to a field typed as another BaseSettings, even when it's
+# built via default_factory. Without this, a nested class silently reads
+# only real process env vars and never the .env file at all (found the
+# hard way: ANTHROPIC_API_KEY/GEMINI_API_KEY both sat in .env and were
+# both silently ignored). `extra="ignore"` is required alongside
+# `env_file` for the same reason as the outer class: once a nested class
+# reads .env itself, it sees every other class's variables in that same
+# file too and must not reject them as unknown.
+_ENV_FILE_CONFIG = SettingsConfigDict(env_file=".env", extra="ignore")
+
 
 class DatabaseSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="DATABASE_")
+    model_config = SettingsConfigDict(**_ENV_FILE_CONFIG, env_prefix="DATABASE_")
 
     url: str = Field(
         default="postgresql+asyncpg://restaurantos:restaurantos@localhost:5432/restaurantos",
@@ -28,7 +40,7 @@ class DatabaseSettings(BaseSettings):
 
 
 class JWTSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="JWT_")
+    model_config = SettingsConfigDict(**_ENV_FILE_CONFIG, env_prefix="JWT_")
 
     private_key: str = Field(
         description="RS256 private key (PEM). Required in every environment "
@@ -41,7 +53,7 @@ class JWTSettings(BaseSettings):
 
 
 class AnthropicSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="ANTHROPIC_")
+    model_config = SettingsConfigDict(**_ENV_FILE_CONFIG, env_prefix="ANTHROPIC_")
 
     api_key: str | None = Field(
         default=None,
@@ -52,7 +64,7 @@ class AnthropicSettings(BaseSettings):
 
 
 class GeminiSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="GEMINI_")
+    model_config = SettingsConfigDict(**_ENV_FILE_CONFIG, env_prefix="GEMINI_")
 
     api_key: str | None = Field(
         default=None,
@@ -63,7 +75,7 @@ class GeminiSettings(BaseSettings):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = _ENV_FILE_CONFIG
 
     app_env: str = Field(default="development", alias="APP_ENV")
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
