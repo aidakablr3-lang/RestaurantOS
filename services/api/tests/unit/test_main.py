@@ -166,4 +166,7 @@ class TestOpenApiSecurityScheme:
         # Menu import from photo/PDF/CSV/XLSX added 2 more, both
         # authenticated (menu.manage): POST .../menu-imports/extract and
         # POST .../menu-imports/commit.
-        assert checked == 129
+        # The counter POS screen added 1 more, authenticated
+        # (order.manage): PATCH .../orders/{order_id}/items/{order_item_id}
+        # (UpdateOrderItemQuantityUseCase).
+        assert checked == 130
