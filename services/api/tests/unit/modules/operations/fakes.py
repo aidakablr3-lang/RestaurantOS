@@ -260,9 +260,7 @@ class InMemoryKitchenTicketRepository:
 
     async def list_for_order(self, tenant_id: str, order_id: str) -> list[KitchenTicket]:
         return [
-            t
-            for t in self._tickets.values()
-            if t.tenant_id == tenant_id and t.order_id == order_id
+            t for t in self._tickets.values() if t.tenant_id == tenant_id and t.order_id == order_id
         ]
 
     async def get_items(self, tenant_id: str, kitchen_ticket_id: str) -> list[KitchenItem]:

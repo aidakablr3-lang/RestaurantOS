@@ -168,7 +168,9 @@ class KitchenTicketModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, Timestamp
     )
     station: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="fired")
-    cancelled_at: Mapped[datetime | None] = mapped_column(TimestampType(timezone=True), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(
+        TimestampType(timezone=True), nullable=True
+    )
 
 
 class KitchenItemModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin):
