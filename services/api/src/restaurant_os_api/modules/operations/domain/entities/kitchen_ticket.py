@@ -13,6 +13,18 @@ through its own route (a cook marking one item ready before the rest),
 and no invariant enforces "ticket can only be marked ready once every
 item is ready" (that stricter cross-child rule is real, disclosed
 future work, not silently assumed).
+
+``cancel()`` (operational-gap fix, 2026-09-08): the KDS-visible
+counterpart to ``VoidOrderUseCase`` voiding the parent ``Order`` --
+previously a post-fire void left the ticket sitting on the board in
+whatever status it was in, with nothing telling the kitchen to stop.
+Allowed from ``fired``/``in_progress``/``ready`` (a chef could be
+mid-dish at any of those) but not from ``served`` -- a served ticket
+already reached the guest, cancelling it after the fact would be a
+lie, not a correction. ``cancelled_at`` is stamped by the caller (same
+shape as ``Order.closed_at``), not defaulted here, so the KDS can
+compute "how long has this been cancelled" without this entity needing
+clock access of its own.
 """
 
 from __future__ import annotations
@@ -31,6 +43,7 @@ class KitchenTicketStatus(StrEnum):
     IN_PROGRESS = "in_progress"
     READY = "ready"
     SERVED = "served"
+    CANCELLED = "cancelled"
 
 
 @dataclass(slots=True)
@@ -41,6 +54,7 @@ class KitchenTicket:
     station: str
     status: KitchenTicketStatus
     created_at: datetime
+    cancelled_at: datetime | None = None
 
     def start(self) -> None:
         self._transition_to(
@@ -54,6 +68,17 @@ class KitchenTicket:
 
     def mark_served(self) -> None:
         self._transition_to(KitchenTicketStatus.SERVED, allowed_from=(KitchenTicketStatus.READY,))
+
+    def cancel(self, *, cancelled_at: datetime) -> None:
+        self._transition_to(
+            KitchenTicketStatus.CANCELLED,
+            allowed_from=(
+                KitchenTicketStatus.FIRED,
+                KitchenTicketStatus.IN_PROGRESS,
+                KitchenTicketStatus.READY,
+            ),
+        )
+        self.cancelled_at = cancelled_at
 
     def _transition_to(
         self, new_status: KitchenTicketStatus, *, allowed_from: tuple[KitchenTicketStatus, ...]

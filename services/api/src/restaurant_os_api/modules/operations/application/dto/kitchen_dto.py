@@ -26,6 +26,7 @@ class KitchenTicketDTO:
     status: str
     created_at: datetime
     items: list[KitchenItemDTO]
+    cancelled_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

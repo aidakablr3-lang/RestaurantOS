@@ -25,6 +25,10 @@ class AddOrderItemRequestSchema(CamelModel):
     modifiers_snapshot: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class UpdateOrderItemQuantityRequestSchema(CamelModel):
+    quantity: int = Field(..., gt=0)
+
+
 class OrderItemResponseSchema(CamelModel):
     id: str
     order_id: str

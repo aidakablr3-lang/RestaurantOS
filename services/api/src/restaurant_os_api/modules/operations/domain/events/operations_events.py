@@ -124,6 +124,33 @@ class TicketReady:
 
 
 @dataclass(frozen=True, slots=True)
+class KitchenTicketCancelled:
+    """Published once per ticket by the ``VoidOrderUseCase`` kitchen
+    cascade (operational-gap fix, 2026-09-08) -- the event a future
+    KDS WebSocket consumer would use to push an immediate "stop
+    cooking" signal, same shape as ``TicketReady``'s own disclosed gap
+    (no consumer exists yet; lands in the outbox and waits)."""
+
+    kitchen_ticket_id: str
+    order_id: str
+    occurred_at: datetime
+
+    event_type: ClassVar[str] = "KitchenTicketCancelled"
+    aggregate_type: ClassVar[str] = "kitchen_ticket"
+
+    @property
+    def aggregate_id(self) -> str:
+        return self.kitchen_ticket_id
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "kitchenTicketId": self.kitchen_ticket_id,
+            "orderId": self.order_id,
+            "occurredAt": self.occurred_at.isoformat(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class PaymentSettled:
     payment_id: str
     bill_id: str

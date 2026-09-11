@@ -36,6 +36,7 @@ from restaurant_os_api.modules.operations.domain.entities import (
 from restaurant_os_api.modules.operations.domain.events import OrderServed, TicketReady
 from restaurant_os_api.modules.operations.domain.exceptions import (
     InvalidKitchenItemStatusTransitionError,
+    InvalidKitchenTicketStatusTransitionError,
     KitchenItemNotFoundError,
     KitchenTicketNotFoundError,
 )
@@ -564,6 +565,31 @@ class TestUpdateKitchenTicketStatusUseCase:
                 TENANT_ID,
                 "user-1",
                 ChangeKitchenTicketStatusRequestDTO(kitchen_ticket_id=TICKET_ID, status="ready"),
+            )
+
+    async def test_a_cancelled_ticket_is_no_longer_actionable(self) -> None:
+        # Kitchen-ticket-cancellation operational-gap fix: once a ticket
+        # is cancelled (VoidOrderUseCase's cascade), the KDS's own bump
+        # route must refuse to advance it -- a cancelled ticket has no
+        # entry in KitchenTicket._transition_to's allowed_from for any
+        # of start/mark_ready/mark_served, so this is enforced by the
+        # entity itself, not a special case in the use case.
+        use_case = self._use_case(
+            InMemoryKitchenTicketRepository(
+                {TICKET_ID: _ticket(status=KitchenTicketStatus.CANCELLED)}
+            ),
+            InMemoryOrderRepository({ORDER_ID: _order()}),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            FakeOutboxWriter(),
+        )
+
+        with pytest.raises(InvalidKitchenTicketStatusTransitionError):
+            await use_case.execute(
+                TENANT_ID,
+                "user-1",
+                ChangeKitchenTicketStatusRequestDTO(
+                    kitchen_ticket_id=TICKET_ID, status="in_progress"
+                ),
             )
 
     async def test_no_grant_at_all_is_denied(self) -> None:

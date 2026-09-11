@@ -38,3 +38,4 @@ class KitchenTicketResponseSchema(CamelModel):
     status: str
     created_at: datetime
     items: list[KitchenItemResponseSchema]
+    cancelled_at: datetime | None = None

@@ -13,6 +13,7 @@ from restaurant_os_api.modules.identity.domain.exceptions import PermissionDenie
 from restaurant_os_api.modules.operations.application.dto import (
     AddOrderItemRequestDTO,
     CreateOrderRequestDTO,
+    UpdateOrderItemQuantityRequestDTO,
 )
 from restaurant_os_api.modules.operations.application.use_cases import (
     AddOrderItemUseCase,
@@ -21,10 +22,15 @@ from restaurant_os_api.modules.operations.application.use_cases import (
     FireOrderUseCase,
     GetOrderUseCase,
     ListOrdersUseCase,
+    UpdateOrderItemQuantityUseCase,
     VoidOrderItemUseCase,
     VoidOrderUseCase,
 )
 from restaurant_os_api.modules.operations.domain.entities import (
+    KitchenItem,
+    KitchenItemStatus,
+    KitchenTicket,
+    KitchenTicketStatus,
     Order,
     OrderItem,
     OrderItemLineStatus,
@@ -32,6 +38,7 @@ from restaurant_os_api.modules.operations.domain.entities import (
     OrderStatus,
 )
 from restaurant_os_api.modules.operations.domain.events import (
+    KitchenTicketCancelled,
     OrderClosed,
     OrderFired,
     OrderPlaced,
@@ -42,6 +49,7 @@ from restaurant_os_api.modules.operations.domain.exceptions import (
     InvalidOrderStatusTransitionError,
     MenuItemNotAvailableError,
     OrderHasNoItemsError,
+    OrderItemNotEditableError,
     OrderItemNotFoundError,
     OrderNotFoundError,
 )
@@ -196,6 +204,32 @@ def _order_item(**overrides) -> OrderItem:
     }
     defaults.update(overrides)
     return OrderItem(**defaults)
+
+
+def _kitchen_ticket(**overrides) -> KitchenTicket:
+    defaults = {
+        "id": "ticket-1",
+        "tenant_id": TENANT_ID,
+        "order_id": ORDER_ID,
+        "station": "kitchen",
+        "status": KitchenTicketStatus.FIRED,
+        "created_at": datetime.now(UTC),
+    }
+    defaults.update(overrides)
+    return KitchenTicket(**defaults)
+
+
+def _kitchen_item(**overrides) -> KitchenItem:
+    defaults = {
+        "id": "kitem-1",
+        "tenant_id": TENANT_ID,
+        "kitchen_ticket_id": "ticket-1",
+        "order_item_id": "item-1",
+        "status": KitchenItemStatus.QUEUED,
+        "created_at": datetime.now(UTC),
+    }
+    defaults.update(overrides)
+    return KitchenItem(**defaults)
 
 
 class TestCreateOrderUseCase:
@@ -693,18 +727,39 @@ class TestCloseOrderUseCase:
 
 
 class TestVoidOrderUseCase:
-    async def test_voids_an_open_order_and_publishes_order_voided(self) -> None:
-        outbox = FakeOutboxWriter()
-        use_case = VoidOrderUseCase(
+    def _use_case(
+        self,
+        order_repo,
+        branch_repo=None,
+        table_repo=None,
+        kitchen_ticket_repo=None,
+        outbox=None,
+    ):
+        return VoidOrderUseCase(
             session_factory=_session_factory(),
-            order_repository_factory=lambda _s: InMemoryOrderRepository({ORDER_ID: _order()}),
-            branch_repository_factory=lambda _s: InMemoryBranchRepository({BRANCH_ID: _branch()}),
-            table_repository_factory=lambda _s: InMemoryTableRepository(),
+            order_repository_factory=lambda _s: order_repo,
+            branch_repository_factory=lambda _s: (
+                branch_repo
+                if branch_repo is not None
+                else InMemoryBranchRepository({BRANCH_ID: _branch()})
+            ),
+            table_repository_factory=lambda _s: (
+                table_repo if table_repo is not None else InMemoryTableRepository()
+            ),
+            kitchen_ticket_repository_factory=lambda _s: (
+                kitchen_ticket_repo
+                if kitchen_ticket_repo is not None
+                else InMemoryKitchenTicketRepository()
+            ),
             resolve_user_permissions=FakeResolveUserPermissionsUseCase(
                 resolved=ResolvedPermissions(tenant_wide=frozenset({"order.manage"}))
             ),
-            outbox_writer_factory=lambda _s: outbox,
+            outbox_writer_factory=lambda _s: outbox if outbox is not None else FakeOutboxWriter(),
         )
+
+    async def test_voids_an_open_order_and_publishes_order_voided(self) -> None:
+        outbox = FakeOutboxWriter()
+        use_case = self._use_case(InMemoryOrderRepository({ORDER_ID: _order()}), outbox=outbox)
 
         result = await use_case.execute(TENANT_ID, "user-1", ORDER_ID)
 
@@ -713,17 +768,8 @@ class TestVoidOrderUseCase:
 
     async def test_voiding_a_table_order_marks_the_table_available(self) -> None:
         table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
-        use_case = VoidOrderUseCase(
-            session_factory=_session_factory(),
-            order_repository_factory=lambda _s: InMemoryOrderRepository(
-                {ORDER_ID: _order(table_id=TABLE_ID)}
-            ),
-            branch_repository_factory=lambda _s: InMemoryBranchRepository({BRANCH_ID: _branch()}),
-            table_repository_factory=lambda _s: table_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
-                resolved=ResolvedPermissions(tenant_wide=frozenset({"order.manage"}))
-            ),
-            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+        use_case = self._use_case(
+            InMemoryOrderRepository({ORDER_ID: _order(table_id=TABLE_ID)}), table_repo=table_repo
         )
 
         await use_case.execute(TENANT_ID, "user-1", ORDER_ID)
@@ -736,20 +782,14 @@ class TestVoidOrderUseCase:
         self,
     ) -> None:
         table_repo = InMemoryTableRepository({TABLE_ID: _table(status=TableStatus.OCCUPIED)})
-        use_case = VoidOrderUseCase(
-            session_factory=_session_factory(),
-            order_repository_factory=lambda _s: InMemoryOrderRepository(
+        use_case = self._use_case(
+            InMemoryOrderRepository(
                 {
                     ORDER_ID: _order(table_id=TABLE_ID),
                     ORDER2_ID: _order(id=ORDER2_ID, status=OrderStatus.FIRED, table_id=TABLE_ID),
                 }
             ),
-            branch_repository_factory=lambda _s: InMemoryBranchRepository({BRANCH_ID: _branch()}),
-            table_repository_factory=lambda _s: table_repo,
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
-                resolved=ResolvedPermissions(tenant_wide=frozenset({"order.manage"}))
-            ),
-            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
+            table_repo=table_repo,
         )
 
         await use_case.execute(TENANT_ID, "user-1", ORDER_ID)
@@ -759,19 +799,68 @@ class TestVoidOrderUseCase:
         assert table.status == TableStatus.OCCUPIED
 
     async def test_raises_not_found_for_an_unknown_order(self) -> None:
-        use_case = VoidOrderUseCase(
-            session_factory=_session_factory(),
-            order_repository_factory=lambda _s: InMemoryOrderRepository(),
-            branch_repository_factory=lambda _s: InMemoryBranchRepository({BRANCH_ID: _branch()}),
-            table_repository_factory=lambda _s: InMemoryTableRepository(),
-            resolve_user_permissions=FakeResolveUserPermissionsUseCase(
-                resolved=ResolvedPermissions(tenant_wide=frozenset({"order.manage"}))
-            ),
-            outbox_writer_factory=lambda _s: FakeOutboxWriter(),
-        )
+        use_case = self._use_case(InMemoryOrderRepository())
 
         with pytest.raises(OrderNotFoundError):
             await use_case.execute(TENANT_ID, "user-1", ORDER_ID)
+
+    async def test_cascades_a_fired_ticket_and_its_items_to_cancelled(self) -> None:
+        outbox = FakeOutboxWriter()
+        kitchen_ticket_repo = InMemoryKitchenTicketRepository(
+            tickets={"ticket-1": _kitchen_ticket()},
+            items={
+                "kitem-1": _kitchen_item(status=KitchenItemStatus.IN_PROGRESS),
+                "kitem-2": _kitchen_item(id="kitem-2", status=KitchenItemStatus.QUEUED),
+            },
+        )
+        use_case = self._use_case(
+            InMemoryOrderRepository({ORDER_ID: _order(status=OrderStatus.FIRED)}),
+            kitchen_ticket_repo=kitchen_ticket_repo,
+            outbox=outbox,
+        )
+
+        await use_case.execute(TENANT_ID, "user-1", ORDER_ID)
+
+        ticket = kitchen_ticket_repo._tickets["ticket-1"]
+        assert ticket.status == KitchenTicketStatus.CANCELLED
+        assert ticket.cancelled_at is not None
+        assert all(
+            item.status == KitchenItemStatus.CANCELLED
+            for item in kitchen_ticket_repo._items.values()
+        )
+        cancelled_events = [
+            e[1] for e in outbox.published if isinstance(e[1], KitchenTicketCancelled)
+        ]
+        assert len(cancelled_events) == 1
+        assert cancelled_events[0].kitchen_ticket_id == "ticket-1"
+
+    async def test_does_not_touch_an_already_served_ticket(self) -> None:
+        kitchen_ticket_repo = InMemoryKitchenTicketRepository(
+            tickets={"ticket-1": _kitchen_ticket(status=KitchenTicketStatus.SERVED)},
+        )
+        use_case = self._use_case(
+            InMemoryOrderRepository({ORDER_ID: _order(status=OrderStatus.FIRED)}),
+            kitchen_ticket_repo=kitchen_ticket_repo,
+        )
+
+        await use_case.execute(TENANT_ID, "user-1", ORDER_ID)
+
+        assert kitchen_ticket_repo._tickets["ticket-1"].status == KitchenTicketStatus.SERVED
+
+    async def test_does_not_double_cancel_an_already_cancelled_ticket(self) -> None:
+        outbox = FakeOutboxWriter()
+        kitchen_ticket_repo = InMemoryKitchenTicketRepository(
+            tickets={"ticket-1": _kitchen_ticket(status=KitchenTicketStatus.CANCELLED)},
+        )
+        use_case = self._use_case(
+            InMemoryOrderRepository({ORDER_ID: _order(status=OrderStatus.FIRED)}),
+            kitchen_ticket_repo=kitchen_ticket_repo,
+            outbox=outbox,
+        )
+
+        await use_case.execute(TENANT_ID, "user-1", ORDER_ID)
+
+        assert not any(isinstance(e[1], KitchenTicketCancelled) for e in outbox.published)
 
 
 class TestVoidOrderItemUseCase:
@@ -845,6 +934,132 @@ class TestVoidOrderItemUseCase:
 
         with pytest.raises(PermissionDeniedError):
             await use_case.execute(TENANT_ID, "user-1", ORDER_ID, "item-1")
+
+
+class TestUpdateOrderItemQuantityUseCase:
+    def _use_case(self, order_repo, branch_repo, resolved):
+        return UpdateOrderItemQuantityUseCase(
+            session_factory=_session_factory(),
+            order_repository_factory=lambda _s: order_repo,
+            branch_repository_factory=lambda _s: branch_repo,
+            resolve_user_permissions=FakeResolveUserPermissionsUseCase(resolved=resolved),
+        )
+
+    async def test_changes_quantity_and_adjusts_subtotal_by_the_delta(self) -> None:
+        order_repo = InMemoryOrderRepository(
+            {ORDER_ID: _order(subtotal_amount=Decimal("17.98"))},
+            {"item-1": _order_item(quantity=2, unit_price_amount=Decimal("8.99"))},
+        )
+        use_case = self._use_case(
+            order_repo,
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"order.manage"})),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            UpdateOrderItemQuantityRequestDTO(
+                order_id=ORDER_ID, order_item_id="item-1", quantity=5
+            ),
+        )
+
+        assert result.items[0].quantity == 5
+        # 17.98 (2 x 8.99) + 3 x 8.99 = 44.95 (5 x 8.99)
+        assert result.subtotal_amount == Decimal("44.95")
+
+    async def test_decreasing_quantity_reduces_subtotal(self) -> None:
+        order_repo = InMemoryOrderRepository(
+            {ORDER_ID: _order(subtotal_amount=Decimal("26.97"))},
+            {"item-1": _order_item(quantity=3, unit_price_amount=Decimal("8.99"))},
+        )
+        use_case = self._use_case(
+            order_repo,
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"order.manage"})),
+        )
+
+        result = await use_case.execute(
+            TENANT_ID,
+            "user-1",
+            UpdateOrderItemQuantityRequestDTO(
+                order_id=ORDER_ID, order_item_id="item-1", quantity=1
+            ),
+        )
+
+        assert result.items[0].quantity == 1
+        assert result.subtotal_amount == Decimal("8.99")
+
+    async def test_raises_not_found_for_an_unknown_order(self) -> None:
+        use_case = self._use_case(
+            InMemoryOrderRepository(),
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"order.manage"})),
+        )
+
+        with pytest.raises(OrderNotFoundError):
+            await use_case.execute(
+                TENANT_ID,
+                "user-1",
+                UpdateOrderItemQuantityRequestDTO(
+                    order_id=ORDER_ID, order_item_id="item-1", quantity=3
+                ),
+            )
+
+    async def test_raises_not_found_for_an_item_belonging_to_a_different_order(self) -> None:
+        order_repo = InMemoryOrderRepository(
+            {ORDER_ID: _order(), "other-order": _order(id="other-order")},
+            {"item-1": _order_item(order_id="other-order")},
+        )
+        use_case = self._use_case(
+            order_repo,
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"order.manage"})),
+        )
+
+        with pytest.raises(OrderItemNotFoundError):
+            await use_case.execute(
+                TENANT_ID,
+                "user-1",
+                UpdateOrderItemQuantityRequestDTO(
+                    order_id=ORDER_ID, order_item_id="item-1", quantity=3
+                ),
+            )
+
+    async def test_raises_not_editable_once_the_item_is_fired(self) -> None:
+        order_repo = InMemoryOrderRepository(
+            {ORDER_ID: _order(status=OrderStatus.FIRED)},
+            {"item-1": _order_item(line_status=OrderItemLineStatus.FIRED)},
+        )
+        use_case = self._use_case(
+            order_repo,
+            InMemoryBranchRepository({BRANCH_ID: _branch()}),
+            ResolvedPermissions(tenant_wide=frozenset({"order.manage"})),
+        )
+
+        with pytest.raises(OrderItemNotEditableError):
+            await use_case.execute(
+                TENANT_ID,
+                "user-1",
+                UpdateOrderItemQuantityRequestDTO(
+                    order_id=ORDER_ID, order_item_id="item-1", quantity=5
+                ),
+            )
+
+    async def test_no_grant_at_all_is_denied(self) -> None:
+        order_repo = InMemoryOrderRepository({ORDER_ID: _order()}, {"item-1": _order_item()})
+        use_case = self._use_case(
+            order_repo, InMemoryBranchRepository({BRANCH_ID: _branch()}), ResolvedPermissions()
+        )
+
+        with pytest.raises(PermissionDeniedError):
+            await use_case.execute(
+                TENANT_ID,
+                "user-1",
+                UpdateOrderItemQuantityRequestDTO(
+                    order_id=ORDER_ID, order_item_id="item-1", quantity=5
+                ),
+            )
 
 
 class TestHasActiveOrdersForTable:

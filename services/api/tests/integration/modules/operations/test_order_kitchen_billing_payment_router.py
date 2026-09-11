@@ -670,6 +670,45 @@ class TestOrderKitchenBillingPaymentLifecycle:
         assert void_fired_resp.status_code == 409, void_fired_resp.text
         assert void_fired_resp.json()["error"]["code"] == "INVALID_ORDER_ITEM_STATUS_TRANSITION"
 
+    def test_updates_an_added_items_quantity_in_place(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+
+        order_id = client.post(
+            f"/api/v1/branches/{branch_id}/orders", headers=headers, json={"orderSource": "pos"}
+        ).json()["data"]["id"]
+        item = client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        ).json()["data"]["items"][0]
+
+        patch_resp = client.patch(
+            f"/api/v1/orders/{order_id}/items/{item['id']}", headers=headers, json={"quantity": 3}
+        )
+        assert patch_resp.status_code == 200, patch_resp.text
+        updated_order = patch_resp.json()["data"]
+        # One row still -- quantity changed in place, not a second row for
+        # the same menu item (bill-print-view.tsx prints one <tr> per row
+        # with no menu-item-level merging, so a second row would print as
+        # a separate line at the unit price rather than 3 x unit price).
+        assert len(updated_order["items"]) == 1
+        updated_item = updated_order["items"][0]
+        assert updated_item["id"] == item["id"]
+        assert updated_item["quantity"] == 3
+        assert Decimal(updated_order["subtotalAmount"]) == Decimal("30.00")
+
+        fire_resp = client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+        assert fire_resp.status_code == 200, fire_resp.text
+
+        patch_fired_resp = client.patch(
+            f"/api/v1/orders/{order_id}/items/{item['id']}", headers=headers, json={"quantity": 5}
+        )
+        assert patch_fired_resp.status_code == 409, patch_fired_resp.text
+        assert patch_fired_resp.json()["error"]["code"] == "ORDER_ITEM_NOT_EDITABLE"
+
     def test_adds_and_refires_an_item_onto_an_already_fired_order(
         self, client: TestClient, owner: dict
     ) -> None:
@@ -894,6 +933,50 @@ class TestOrderKitchenBillingPaymentLifecycle:
 
         after_void = client.get(f"/api/v1/branches/{branch_id}/tables/{table_id}", headers=headers)
         assert after_void.json()["data"]["status"] == "available"
+
+    def test_voiding_a_fired_order_cancels_its_kitchen_ticket(
+        self, client: TestClient, owner: dict
+    ) -> None:
+        # Operational-gap fix (2026-09-08): a post-fire void used to leave
+        # the KDS with no idea the order was dead. Real end-to-end proof
+        # against Postgres that the cascade (and its migration -- the new
+        # `cancelled_at` column and the widened status CHECK constraints
+        # on both kitchen_tickets and kitchen_items) actually works, not
+        # just the in-memory-fake unit coverage.
+        headers = _auth_headers(owner["token"])
+        branch_id = owner["branch_id"]
+
+        order_id = client.post(
+            f"/api/v1/branches/{branch_id}/orders", headers=headers, json={"orderSource": "pos"}
+        ).json()["data"]["id"]
+        client.post(
+            f"/api/v1/orders/{order_id}/items",
+            headers=headers,
+            json={"menuItemId": owner["menu_item_id"], "quantity": 1},
+        )
+        client.post(f"/api/v1/orders/{order_id}/fire", headers=headers)
+
+        void_resp = client.post(f"/api/v1/orders/{order_id}/void", headers=headers)
+        assert void_resp.status_code == 200, void_resp.text
+
+        tickets = client.get(
+            f"/api/v1/branches/{branch_id}/kitchen-tickets", headers=headers
+        ).json()["data"]
+        assert len(tickets) == 1
+        ticket = tickets[0]
+        assert ticket["status"] == "cancelled"
+        assert ticket["cancelledAt"] is not None
+        assert len(ticket["items"]) == 1
+        assert ticket["items"][0]["status"] == "cancelled"
+
+        # No longer actionable: the same status route the KDS bump button
+        # uses must refuse to advance a cancelled ticket.
+        bump_resp = client.post(
+            f"/api/v1/kitchen-tickets/{ticket['id']}/status",
+            headers=headers,
+            json={"status": "in_progress"},
+        )
+        assert bump_resp.status_code == 409, bump_resp.text
 
     def test_requires_authentication(self, client: TestClient, owner: dict) -> None:
         response = client.post(

@@ -51,4 +51,5 @@ def kitchen_ticket_to_dto(ticket: KitchenTicket, items: list[KitchenItemDTO]) ->
         status=ticket.status.value,
         created_at=ticket.created_at,
         items=items,
+        cancelled_at=ticket.cancelled_at,
     )

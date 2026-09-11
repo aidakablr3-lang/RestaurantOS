@@ -128,6 +128,9 @@ from restaurant_os_api.modules.operations.application.use_cases.update_kitchen_i
 from restaurant_os_api.modules.operations.application.use_cases.update_kitchen_ticket_status import (
     UpdateKitchenTicketStatusUseCase,
 )
+from restaurant_os_api.modules.operations.application.use_cases.update_order_item_quantity import (
+    UpdateOrderItemQuantityUseCase,
+)
 from restaurant_os_api.modules.operations.application.use_cases.update_supplier import (
     UpdateSupplierUseCase,
 )
@@ -185,6 +188,7 @@ __all__ = [
     "UpdateInventoryItemUseCase",
     "UpdateKitchenItemStatusUseCase",
     "UpdateKitchenTicketStatusUseCase",
+    "UpdateOrderItemQuantityUseCase",
     "UpdateSupplierUseCase",
     "VoidOrderItemUseCase",
     "VoidOrderUseCase",

@@ -1,4 +1,5 @@
 from restaurant_os_api.modules.operations.domain.events.operations_events import (
+    KitchenTicketCancelled,
     LowStockDetected,
     OrderClosed,
     OrderFired,
@@ -12,6 +13,7 @@ from restaurant_os_api.modules.operations.domain.events.operations_events import
 )
 
 __all__ = [
+    "KitchenTicketCancelled",
     "LowStockDetected",
     "OrderClosed",
     "OrderFired",

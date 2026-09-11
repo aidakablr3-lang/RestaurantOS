@@ -62,6 +62,7 @@ def _kitchen_ticket_to_schema(dto: Any) -> KitchenTicketResponseSchema:
             )
             for item in dto.items
         ],
+        cancelled_at=dto.cancelled_at,
     )
 
 

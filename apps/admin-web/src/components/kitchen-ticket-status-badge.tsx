@@ -9,6 +9,7 @@ const TICKET_STATUS_VARIANT: Record<
   in_progress: "secondary",
   ready: "default",
   served: "secondary",
+  cancelled: "destructive",
 }
 
 const TICKET_STATUS_LABEL: Record<KitchenTicketStatus, string> = {
@@ -16,6 +17,7 @@ const TICKET_STATUS_LABEL: Record<KitchenTicketStatus, string> = {
   in_progress: "In progress",
   ready: "Ready",
   served: "Served",
+  cancelled: "Cancelled",
 }
 
 export function KitchenTicketStatusBadge({ status }: { status: KitchenTicketStatus }) {
@@ -34,6 +36,7 @@ const ITEM_STATUS_VARIANT: Record<
   in_progress: "secondary",
   ready: "default",
   served: "secondary",
+  cancelled: "destructive",
 }
 
 const ITEM_STATUS_LABEL: Record<KitchenItemStatus, string> = {
@@ -41,6 +44,7 @@ const ITEM_STATUS_LABEL: Record<KitchenItemStatus, string> = {
   in_progress: "In progress",
   ready: "Ready",
   served: "Served",
+  cancelled: "Cancelled",
 }
 
 export function KitchenItemStatusBadge({ status }: { status: KitchenItemStatus }) {

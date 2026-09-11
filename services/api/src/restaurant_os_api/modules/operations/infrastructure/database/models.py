@@ -158,7 +158,8 @@ class KitchenTicketModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, Timestamp
     __table_args__ = (
         ulid_check_constraint("id"),
         CheckConstraint(
-            "status IN ('fired', 'in_progress', 'ready', 'served')", name="status_is_valid"
+            "status IN ('fired', 'in_progress', 'ready', 'served', 'cancelled')",
+            name="status_is_valid",
         ),
     )
 
@@ -167,13 +168,16 @@ class KitchenTicketModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, Timestamp
     )
     station: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="fired")
+    cancelled_at: Mapped[datetime | None] = mapped_column(TimestampType(timezone=True), nullable=True)
 
 
 class KitchenItemModel(Base, ULIDPrimaryKeyMixin, TenantScopedMixin, TimestampMixin):
     __tablename__ = "kitchen_items"
     __table_args__ = (
         ulid_check_constraint("id"),
-        CheckConstraint("status IN ('queued', 'in_progress', 'ready')", name="status_is_valid"),
+        CheckConstraint(
+            "status IN ('queued', 'in_progress', 'ready', 'cancelled')", name="status_is_valid"
+        ),
     )
 
     kitchen_ticket_id: Mapped[str] = mapped_column(

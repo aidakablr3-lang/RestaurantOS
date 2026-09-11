@@ -58,6 +58,10 @@ export interface AddOrderItemRequest {
   modifiersSnapshot?: Record<string, unknown>[]
 }
 
+export interface UpdateOrderItemQuantityRequest {
+  quantity: number
+}
+
 export interface ListOrdersParams {
   offset?: number
   limit?: number

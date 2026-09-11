@@ -5,9 +5,9 @@
  * KitchenItemStatus StrEnums. Field names are camelCase on the wire.
  */
 
-export type KitchenTicketStatus = "fired" | "in_progress" | "ready" | "served"
+export type KitchenTicketStatus = "fired" | "in_progress" | "ready" | "served" | "cancelled"
 
-export type KitchenItemStatus = "queued" | "in_progress" | "ready" | "served"
+export type KitchenItemStatus = "queued" | "in_progress" | "ready" | "served" | "cancelled"
 
 export interface KitchenItem {
   id: string
@@ -27,6 +27,11 @@ export interface KitchenTicket {
   status: KitchenTicketStatus
   createdAt: string
   items: KitchenItem[]
+  // Set only once the ticket is cancelled (VoidOrderUseCase's kitchen
+  // cascade) -- the KDS uses this to decide how long a cancelled
+  // ticket stays visible before dropping off the board. See
+  // kitchen/page.tsx's own CANCELLED_VISIBILITY_MS.
+  cancelledAt: string | null
 }
 
 export interface ChangeKitchenTicketStatusRequest {

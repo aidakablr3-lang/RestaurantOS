@@ -81,6 +81,7 @@ from restaurant_os_api.modules.operations.application.use_cases import (
     UpdateInventoryItemUseCase,
     UpdateKitchenItemStatusUseCase,
     UpdateKitchenTicketStatusUseCase,
+    UpdateOrderItemQuantityUseCase,
     UpdateSupplierUseCase,
     VoidOrderItemUseCase,
     VoidOrderUseCase,
@@ -186,6 +187,7 @@ __all__ = [
     "UpdateInventoryItemUseCaseDep",
     "UpdateKitchenItemStatusUseCaseDep",
     "UpdateKitchenTicketStatusUseCaseDep",
+    "UpdateOrderItemQuantityUseCaseDep",
     "UpdateSupplierUseCaseDep",
     "VoidOrderItemUseCaseDep",
     "VoidOrderUseCaseDep",
@@ -447,6 +449,7 @@ def get_void_order_use_case(
         order_repository_factory=SQLAlchemyOrderRepository,
         branch_repository_factory=SQLAlchemyBranchRepository,
         table_repository_factory=SQLAlchemyTableRepository,
+        kitchen_ticket_repository_factory=SQLAlchemyKitchenTicketRepository,
         resolve_user_permissions=resolve_user_permissions,
         outbox_writer_factory=SQLAlchemyOutboxWriter,
     )
@@ -468,6 +471,23 @@ def get_void_order_item_use_case(
 
 
 VoidOrderItemUseCaseDep = Annotated[VoidOrderItemUseCase, Depends(get_void_order_item_use_case)]
+
+
+def get_update_order_item_quantity_use_case(
+    session_factory: SessionFactoryDep,
+    resolve_user_permissions: ResolveUserPermissionsUseCaseDep,
+) -> UpdateOrderItemQuantityUseCase:
+    return UpdateOrderItemQuantityUseCase(
+        session_factory=session_factory,
+        order_repository_factory=SQLAlchemyOrderRepository,
+        branch_repository_factory=SQLAlchemyBranchRepository,
+        resolve_user_permissions=resolve_user_permissions,
+    )
+
+
+UpdateOrderItemQuantityUseCaseDep = Annotated[
+    UpdateOrderItemQuantityUseCase, Depends(get_update_order_item_quantity_use_case)
+]
 
 
 def get_create_tab_use_case(session_factory: SessionFactoryDep) -> CreateTabUseCase:

@@ -22,6 +22,14 @@ class KitchenTicketRepository(Protocol):
         ``branch_id`` column of its own (Architecture doc SS9)."""
         ...
 
+    async def list_for_order(self, tenant_id: str, order_id: str) -> list[KitchenTicket]:
+        """Every ticket fired for this order, across every station --
+        unpaginated, since one order fans out into at most a handful of
+        tickets (one per distinct station in a single fire/re-fire
+        call), never enough to need paging. Used by the void-order
+        kitchen-cancellation cascade."""
+        ...
+
     async def get_items(self, tenant_id: str, kitchen_ticket_id: str) -> list[KitchenItem]: ...
 
     async def get_item_by_id(self, tenant_id: str, kitchen_item_id: str) -> KitchenItem | None: ...

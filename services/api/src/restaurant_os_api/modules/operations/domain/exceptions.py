@@ -80,6 +80,26 @@ class InvalidOrderItemStatusTransitionError(OperationsDomainError):
         self.to_status = to_status
 
 
+class OrderItemNotEditableError(OperationsDomainError):
+    """Quantity is only adjustable pre-fire (``added``) -- once a line
+    has been sent to the kitchen, changing its quantity in place would
+    silently change what's already cooking with no signal to the
+    kitchen, the same reasoning ``VoidOrderItemUseCase`` already
+    applies to voiding a fired line. Not a status-transition error
+    (quantity isn't part of the ``OrderItemLineStatus`` graph), so kept
+    distinct from ``InvalidOrderItemStatusTransitionError`` rather than
+    overloading it for a different kind of precondition failure."""
+
+    error_code = "ORDER_ITEM_NOT_EDITABLE"
+
+    def __init__(self, order_item_id: str, line_status: str) -> None:
+        super().__init__(
+            f"OrderItem '{order_item_id}' cannot have its quantity changed while '{line_status}'."
+        )
+        self.order_item_id = order_item_id
+        self.line_status = line_status
+
+
 class MenuItemNotAvailableError(OperationsDomainError):
     """The item exists (a plain not-found would be
     ``restaurant.domain.exceptions.MenuItemNotFoundError``, reused

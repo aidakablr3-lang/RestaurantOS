@@ -40,6 +40,7 @@ from restaurant_os_api.modules.operations.application.dto.order_dto import (
     OrderDTO,
     OrderItemDTO,
     OrderListResultDTO,
+    UpdateOrderItemQuantityRequestDTO,
 )
 from restaurant_os_api.modules.operations.application.dto.payment_dto import (
     PaymentDTO,
@@ -133,5 +134,6 @@ __all__ = [
     "TenderBreakdownDTO",
     "TopMenuItemDTO",
     "UpdateInventoryItemRequestDTO",
+    "UpdateOrderItemQuantityRequestDTO",
     "UpdateSupplierRequestDTO",
 ]

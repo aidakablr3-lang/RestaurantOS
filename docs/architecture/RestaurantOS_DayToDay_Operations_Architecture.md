@@ -129,8 +129,12 @@ Every entity below was already specified — at minimum a catalogue-level descri
 
 | Entity | Fields | Lifecycle | Notes |
 |---|---|---|---|
-| **KitchenTicket** | `order_id`, `station` (attribute, e.g. `'grill'`/`'cold'`/`'expo'` — **not a separate entity**, matching Data Architecture v1.0 §3.6/§14.5 explicitly) | Fired → in-progress → ready → bumped/served | One `Order`'s items can fan out into multiple tickets (one per station); each ticket ages independently. |
-| **KitchenItem** | `kitchen_ticket_id`, `order_item_id`, `status` (`queued`\|`in_progress`\|`ready`) | Queued → in-progress → ready | Lets a ticket be partially ready (some items done, others still cooking) — the KDS's own "bump" action operates at this granularity. |
+| **KitchenTicket** | `order_id`, `station` (attribute, e.g. `'grill'`/`'cold'`/`'expo'` — **not a separate entity**, matching Data Architecture v1.0 §3.6/§14.5 explicitly), `cancelled_at` (nullable, added 2026-09-08) | Fired → in-progress → ready → bumped/served; fired/in-progress/ready → **cancelled** (added 2026-09-08, see below) | One `Order`'s items can fan out into multiple tickets (one per station); each ticket ages independently. |
+| **KitchenItem** | `kitchen_ticket_id`, `order_item_id`, `status` (`queued`\|`in_progress`\|`ready`\|`cancelled`) | Queued → in-progress → ready; any of those → cancelled | Lets a ticket be partially ready (some items done, others still cooking) — the KDS's own "bump" action operates at this granularity. |
+
+**Cancellation (operational-gap fix, 2026-09-08).** `VoidOrderUseCase` voiding a fired `Order` used to stop at the `Order` itself, leaving any already-created `KitchenTicket` sitting on the KDS in whatever status it was in — nothing told the kitchen to stop. The void now cascades: every non-`served`, non-`cancelled` `KitchenTicket` for that order (and its own non-terminal `KitchenItem` children) moves to `cancelled`, `KitchenTicket.cancelled_at` is stamped, and one `KitchenTicketCancelled` event is published per ticket cancelled. The KDS keeps a cancelled ticket visible for 5 minutes past `cancelled_at` (not dropped immediately, unlike `served`) — see `apps/admin-web`'s kitchen page for the exact reasoning; the short version is that a cancellation is unsolicited news the kitchen needs a real chance to notice, where a `served` ticket's disappearance is just the normal end of its own story. `VoidOrderItemUseCase` (the pre-fire, single-line void) needs no equivalent cascade: its precondition (`OrderItem.void()`, `added` only) structurally means no `KitchenItem` has been created yet for any line it can legally touch.
+
+**Disclosed limitation, not fixed by the above (inventory isn't in real use yet, so this has no live impact today):** a partially-served order — some `OrderItem`s already reached `served` and had their recipe-ingredient inventory deducted (§3.6), while the order itself is still `fired` because not *every* item has served — can still be legally void'd. The cancellation cascade above does not reverse that already-posted deduction. Revisit if/when Inventory & Recipes moves from configured-but-unused to real production use.
 
 ### 3.3 POS Billing
 
@@ -357,6 +361,7 @@ Published through the existing `OutboxWriter` port, same dataclass/`ClassVar` co
 | `OrderClosed` | `order` | Close-order use case |
 | `OrderVoided` | `order` | Void use case |
 | `TicketReady` | `kitchen_ticket` | Kitchen item status update, once every item on a ticket reaches `ready` — the literal event a future KDS/expo-screen WebSocket consumer subscribes to |
+| `KitchenTicketCancelled` | `kitchen_ticket` | Void-order use case's kitchen-cancellation cascade (2026-09-08), one per ticket actually cancelled |
 | `StockDeducted` | `stock_movement` | Written by the same use case that emits `OrderClosed`, one per served `OrderItem`'s ingredients — the event a future menu-availability/86-list cache-invalidation consumer subscribes to |
 | `LowStockDetected` | `inventory_item` | Emitted when a `StockMovement` insert crosses `InventoryItem.reorder_point` going downward |
 | `PaymentSettled` | `payment` | Record-payment use case |

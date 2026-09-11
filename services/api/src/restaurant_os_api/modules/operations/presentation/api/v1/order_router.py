@@ -31,6 +31,7 @@ from restaurant_os_api.modules.operations.application.dto import (
     AddOrderItemRequestDTO,
     CreateOrderRequestDTO,
     OrderDTO,
+    UpdateOrderItemQuantityRequestDTO,
 )
 from restaurant_os_api.modules.operations.presentation.dependencies import (
     AddOrderItemUseCaseDep,
@@ -43,6 +44,7 @@ from restaurant_os_api.modules.operations.presentation.dependencies import (
     RequireOrderManageAtAnyScopeDep,
     RequireOrderManageDep,
     RequireOrderReadDep,
+    UpdateOrderItemQuantityUseCaseDep,
     VoidOrderItemUseCaseDep,
     VoidOrderUseCaseDep,
 )
@@ -51,6 +53,7 @@ from restaurant_os_api.modules.operations.presentation.schemas.order_schemas imp
     CreateOrderRequestSchema,
     OrderItemResponseSchema,
     OrderResponseSchema,
+    UpdateOrderItemQuantityRequestSchema,
 )
 from restaurant_os_api.platform.idempotency import fingerprint_request
 
@@ -328,6 +331,44 @@ async def void_order_item(
             idempotency_key=idempotency_key,
             request_fingerprint=fingerprint_request(
                 {"orderId": order_id, "orderItemId": order_item_id, "action": "void_item"}
+            ),
+            execute=execute,
+        )
+    return JSONResponse(status_code=http_status, content=response_body)
+
+
+@router.patch(
+    "/api/v1/orders/{order_id}/items/{order_item_id}",
+    response_model=ApiResponse[OrderResponseSchema],
+)
+async def update_order_item_quantity(
+    order_id: OrderIdPath,
+    order_item_id: OrderItemIdPath,
+    body: UpdateOrderItemQuantityRequestSchema,
+    principal: RequireOrderManageAtAnyScopeDep,
+    use_case: UpdateOrderItemQuantityUseCaseDep,
+    idempotency_guard: IdempotencyGuardDep,
+    idempotency_key: IdempotencyKeyHeader = None,
+) -> JSONResponse:
+    async def execute() -> tuple[int, dict[str, Any]]:
+        result = await use_case.execute(
+            principal.tenant_id,
+            principal.user_id,
+            UpdateOrderItemQuantityRequestDTO(
+                order_id=order_id, order_item_id=order_item_id, quantity=body.quantity
+            ),
+        )
+        response = ApiResponse(data=_order_to_schema(result))
+        return status.HTTP_200_OK, response.model_dump(mode="json", by_alias=True)
+
+    if idempotency_key is None:
+        http_status, response_body = await execute()
+    else:
+        http_status, response_body = await idempotency_guard.run(
+            tenant_id=principal.tenant_id,
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint_request(
+                {"orderId": order_id, "orderItemId": order_item_id, "quantity": body.quantity}
             ),
             execute=execute,
         )

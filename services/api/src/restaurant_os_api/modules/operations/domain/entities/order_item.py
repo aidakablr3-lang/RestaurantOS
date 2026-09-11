@@ -23,6 +23,7 @@ from typing import Any
 
 from restaurant_os_api.modules.operations.domain.exceptions import (
     InvalidOrderItemStatusTransitionError,
+    OrderItemNotEditableError,
 )
 
 
@@ -52,6 +53,19 @@ class OrderItem:
 
     def void(self) -> None:
         self._transition_to(OrderItemLineStatus.VOIDED, allowed_from=(OrderItemLineStatus.ADDED,))
+
+    def change_quantity(self, quantity: int) -> None:
+        """Pre-fire only, same boundary ``void()`` already enforces --
+        a line already sent to the kitchen has no route here to
+        silently change what's cooking. Exists so a caller (a counter
+        POS screen's tap-to-add/remove, specifically) can adjust one
+        line's own quantity in place instead of adding a second
+        ``OrderItem`` row for the same menu item -- see
+        ``UpdateOrderItemQuantityUseCase``'s own docstring for why that
+        distinction is customer-facing, not just internal bookkeeping."""
+        if self.line_status != OrderItemLineStatus.ADDED:
+            raise OrderItemNotEditableError(self.id, self.line_status.value)
+        self.quantity = quantity
 
     def ready(self) -> None:
         self._transition_to(OrderItemLineStatus.READY, allowed_from=(OrderItemLineStatus.FIRED,))

@@ -1,5 +1,11 @@
 import { apiClient } from "@/lib/api-client"
-import type { AddOrderItemRequest, CreateOrderRequest, ListOrdersParams, Order } from "@/types/order"
+import type {
+  AddOrderItemRequest,
+  CreateOrderRequest,
+  ListOrdersParams,
+  Order,
+  UpdateOrderItemQuantityRequest,
+} from "@/types/order"
 
 const BRANCH_BASE = (branchId: string) => `/api/v1/branches/${branchId}/orders`
 
@@ -40,4 +46,12 @@ export function voidOrderItem(orderId: string, orderItemId: string, idempotencyK
   return apiClient.post<Order>(`/api/v1/orders/${orderId}/items/${orderItemId}/void`, undefined, {
     idempotencyKey,
   })
+}
+
+export function updateOrderItemQuantity(
+  orderId: string,
+  orderItemId: string,
+  body: UpdateOrderItemQuantityRequest
+) {
+  return apiClient.patch<Order>(`/api/v1/orders/${orderId}/items/${orderItemId}`, body)
 }

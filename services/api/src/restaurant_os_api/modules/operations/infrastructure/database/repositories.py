@@ -146,6 +146,7 @@ def _kitchen_ticket_from_model(model: KitchenTicketModel) -> KitchenTicket:
         station=model.station,
         status=KitchenTicketStatus(model.status),
         created_at=model.created_at,
+        cancelled_at=model.cancelled_at,
     )
 
 
@@ -317,10 +318,19 @@ class SQLAlchemyOrderRepository:
         return _order_item_from_model(model)
 
     async def update_item(self, item: OrderItem) -> OrderItem:
+        # Persists both mutable fields -- line_status (fire()/void()/
+        # ready()/serve()) and quantity (change_quantity(), added
+        # alongside UpdateOrderItemQuantityUseCase). Before
+        # change_quantity() existed, quantity was write-once at
+        # add_item() time, so this only ever needed line_status; now
+        # that it can change post-creation, dropping it here would
+        # silently discard the mutation -- the caller's returned DTO
+        # would look right (built from the in-memory item), but any
+        # later re-fetch would read back the stale, unchanged row.
         stmt = (
             update(OrderItemModel)
             .where(OrderItemModel.id == item.id, OrderItemModel.tenant_id == item.tenant_id)
-            .values(line_status=item.line_status.value)
+            .values(line_status=item.line_status.value, quantity=item.quantity)
         )
         await self._session.execute(stmt)
         return item
@@ -394,10 +404,22 @@ class SQLAlchemyKitchenTicketRepository:
             .where(
                 KitchenTicketModel.id == ticket.id, KitchenTicketModel.tenant_id == ticket.tenant_id
             )
-            .values(status=ticket.status.value)
+            .values(status=ticket.status.value, cancelled_at=ticket.cancelled_at)
         )
         await self._session.execute(stmt)
         return ticket
+
+    async def list_for_order(self, tenant_id: str, order_id: str) -> list[KitchenTicket]:
+        stmt = (
+            select(KitchenTicketModel)
+            .where(
+                KitchenTicketModel.tenant_id == tenant_id,
+                KitchenTicketModel.order_id == order_id,
+            )
+            .order_by(KitchenTicketModel.created_at)
+        )
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [_kitchen_ticket_from_model(m) for m in models]
 
     async def list_for_branch(
         self, tenant_id: str, branch_id: str, *, offset: int, limit: int

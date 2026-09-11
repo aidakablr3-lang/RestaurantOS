@@ -21,6 +21,27 @@ import type { KitchenItemStatus, KitchenTicket, KitchenTicketStatus } from "@/ty
 
 const REFETCH_INTERVAL_MS = 8_000
 
+// A cancelled ticket (VoidOrderUseCase's kitchen cascade) must not just
+// vanish the instant it's cancelled -- a chef mid-dish needs to actually
+// see it happened, not have the card disappear between one 8s poll and
+// the next. 5 minutes: long enough that a chef who glances at the board
+// only occasionally during a busy stretch (kitchens are noisy; nobody
+// stares at this screen continuously) still gets several chances to
+// notice -- it roughly matches how long an active dish is already being
+// watched for anyway, so it's very unlikely to be missed inside that
+// window. Short enough that a cancelled card doesn't linger and compete
+// with real, actionable tickets for the rest of the shift, which would
+// undermine the board's whole point. Unlike "served" (dropped the
+// instant it's fetched -- the kitchen's job on that ticket is simply
+// done, nothing to notice), a cancellation is news the kitchen didn't
+// ask for and needs a real chance to see.
+const CANCELLED_VISIBILITY_MS = 5 * 60_000
+
+function isStaleCancelled(ticket: KitchenTicket): boolean {
+  if (ticket.status !== "cancelled" || !ticket.cancelledAt) return false
+  return Date.now() - new Date(ticket.cancelledAt).getTime() > CANCELLED_VISIBILITY_MS
+}
+
 const NEXT_TICKET_STATUS: Partial<Record<KitchenTicketStatus, KitchenTicketStatus>> = {
   fired: "in_progress",
   in_progress: "ready",
@@ -67,14 +88,20 @@ function TicketCard({ ticket, branchId, canManage }: { ticket: KitchenTicket; br
   }
 
   const ticketNextLabel = NEXT_TICKET_STATUS[ticket.status]
+  const isCancelled = ticket.status === "cancelled"
 
   return (
-    <Card>
+    <Card className={isCancelled ? "border-destructive/40 bg-destructive/5" : undefined}>
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle>{ticket.station}</CardTitle>
         <KitchenTicketStatusBadge status={ticket.status} />
       </CardHeader>
       <CardContent className="grid gap-3">
+        {isCancelled ? (
+          <p className="text-sm font-medium text-destructive">
+            Cancelled -- order was voided. Stop preparing these items.
+          </p>
+        ) : null}
         <ul className="grid gap-2">
           {ticket.items.map((item) => {
             const nextItemLabel = NEXT_ITEM_STATUS[item.status]
@@ -125,14 +152,16 @@ export default function KitchenPage() {
     { enabled, refetchInterval: enabled ? REFETCH_INTERVAL_MS : undefined }
   )
 
-  const tickets = (data?.data ?? []).filter((ticket) => ticket.status !== "served")
+  const tickets = (data?.data ?? []).filter(
+    (ticket) => ticket.status !== "served" && !isStaleCancelled(ticket)
+  )
   const loading = perms.isLoading || isLoading
 
   return (
     <div className="grid gap-6">
       <PageHeader
         title="Kitchen display"
-        description="Auto-refreshes every few seconds. Served tickets drop off the board."
+        description="Auto-refreshes every few seconds. Served tickets drop off the board immediately; cancelled tickets stay visible for 5 minutes."
       />
 
       <BranchSubNav branchId={branchId} />

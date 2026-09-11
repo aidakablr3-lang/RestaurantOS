@@ -20,6 +20,18 @@ Backs the voided line's cost out of ``Order.subtotal_amount`` --
 the exact inverse of the accumulation ``AddOrderItemUseCase`` performs
 when the line was added, so a voided-then-never-refired line never
 lingers in the order's own total.
+
+**No ``KitchenTicket``/``KitchenItem`` cascade needed here** (checked
+while building ``VoidOrderUseCase``'s own kitchen-cancellation cascade,
+2026-09-08): ``OrderItem.void()``'s precondition is ``added`` only, and
+a ``KitchenItem`` is never created for an order item until it's fired
+(``FireOrderUseCase``/``fan_out_items_into_station_tickets``). A line
+this use case can legally void therefore never has a corresponding
+``KitchenItem`` yet -- there is nothing on the KDS for it to cascade
+to. If a future "86 this fired item" route is ever built (the gap this
+docstring already names above), it would need its own cascade into the
+single affected ``KitchenItem``; this route structurally can't reach
+that case.
 """
 
 from __future__ import annotations

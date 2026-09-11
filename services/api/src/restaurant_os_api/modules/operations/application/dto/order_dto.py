@@ -31,6 +31,13 @@ class AddOrderItemRequestDTO:
 
 
 @dataclass(frozen=True, slots=True)
+class UpdateOrderItemQuantityRequestDTO:
+    order_id: str
+    order_item_id: str
+    quantity: int
+
+
+@dataclass(frozen=True, slots=True)
 class OrderItemDTO:
     id: str
     order_id: str
