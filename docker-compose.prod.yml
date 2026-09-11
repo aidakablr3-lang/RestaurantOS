@@ -112,6 +112,23 @@ services:
       - ./apps/marketing:/srv/marketing:ro
       - caddy_data:/data
       - caddy_config:/config
+    # `default` (this project's own implicit network) reaches api/
+    # admin-web, as always. `shared_edge` is new (BarLedger co-location,
+    # a second/independent Compose project on this same box): an
+    # external network this Caddy also joins so it can reverse-proxy to
+    # BarLedger's containers by the aliases their own compose file
+    # declares (barledger-api/barledger-admin-web/barledger-count-web).
+    # Create it once, before either stack needs it:
+    #   docker network create shared_edge
+    # No other RestaurantOS service joins shared_edge -- api/admin-web/
+    # postgres are unaffected by this and stay exactly as before.
+    networks:
+      default: {}
+      shared_edge: {}
+
+networks:
+  shared_edge:
+    external: true
 
 volumes:
   postgres_data:

@@ -1,13 +1,19 @@
 # Production Caddy config for RestaurantOS -- api.prashanthai.com /
-# admin.prashanthai.com, single VPS.
+# admin.prashanthai.com, single VPS. Also -- M10, BarLedger co-location --
+# the barledger-{admin,count,api}.prashanthai.com blocks at the bottom of
+# this file, for the second, independent Compose project sharing this
+# same box and this same Caddy instance.
 #
 # Runs as the `caddy` service in docker-compose.prod.yml (not on the bare
 # host -- see docker-compose.prod.yml's own comment for why this deploy
 # containerizes Caddy). Automatic Let's Encrypt HTTPS: Caddy issues and
-# renews certificates on its own, no certbot, no renewal cron. Both
-# upstreams are reached by Compose service name (admin-web:3000,
+# renews certificates on its own, no certbot, no renewal cron. This
+# file's own upstreams are reached by Compose service name (admin-web:3000,
 # api:8000), not 127.0.0.1 -- Caddy is a sibling container on the same
-# Compose network, not a host-level process.
+# Compose network, not a host-level process. BarLedger's upstreams below
+# are reached the same way, but over the separate `shared_edge` network
+# (docker-compose.prod.yml's own comment) since they're a different
+# Compose project's containers, not this one's.
 #
 # CADDY_ACME_EMAIL is read from the environment (set in the repo-root
 # .env, passed through by docker-compose.prod.yml) -- Let's Encrypt uses
@@ -41,4 +47,24 @@ api.prashanthai.com {
 restaurantos.prashanthai.com {
 	root * /srv/marketing
 	file_server
+}
+
+# --- BarLedger (M10 part 5, co-located on this same VPS) -------------
+# A separate Compose project (/opt/barledger, its own docker-compose.prod.yml)
+# with no Caddy of its own -- this instance terminates TLS for it too.
+# Upstreams are that project's own network aliases on the shared external
+# `shared_edge` network this caddy service also joins -- not plain
+# service names, since barledger-api etc. don't otherwise exist on this
+# project's own network.
+
+barledger-admin.prashanthai.com {
+	reverse_proxy barledger-admin-web:3000
+}
+
+barledger-count.prashanthai.com {
+	reverse_proxy barledger-count-web:3001
+}
+
+barledger-api.prashanthai.com {
+	reverse_proxy barledger-api:8000
 }
